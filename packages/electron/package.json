@@ -1,0 +1,76 @@
+{
+  "name": "@flashpad/electron",
+  "version": "0.1.0",
+  "description": "Flashpad desktop app - Quick note capture for Windows and Mac",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build && electron-builder",
+    "build:ci": "tsc && vite build",
+    "preview": "vite preview",
+    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\""
+  },
+  "keywords": [
+    "flashpad",
+    "notes",
+    "quick-capture"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "electron-store": "^11.0.2",
+    "electron-updater": "^6.3.9",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-router-dom": "^7.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.3",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.2",
+    "concurrently": "^9.1.2",
+    "electron": "^39.2.7",
+    "electron-builder": "^26.0.12",
+    "typescript": "^5.8.3",
+    "vite": "^7.3.0",
+    "vite-plugin-electron": "^0.29.0",
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "wait-on": "^9.0.3"
+  },
+  "build": {
+    "appId": "com.flashpad.app",
+    "productName": "Flashpad",
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "jeremywho",
+      "repo": "flashpad"
+    }
+  }
+}

@@ -1,0 +1,65 @@
+version: 2
+updates:
+  # Root workspace
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    groups:
+      development-dependencies:
+        dependency-type: "development"
+      production-dependencies:
+        dependency-type: "production"
+
+  # Electron app
+  - package-ecosystem: "npm"
+    directory: "/packages/electron"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    groups:
+      development-dependencies:
+        dependency-type: "development"
+      production-dependencies:
+        dependency-type: "production"
+
+  # React Native app
+  - package-ecosystem: "npm"
+    directory: "/packages/mobile"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    groups:
+      development-dependencies:
+        dependency-type: "development"
+      production-dependencies:
+        dependency-type: "production"
+
+  # Shared package
+  - package-ecosystem: "npm"
+    directory: "/packages/shared"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    groups:
+      development-dependencies:
+        dependency-type: "development"
+      production-dependencies:
+        dependency-type: "production"
+
+  # .NET backend
+  - package-ecosystem: "nuget"
+    directory: "/packages/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    groups:
+      production-dependencies:
+        patterns:
+          - "*"

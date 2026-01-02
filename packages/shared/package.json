@@ -1,0 +1,24 @@
+{
+  "name": "@flashpad/shared",
+  "version": "0.1.0",
+  "description": "Shared types and utilities for Flashpad apps",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "keywords": [
+    "flashpad",
+    "shared"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@microsoft/signalr": "^8.0.7"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.3",
+    "typescript": "^5.8.3"
+  }
+}

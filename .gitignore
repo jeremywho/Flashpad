@@ -1,0 +1,74 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Build outputs
+dist/
+build/
+out/
+release/
+
+# .NET
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+*.db
+*.db-shm
+*.db-wal
+
+# React Native
+.expo/
+.expo-shared/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+android/app/build/
+android/.gradle/
+android/local.properties
+ios/Pods/
+ios/build/
+.bundle/
+
+# Electron
+packages/electron/dist/
+packages/electron/dist-electron/
+packages/electron/out/
+
+# Environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Testing
+coverage/
+.nyc_output/
+
+# Temporary files
+tmp/
+temp/

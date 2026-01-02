@@ -1,0 +1,100 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ master, main, develop ]
+  pull_request:
+    branches: [ master, main, develop ]
+  schedule:
+    # Run weekly on Monday at 9am UTC
+    - cron: '0 9 * * 1'
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+
+  security-audit:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: NPM Audit (Root)
+      run: npm audit --audit-level=moderate
+      continue-on-error: true
+
+    - name: NPM Audit (Electron)
+      working-directory: packages/electron
+      run: npm audit --audit-level=moderate
+      continue-on-error: true
+
+    - name: NPM Audit (Mobile)
+      working-directory: packages/mobile
+      run: npm audit --audit-level=moderate
+      continue-on-error: true
+
+    - name: NPM Audit (Shared)
+      working-directory: packages/shared
+      run: npm audit --audit-level=moderate
+      continue-on-error: true
+
+    - name: .NET Security Audit
+      working-directory: packages/backend
+      run: |
+        dotnet restore
+        dotnet list package --vulnerable --include-transitive
+      continue-on-error: true
+
+  typescript-check:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Build shared package
+      run: |
+        cd packages/shared
+        npm run build
+
+    - name: TypeScript Check - Shared
+      working-directory: packages/shared
+      run: npx tsc --noEmit
+
+    - name: Install Electron dependencies
+      working-directory: packages/electron
+      run: npm install
+
+    - name: TypeScript Check - Electron
+      working-directory: packages/electron
+      run: npx tsc --noEmit
+
+    - name: Install Mobile dependencies
+      working-directory: packages/mobile
+      run: npm install
+
+    - name: TypeScript Check - Mobile
+      working-directory: packages/mobile
+      run: npx tsc --noEmit

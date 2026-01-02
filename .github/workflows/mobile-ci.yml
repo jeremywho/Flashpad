@@ -1,0 +1,137 @@
+name: Mobile CI
+
+on:
+  push:
+    branches: [ master, main, develop ]
+    paths:
+      - 'packages/mobile/**'
+      - 'packages/shared/**'
+      - '.github/workflows/mobile-ci.yml'
+  pull_request:
+    branches: [ master, main, develop ]
+    paths:
+      - 'packages/mobile/**'
+      - 'packages/shared/**'
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install root dependencies
+      run: npm install
+
+    - name: Build shared package
+      run: |
+        cd packages/shared
+        npm run build
+
+    - name: Install mobile dependencies
+      working-directory: packages/mobile
+      run: npm install
+
+    - name: Lint
+      working-directory: packages/mobile
+      run: npm run lint
+      continue-on-error: true
+
+    - name: TypeScript check
+      working-directory: packages/mobile
+      run: npx tsc --noEmit
+      continue-on-error: true
+
+    - name: Run tests
+      working-directory: packages/mobile
+      run: npm test -- --passWithNoTests
+      continue-on-error: true
+
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Install root dependencies
+      run: npm install
+
+    - name: Build shared package
+      run: |
+        cd packages/shared
+        npm run build
+
+    - name: Symlink node_modules for React Native Gradle
+      run: |
+        rm -rf packages/mobile/node_modules
+        ln -s ../../node_modules packages/mobile/node_modules
+
+    - name: Make gradlew executable
+      working-directory: packages/mobile/android
+      run: chmod +x gradlew
+
+    - name: Build Android APK
+      working-directory: packages/mobile/android
+      run: ./gradlew assembleDebug --no-daemon
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-debug-apk
+        path: packages/mobile/android/app/build/outputs/apk/debug/*.apk
+        retention-days: 7
+
+  build-ios:
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install root dependencies
+      run: npm install
+
+    - name: Build shared package
+      run: |
+        cd packages/shared
+        npm run build
+
+    - name: Install mobile dependencies
+      working-directory: packages/mobile
+      run: npm install
+
+    - name: Install CocoaPods dependencies
+      working-directory: packages/mobile/ios
+      run: |
+        gem install cocoapods
+        pod install
+
+    - name: Build iOS app
+      working-directory: packages/mobile/ios
+      run: |
+        xcodebuild -workspace mobile.xcworkspace \
+          -scheme mobile \
+          -configuration Debug \
+          -sdk iphonesimulator \
+          -derivedDataPath build \
+          CODE_SIGNING_ALLOWED=NO

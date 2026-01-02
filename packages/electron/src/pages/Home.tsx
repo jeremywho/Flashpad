@@ -1,0 +1,338 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useAuth } from '../AuthContext';
+import { Note, Category, NoteStatus, CreateCategoryDto, SignalRClient, ConnectionState } from '@shared/index';
+import Sidebar from '../components/Sidebar';
+import NotesList from '../components/NotesList';
+import NoteEditor from '../components/NoteEditor';
+import CategoryManager from '../components/CategoryManager';
+import ConnectionStatus from '../components/ConnectionStatus';
+
+type ViewType = 'inbox' | 'archive' | 'trash' | string;
+
+const API_URL = 'http://localhost:5000';
+
+function Home() {
+  const { api } = useAuth();
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedView, setSelectedView] = useState<ViewType>('inbox');
+  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+  const [isNewNote, setIsNewNote] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [inboxCount, setInboxCount] = useState(0);
+  const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
+  const signalRRef = useRef<SignalRClient | null>(null);
+
+  const fetchNotes = useCallback(async () => {
+    try {
+      let status: NoteStatus | undefined;
+      let categoryId: string | undefined;
+
+      if (selectedView === 'inbox') {
+        status = NoteStatus.Inbox;
+      } else if (selectedView === 'archive') {
+        status = NoteStatus.Archived;
+      } else if (selectedView === 'trash') {
+        status = NoteStatus.Trash;
+      } else {
+        categoryId = selectedView;
+        status = NoteStatus.Inbox;
+      }
+
+      const response = await api.getNotes({ status, categoryId });
+      setNotes(response.notes);
+    } catch (error) {
+      console.error('Failed to fetch notes:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [api, selectedView]);
+
+  const fetchCategories = useCallback(async () => {
+    try {
+      const cats = await api.getCategories();
+      setCategories(cats);
+    } catch (error) {
+      console.error('Failed to fetch categories:', error);
+    }
+  }, [api]);
+
+  const fetchInboxCount = useCallback(async () => {
+    try {
+      const response = await api.getNotes({ status: NoteStatus.Inbox, pageSize: 1 });
+      setInboxCount(response.totalCount);
+    } catch (error) {
+      console.error('Failed to fetch inbox count:', error);
+    }
+  }, [api]);
+
+  useEffect(() => {
+    fetchNotes();
+  }, [fetchNotes]);
+
+  useEffect(() => {
+    fetchCategories();
+    fetchInboxCount();
+  }, [fetchCategories, fetchInboxCount]);
+
+  useEffect(() => {
+    const handleRefresh = () => {
+      fetchNotes();
+      fetchCategories();
+      fetchInboxCount();
+    };
+
+    window.electron.onRefreshNotes(handleRefresh);
+    return () => {
+      window.electron.removeRefreshNotesListener();
+    };
+  }, [fetchNotes, fetchCategories, fetchInboxCount]);
+
+  // SignalR real-time sync
+  useEffect(() => {
+    const token = api.getToken();
+    if (!token) return;
+
+    const client = new SignalRClient({
+      baseUrl: API_URL,
+      getToken: () => api.getToken(),
+      onConnectionStateChange: setConnectionState,
+      onNoteCreated: (note) => {
+        // Only add if it matches current view
+        if (shouldShowNoteInCurrentView(note)) {
+          setNotes((prev) => {
+            if (prev.some((n) => n.id === note.id)) return prev;
+            return [note, ...prev];
+          });
+        }
+        fetchInboxCount();
+        fetchCategories();
+      },
+      onNoteUpdated: (note) => {
+        setNotes((prev) => prev.map((n) => (n.id === note.id ? note : n)));
+        setSelectedNote((prev) => (prev?.id === note.id ? note : prev));
+        fetchCategories();
+      },
+      onNoteDeleted: (noteId) => {
+        setNotes((prev) => prev.filter((n) => n.id !== noteId));
+        setSelectedNote((prev) => (prev?.id === noteId ? null : prev));
+        fetchInboxCount();
+      },
+      onNoteStatusChanged: (note) => {
+        // Remove from current view if status changed
+        setNotes((prev) => prev.filter((n) => n.id !== note.id));
+        setSelectedNote((prev) => (prev?.id === note.id ? null : prev));
+        fetchInboxCount();
+        fetchCategories();
+      },
+      onCategoryCreated: (category) => {
+        setCategories((prev) => [...prev, category]);
+      },
+      onCategoryUpdated: (category) => {
+        setCategories((prev) => prev.map((c) => (c.id === category.id ? category : c)));
+      },
+      onCategoryDeleted: (categoryId) => {
+        setCategories((prev) => prev.filter((c) => c.id !== categoryId));
+        if (selectedView === categoryId) {
+          setSelectedView('inbox');
+        }
+      },
+    });
+
+    signalRRef.current = client;
+    client.start().catch(console.error);
+
+    return () => {
+      client.stop();
+      signalRRef.current = null;
+    };
+  }, [api, selectedView]);
+
+  // Helper to check if a note should show in current view
+  const shouldShowNoteInCurrentView = (note: Note): boolean => {
+    if (selectedView === 'inbox') {
+      return note.status === NoteStatus.Inbox && !note.categoryId;
+    }
+    if (selectedView === 'archive') {
+      return note.status === NoteStatus.Archived;
+    }
+    if (selectedView === 'trash') {
+      return note.status === NoteStatus.Trash;
+    }
+    // Category view
+    return note.status === NoteStatus.Inbox && note.categoryId === selectedView;
+  };
+
+  const getViewTitle = () => {
+    if (selectedView === 'inbox') return 'Inbox';
+    if (selectedView === 'archive') return 'Archive';
+    if (selectedView === 'trash') return 'Trash';
+    const category = categories.find((c) => c.id === selectedView);
+    return category?.name || 'Notes';
+  };
+
+  const handleViewChange = (view: ViewType) => {
+    setSelectedView(view);
+    setSelectedNote(null);
+    setIsNewNote(false);
+    setIsLoading(true);
+  };
+
+  const handleNoteSelect = (note: Note) => {
+    setSelectedNote(note);
+    setIsNewNote(false);
+  };
+
+  const handleNewNote = () => {
+    setSelectedNote(null);
+    setIsNewNote(true);
+  };
+
+  const handleSave = async (content: string, categoryId?: string) => {
+    setIsSaving(true);
+    try {
+      if (isNewNote) {
+        const newNote = await api.createNote({
+          content,
+          categoryId,
+          deviceId: 'electron-desktop',
+        });
+        setNotes((prev) => [newNote, ...prev]);
+        setSelectedNote(newNote);
+        setIsNewNote(false);
+        fetchInboxCount();
+        fetchCategories();
+      } else if (selectedNote) {
+        const updatedNote = await api.updateNote(selectedNote.id, {
+          content,
+          categoryId,
+          deviceId: 'electron-desktop',
+        });
+        setNotes((prev) =>
+          prev.map((n) => (n.id === updatedNote.id ? updatedNote : n))
+        );
+        setSelectedNote(updatedNote);
+        fetchInboxCount();
+        fetchCategories();
+      }
+    } catch (error) {
+      console.error('Failed to save note:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleArchive = async () => {
+    if (!selectedNote) return;
+    try {
+      await api.archiveNote(selectedNote.id);
+      setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
+      setSelectedNote(null);
+      fetchCategories();
+    } catch (error) {
+      console.error('Failed to archive note:', error);
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!selectedNote) return;
+    try {
+      await api.restoreNote(selectedNote.id);
+      setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
+      setSelectedNote(null);
+      fetchCategories();
+    } catch (error) {
+      console.error('Failed to restore note:', error);
+    }
+  };
+
+  const handleTrash = async () => {
+    if (!selectedNote) return;
+    try {
+      await api.trashNote(selectedNote.id);
+      setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
+      setSelectedNote(null);
+      fetchCategories();
+    } catch (error) {
+      console.error('Failed to trash note:', error);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedNote) return;
+    if (!confirm('Are you sure you want to permanently delete this note?')) return;
+    try {
+      await api.deleteNotePermanently(selectedNote.id);
+      setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
+      setSelectedNote(null);
+    } catch (error) {
+      console.error('Failed to delete note:', error);
+    }
+  };
+
+  const handleCreateCategory = async (data: CreateCategoryDto) => {
+    await api.createCategory(data);
+    fetchCategories();
+  };
+
+  const handleUpdateCategory = async (id: string, data: CreateCategoryDto) => {
+    await api.updateCategory(id, { ...data, sortOrder: undefined });
+    fetchCategories();
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    await api.deleteCategory(id);
+    if (selectedView === id) {
+      setSelectedView('inbox');
+    }
+    fetchCategories();
+    fetchNotes();
+  };
+
+  return (
+    <div className="app-layout">
+      <Sidebar
+        categories={categories}
+        selectedView={selectedView}
+        onViewChange={handleViewChange}
+        onManageCategories={() => setShowCategoryManager(true)}
+        inboxCount={inboxCount}
+        archiveCount={0}
+        trashCount={0}
+      />
+      <NotesList
+        notes={notes}
+        selectedNoteId={selectedNote?.id || null}
+        onNoteSelect={handleNoteSelect}
+        onNewNote={handleNewNote}
+        isLoading={isLoading}
+        viewTitle={getViewTitle()}
+      />
+      <NoteEditor
+        note={selectedNote}
+        categories={categories}
+        onSave={handleSave}
+        onArchive={handleArchive}
+        onRestore={handleRestore}
+        onTrash={handleTrash}
+        onDelete={handleDelete}
+        isNew={isNewNote}
+        isSaving={isSaving}
+      />
+      {showCategoryManager && (
+        <CategoryManager
+          categories={categories}
+          onCreateCategory={handleCreateCategory}
+          onUpdateCategory={handleUpdateCategory}
+          onDeleteCategory={handleDeleteCategory}
+          onClose={() => setShowCategoryManager(false)}
+        />
+      )}
+      <ConnectionStatus state={connectionState} />
+    </div>
+  );
+}
+
+export default Home;
