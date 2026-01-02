@@ -1,0 +1,629 @@
+import {
+  Note,
+  Category,
+  NoteStatus,
+  CreateNoteDto,
+  UpdateNoteDto,
+  CreateCategoryDto,
+  UpdateCategoryDto,
+  ApiClient,
+} from '@shared/index';
+import {
+  getLocalNotes,
+  getLocalNote,
+  saveLocalNote,
+  deleteLocalNote,
+  bulkSaveNotes,
+  getLocalCategories,
+  saveLocalCategory,
+  deleteLocalCategory,
+  bulkSaveCategories,
+  addToSyncQueue,
+  getSyncQueue,
+  removeSyncQueueItem,
+  updateSyncQueueItemError,
+  getSyncQueueCount,
+  clearLocalData,
+  SyncOperation,
+  getInboxCount as getLocalInboxCount,
+  getCategoryCounts,
+} from './database';
+
+export type SyncStatus = 'idle' | 'syncing' | 'offline' | 'error';
+
+export interface SyncManagerOptions {
+  api: ApiClient;
+  onSyncStatusChange?: (status: SyncStatus) => void;
+  onPendingCountChange?: (count: number) => void;
+  onDataRefresh?: () => void;
+}
+
+export class SyncManager {
+  private api: ApiClient;
+  private isOnline: boolean = navigator.onLine;
+  private syncStatus: SyncStatus = 'idle';
+  private syncInProgress: boolean = false;
+  private onSyncStatusChange?: (status: SyncStatus) => void;
+  private onPendingCountChange?: (count: number) => void;
+  private onDataRefresh?: () => void;
+
+  constructor(options: SyncManagerOptions) {
+    this.api = options.api;
+    this.onSyncStatusChange = options.onSyncStatusChange;
+    this.onPendingCountChange = options.onPendingCountChange;
+    this.onDataRefresh = options.onDataRefresh;
+
+    // Set up online/offline listeners
+    window.addEventListener('online', this.handleOnline);
+    window.addEventListener('offline', this.handleOffline);
+
+    // Initial status
+    this.updateSyncStatus(navigator.onLine ? 'idle' : 'offline');
+  }
+
+  destroy(): void {
+    window.removeEventListener('online', this.handleOnline);
+    window.removeEventListener('offline', this.handleOffline);
+  }
+
+  private handleOnline = async (): Promise<void> => {
+    this.isOnline = true;
+    this.updateSyncStatus('idle');
+    // Process any pending operations
+    await this.processSyncQueue();
+  };
+
+  private handleOffline = (): void => {
+    this.isOnline = false;
+    this.updateSyncStatus('offline');
+  };
+
+  private updateSyncStatus(status: SyncStatus): void {
+    this.syncStatus = status;
+    this.onSyncStatusChange?.(status);
+  }
+
+  private async updatePendingCount(): Promise<void> {
+    const count = await getSyncQueueCount();
+    this.onPendingCountChange?.(count);
+  }
+
+  getSyncStatus(): SyncStatus {
+    return this.syncStatus;
+  }
+
+  isNetworkOnline(): boolean {
+    return this.isOnline;
+  }
+
+  // Initial data sync - fetch from server and populate local DB
+  async initialSync(): Promise<void> {
+    if (!this.isOnline) {
+      console.log('Offline - skipping initial sync');
+      return;
+    }
+
+    try {
+      this.updateSyncStatus('syncing');
+
+      // Fetch all notes and categories from server
+      const [notesResponse, categories] = await Promise.all([
+        this.api.getNotes({ pageSize: 1000 }),
+        this.api.getCategories(),
+      ]);
+
+      // Save to local DB
+      await bulkSaveNotes(notesResponse.notes);
+      await bulkSaveCategories(categories);
+
+      this.updateSyncStatus('idle');
+      console.log('Initial sync complete');
+    } catch (error) {
+      console.error('Initial sync failed:', error);
+      this.updateSyncStatus('error');
+    }
+  }
+
+  // Process pending sync queue
+  async processSyncQueue(): Promise<void> {
+    if (!this.isOnline || this.syncInProgress) return;
+
+    this.syncInProgress = true;
+    this.updateSyncStatus('syncing');
+
+    try {
+      const queue = await getSyncQueue();
+
+      for (const item of queue) {
+        try {
+          const payload = JSON.parse(item.payload);
+
+          switch (item.operation) {
+            case SyncOperation.Create:
+              if (item.entityType === 'note') {
+                const newNote = await this.api.createNote(payload as CreateNoteDto);
+                // Update local note with server ID
+                const localNote = await getLocalNote(item.entityId);
+                if (localNote) {
+                  await deleteLocalNote(item.entityId);
+                  await saveLocalNote(newNote, false);
+                }
+              } else if (item.entityType === 'category') {
+                const newCategory = await this.api.createCategory(payload as CreateCategoryDto);
+                await deleteLocalCategory(item.entityId);
+                await saveLocalCategory(newCategory, false);
+              }
+              break;
+
+            case SyncOperation.Update:
+              if (item.entityType === 'note') {
+                const updatedNote = await this.api.updateNote(item.entityId, payload as UpdateNoteDto);
+                await saveLocalNote(updatedNote, false);
+              } else if (item.entityType === 'category') {
+                const updatedCategory = await this.api.updateCategory(item.entityId, payload as UpdateCategoryDto);
+                await saveLocalCategory(updatedCategory, false);
+              }
+              break;
+
+            case SyncOperation.Delete:
+              if (item.entityType === 'note') {
+                await this.api.deleteNotePermanently(item.entityId);
+                await deleteLocalNote(item.entityId);
+              } else if (item.entityType === 'category') {
+                await this.api.deleteCategory(item.entityId);
+                await deleteLocalCategory(item.entityId);
+              }
+              break;
+
+            case SyncOperation.Archive:
+              await this.api.archiveNote(item.entityId);
+              break;
+
+            case SyncOperation.Restore:
+              await this.api.restoreNote(item.entityId);
+              break;
+
+            case SyncOperation.Trash:
+              await this.api.trashNote(item.entityId);
+              break;
+
+            case SyncOperation.Move:
+              await this.api.moveNote(item.entityId, payload);
+              break;
+          }
+
+          // Remove from queue on success
+          await removeSyncQueueItem(item.id);
+          await this.updatePendingCount();
+        } catch (error) {
+          console.error(`Failed to sync item ${item.id}:`, error);
+          await updateSyncQueueItemError(item.id, (error as Error).message);
+
+          // If we've retried too many times, skip this item
+          if (item.retryCount >= 3) {
+            console.warn(`Giving up on sync item ${item.id} after 3 retries`);
+            await removeSyncQueueItem(item.id);
+          }
+        }
+      }
+
+      this.updateSyncStatus('idle');
+      this.onDataRefresh?.();
+    } catch (error) {
+      console.error('Sync queue processing failed:', error);
+      this.updateSyncStatus('error');
+    } finally {
+      this.syncInProgress = false;
+    }
+  }
+
+  // Note operations with offline support
+  async getNotes(params: { status?: NoteStatus; categoryId?: string }): Promise<Note[]> {
+    // Always read from local DB first for instant response
+    const localNotes = await getLocalNotes(params);
+
+    // If online, also fetch from server and update local DB in background
+    if (this.isOnline) {
+      this.api.getNotes({ ...params, pageSize: 1000 })
+        .then(async (response) => {
+          await bulkSaveNotes(response.notes);
+        })
+        .catch(console.error);
+    }
+
+    return localNotes;
+  }
+
+  async createNote(data: CreateNoteDto): Promise<Note> {
+    const now = new Date().toISOString();
+    const tempId = `local_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+    const localNote: Note = {
+      id: tempId,
+      content: data.content,
+      categoryId: data.categoryId,
+      status: NoteStatus.Inbox,
+      version: 1,
+      deviceId: data.deviceId,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    // Save locally first
+    await saveLocalNote(localNote, true);
+
+    if (this.isOnline) {
+      try {
+        // Try to create on server
+        const serverNote = await this.api.createNote(data);
+        // Update local with server data
+        await deleteLocalNote(tempId);
+        await saveLocalNote(serverNote, false);
+        return serverNote;
+      } catch (error) {
+        console.error('Failed to create note on server, queuing:', error);
+        await addToSyncQueue({
+          entityType: 'note',
+          entityId: tempId,
+          operation: SyncOperation.Create,
+          payload: JSON.stringify(data),
+          baseVersion: null,
+        });
+        await this.updatePendingCount();
+        return localNote;
+      }
+    } else {
+      // Queue for later sync
+      await addToSyncQueue({
+        entityType: 'note',
+        entityId: tempId,
+        operation: SyncOperation.Create,
+        payload: JSON.stringify(data),
+        baseVersion: null,
+      });
+      await this.updatePendingCount();
+      return localNote;
+    }
+  }
+
+  async updateNote(id: string, data: UpdateNoteDto): Promise<Note> {
+    const existingNote = await getLocalNote(id);
+    if (!existingNote) {
+      throw new Error('Note not found');
+    }
+
+    const updatedNote: Note = {
+      ...existingNote,
+      content: data.content,
+      categoryId: data.categoryId,
+      version: existingNote.version + 1,
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Save locally first
+    await saveLocalNote(updatedNote, existingNote.id.startsWith('local_'));
+
+    if (this.isOnline && !id.startsWith('local_')) {
+      try {
+        const serverNote = await this.api.updateNote(id, data);
+        await saveLocalNote(serverNote, false);
+        return serverNote;
+      } catch (error) {
+        console.error('Failed to update note on server, queuing:', error);
+        await addToSyncQueue({
+          entityType: 'note',
+          entityId: id,
+          operation: SyncOperation.Update,
+          payload: JSON.stringify(data),
+          baseVersion: existingNote.version,
+        });
+        await this.updatePendingCount();
+        return updatedNote;
+      }
+    } else {
+      // Queue for later sync (only if not a local-only note)
+      if (!id.startsWith('local_')) {
+        await addToSyncQueue({
+          entityType: 'note',
+          entityId: id,
+          operation: SyncOperation.Update,
+          payload: JSON.stringify(data),
+          baseVersion: existingNote.version,
+        });
+        await this.updatePendingCount();
+      }
+      return updatedNote;
+    }
+  }
+
+  async archiveNote(id: string): Promise<void> {
+    const note = await getLocalNote(id);
+    if (note) {
+      note.status = NoteStatus.Archived;
+      note.updatedAt = new Date().toISOString();
+      await saveLocalNote(note, id.startsWith('local_'));
+    }
+
+    if (this.isOnline && !id.startsWith('local_')) {
+      try {
+        await this.api.archiveNote(id);
+      } catch (error) {
+        console.error('Failed to archive note on server, queuing:', error);
+        await addToSyncQueue({
+          entityType: 'note',
+          entityId: id,
+          operation: SyncOperation.Archive,
+          payload: '{}',
+          baseVersion: null,
+        });
+        await this.updatePendingCount();
+      }
+    } else if (!id.startsWith('local_')) {
+      await addToSyncQueue({
+        entityType: 'note',
+        entityId: id,
+        operation: SyncOperation.Archive,
+        payload: '{}',
+        baseVersion: null,
+      });
+      await this.updatePendingCount();
+    }
+  }
+
+  async restoreNote(id: string): Promise<void> {
+    const note = await getLocalNote(id);
+    if (note) {
+      note.status = NoteStatus.Inbox;
+      note.updatedAt = new Date().toISOString();
+      await saveLocalNote(note, id.startsWith('local_'));
+    }
+
+    if (this.isOnline && !id.startsWith('local_')) {
+      try {
+        await this.api.restoreNote(id);
+      } catch (error) {
+        console.error('Failed to restore note on server, queuing:', error);
+        await addToSyncQueue({
+          entityType: 'note',
+          entityId: id,
+          operation: SyncOperation.Restore,
+          payload: '{}',
+          baseVersion: null,
+        });
+        await this.updatePendingCount();
+      }
+    } else if (!id.startsWith('local_')) {
+      await addToSyncQueue({
+        entityType: 'note',
+        entityId: id,
+        operation: SyncOperation.Restore,
+        payload: '{}',
+        baseVersion: null,
+      });
+      await this.updatePendingCount();
+    }
+  }
+
+  async trashNote(id: string): Promise<void> {
+    const note = await getLocalNote(id);
+    if (note) {
+      note.status = NoteStatus.Trash;
+      note.updatedAt = new Date().toISOString();
+      await saveLocalNote(note, id.startsWith('local_'));
+    }
+
+    if (this.isOnline && !id.startsWith('local_')) {
+      try {
+        await this.api.trashNote(id);
+      } catch (error) {
+        console.error('Failed to trash note on server, queuing:', error);
+        await addToSyncQueue({
+          entityType: 'note',
+          entityId: id,
+          operation: SyncOperation.Trash,
+          payload: '{}',
+          baseVersion: null,
+        });
+        await this.updatePendingCount();
+      }
+    } else if (!id.startsWith('local_')) {
+      await addToSyncQueue({
+        entityType: 'note',
+        entityId: id,
+        operation: SyncOperation.Trash,
+        payload: '{}',
+        baseVersion: null,
+      });
+      await this.updatePendingCount();
+    }
+  }
+
+  async deleteNotePermanently(id: string): Promise<void> {
+    await deleteLocalNote(id);
+
+    if (this.isOnline && !id.startsWith('local_')) {
+      try {
+        await this.api.deleteNotePermanently(id);
+      } catch (error) {
+        console.error('Failed to delete note on server, queuing:', error);
+        await addToSyncQueue({
+          entityType: 'note',
+          entityId: id,
+          operation: SyncOperation.Delete,
+          payload: '{}',
+          baseVersion: null,
+        });
+        await this.updatePendingCount();
+      }
+    } else if (!id.startsWith('local_')) {
+      await addToSyncQueue({
+        entityType: 'note',
+        entityId: id,
+        operation: SyncOperation.Delete,
+        payload: '{}',
+        baseVersion: null,
+      });
+      await this.updatePendingCount();
+    }
+  }
+
+  // Category operations with offline support
+  async getCategories(): Promise<Category[]> {
+    const localCategories = await getLocalCategories();
+    const counts = await getCategoryCounts();
+
+    // Add note counts to categories
+    const categoriesWithCounts = localCategories.map((cat) => ({
+      ...cat,
+      noteCount: counts[cat.id] || 0,
+    }));
+
+    // If online, also fetch from server in background
+    if (this.isOnline) {
+      this.api.getCategories()
+        .then(async (categories) => {
+          await bulkSaveCategories(categories);
+        })
+        .catch(console.error);
+    }
+
+    return categoriesWithCounts;
+  }
+
+  async createCategory(data: CreateCategoryDto): Promise<Category> {
+    const now = new Date().toISOString();
+    const tempId = `local_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+    const localCategory: Category = {
+      id: tempId,
+      name: data.name,
+      color: data.color,
+      icon: data.icon,
+      sortOrder: 0,
+      noteCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await saveLocalCategory(localCategory, true);
+
+    if (this.isOnline) {
+      try {
+        const serverCategory = await this.api.createCategory(data);
+        await deleteLocalCategory(tempId);
+        await saveLocalCategory(serverCategory, false);
+        return serverCategory;
+      } catch (error) {
+        console.error('Failed to create category on server, queuing:', error);
+        await addToSyncQueue({
+          entityType: 'category',
+          entityId: tempId,
+          operation: SyncOperation.Create,
+          payload: JSON.stringify(data),
+          baseVersion: null,
+        });
+        await this.updatePendingCount();
+        return localCategory;
+      }
+    } else {
+      await addToSyncQueue({
+        entityType: 'category',
+        entityId: tempId,
+        operation: SyncOperation.Create,
+        payload: JSON.stringify(data),
+        baseVersion: null,
+      });
+      await this.updatePendingCount();
+      return localCategory;
+    }
+  }
+
+  async updateCategory(id: string, data: UpdateCategoryDto): Promise<Category> {
+    const localCategories = await getLocalCategories();
+    const existingCategory = localCategories.find((c) => c.id === id);
+
+    if (!existingCategory) {
+      throw new Error('Category not found');
+    }
+
+    const updatedCategory: Category = {
+      ...existingCategory,
+      name: data.name,
+      color: data.color,
+      icon: data.icon,
+      sortOrder: data.sortOrder ?? existingCategory.sortOrder,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await saveLocalCategory(updatedCategory, id.startsWith('local_'));
+
+    if (this.isOnline && !id.startsWith('local_')) {
+      try {
+        const serverCategory = await this.api.updateCategory(id, data);
+        await saveLocalCategory(serverCategory, false);
+        return serverCategory;
+      } catch (error) {
+        console.error('Failed to update category on server, queuing:', error);
+        await addToSyncQueue({
+          entityType: 'category',
+          entityId: id,
+          operation: SyncOperation.Update,
+          payload: JSON.stringify(data),
+          baseVersion: null,
+        });
+        await this.updatePendingCount();
+        return updatedCategory;
+      }
+    } else if (!id.startsWith('local_')) {
+      await addToSyncQueue({
+        entityType: 'category',
+        entityId: id,
+        operation: SyncOperation.Update,
+        payload: JSON.stringify(data),
+        baseVersion: null,
+      });
+      await this.updatePendingCount();
+    }
+
+    return updatedCategory;
+  }
+
+  async deleteCategory(id: string): Promise<void> {
+    await deleteLocalCategory(id);
+
+    if (this.isOnline && !id.startsWith('local_')) {
+      try {
+        await this.api.deleteCategory(id);
+      } catch (error) {
+        console.error('Failed to delete category on server, queuing:', error);
+        await addToSyncQueue({
+          entityType: 'category',
+          entityId: id,
+          operation: SyncOperation.Delete,
+          payload: '{}',
+          baseVersion: null,
+        });
+        await this.updatePendingCount();
+      }
+    } else if (!id.startsWith('local_')) {
+      await addToSyncQueue({
+        entityType: 'category',
+        entityId: id,
+        operation: SyncOperation.Delete,
+        payload: '{}',
+        baseVersion: null,
+      });
+      await this.updatePendingCount();
+    }
+  }
+
+  // Get inbox count from local DB
+  async getInboxCount(): Promise<number> {
+    return getLocalInboxCount();
+  }
+
+  // Clear all local data (for logout)
+  async clearAllData(): Promise<void> {
+    await clearLocalData();
+  }
+}

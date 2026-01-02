@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/colors';
+import { SyncManager, SyncStatus } from '../services/syncManager';
 import type { Note, Category, NoteStatus } from '@flashpad/shared';
 
 interface HomeScreenProps {
@@ -52,6 +53,9 @@ function HomeScreen({ navigation }: HomeScreenProps) {
   const [selectedTab, setSelectedTab] = useState<TabType>('inbox');
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
+  const [pendingCount, setPendingCount] = useState(0);
+  const syncManagerRef = useRef<SyncManager | null>(null);
 
   const getStatusForTab = (tab: TabType): NoteStatus => {
     switch (tab) {
@@ -64,40 +68,78 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     }
   };
 
+  // Initialize SyncManager
+  useEffect(() => {
+    const syncManager = new SyncManager({
+      api,
+      onSyncStatusChange: setSyncStatus,
+      onPendingCountChange: setPendingCount,
+      onDataRefresh: () => {
+        fetchNotes();
+        fetchCategories();
+      },
+    });
+
+    syncManagerRef.current = syncManager;
+
+    // Perform initial sync
+    syncManager.initialSync().then(() => {
+      fetchNotes();
+      fetchCategories();
+    });
+
+    return () => {
+      syncManager.destroy();
+      syncManagerRef.current = null;
+    };
+  }, [api]);
+
   const fetchNotes = useCallback(async () => {
+    if (!syncManagerRef.current) return;
+
     try {
-      const response = await api.getNotes({ status: getStatusForTab(selectedTab) });
-      setNotes(response.notes);
+      const localNotes = await syncManagerRef.current.getNotes({
+        status: getStatusForTab(selectedTab),
+      });
+      setNotes(localNotes);
     } catch (error) {
       console.error('Failed to fetch notes:', error);
     } finally {
       setIsLoading(false);
       setRefreshing(false);
     }
-  }, [api, selectedTab]);
+  }, [selectedTab]);
 
   const fetchCategories = useCallback(async () => {
+    if (!syncManagerRef.current) return;
+
     try {
-      const cats = await api.getCategories();
+      const cats = await syncManagerRef.current.getCategories();
       setCategories(cats);
     } catch (error) {
       console.error('Failed to fetch categories:', error);
     }
-  }, [api]);
+  }, []);
 
   useEffect(() => {
-    setIsLoading(true);
-    fetchNotes();
+    if (syncManagerRef.current) {
+      setIsLoading(true);
+      fetchNotes();
+    }
   }, [fetchNotes]);
 
   useEffect(() => {
-    fetchCategories();
+    if (syncManagerRef.current) {
+      fetchCategories();
+    }
   }, [fetchCategories]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      fetchNotes();
-      fetchCategories();
+      if (syncManagerRef.current) {
+        fetchNotes();
+        fetchCategories();
+      }
     });
     return unsubscribe;
   }, [navigation, fetchNotes, fetchCategories]);
@@ -105,6 +147,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
   const onRefresh = () => {
     setRefreshing(true);
     fetchNotes();
+    syncManagerRef.current?.processSyncQueue();
   };
 
   const handleNotePress = (note: Note) => {
@@ -116,6 +159,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
   };
 
   const handleLogout = async () => {
+    await syncManagerRef.current?.clearAllData();
     await logout();
   };
 
@@ -129,7 +173,14 @@ function HomeScreen({ navigation }: HomeScreenProps) {
         <Text style={styles.noteTitle} numberOfLines={1}>
           {getTitle(item.content)}
         </Text>
-        <Text style={styles.noteDate}>{formatDate(item.updatedAt)}</Text>
+        <View style={styles.noteMeta}>
+          {item.id.startsWith('local_') && (
+            <View style={styles.localBadge}>
+              <Text style={styles.localBadgeText}>Local</Text>
+            </View>
+          )}
+          <Text style={styles.noteDate}>{formatDate(item.updatedAt)}</Text>
+        </View>
       </View>
       <Text style={styles.notePreview} numberOfLines={2}>
         {getPreview(item.content)}
@@ -159,10 +210,41 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     }
   };
 
+  const renderSyncStatus = () => {
+    if (syncStatus === 'syncing') {
+      return (
+        <View style={styles.syncBadge}>
+          <View style={[styles.syncDot, styles.syncDotSyncing]} />
+          <Text style={styles.syncText}>Syncing...</Text>
+        </View>
+      );
+    }
+    if (pendingCount > 0) {
+      return (
+        <View style={styles.syncBadge}>
+          <View style={[styles.syncDot, styles.syncDotPending]} />
+          <Text style={styles.syncText}>{pendingCount} pending</Text>
+        </View>
+      );
+    }
+    if (syncStatus === 'offline') {
+      return (
+        <View style={styles.syncBadge}>
+          <View style={[styles.syncDot, styles.syncDotOffline]} />
+          <Text style={styles.syncText}>Offline</Text>
+        </View>
+      );
+    }
+    return null;
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{getTabTitle()}</Text>
+        <View style={styles.headerLeft}>
+          <Text style={styles.headerTitle}>{getTabTitle()}</Text>
+          {renderSyncStatus()}
+        </View>
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.headerButton}
@@ -263,6 +345,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   headerTitle: {
     fontSize: 24,
     fontWeight: '700',
@@ -293,6 +380,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  syncBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceElevated,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 6,
+  },
+  syncDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  syncDotSyncing: {
+    backgroundColor: colors.accent,
+  },
+  syncDotPending: {
+    backgroundColor: '#f59e0b',
+  },
+  syncDotOffline: {
+    backgroundColor: '#ef4444',
+  },
+  syncText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
   centered: {
     flex: 1,
     justifyContent: 'center',
@@ -321,9 +435,25 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginRight: 8,
   },
+  noteMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   noteDate: {
     fontSize: 12,
     color: colors.textMuted,
+  },
+  localBadge: {
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  localBadgeText: {
+    fontSize: 10,
+    color: '#f59e0b',
+    fontWeight: '600',
   },
   notePreview: {
     fontSize: 14,

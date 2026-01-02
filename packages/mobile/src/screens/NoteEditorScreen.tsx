@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/colors';
+import { SyncManager } from '../services/syncManager';
+import { getLocalNote } from '../services/database';
 import type { Note, Category, NoteStatus } from '@flashpad/shared';
 
 interface NoteEditorScreenProps {
@@ -32,11 +34,29 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
   const textInputRef = useRef<TextInput>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const syncManagerRef = useRef<SyncManager | null>(null);
 
   const noteId = route.params?.noteId;
   const isNew = route.params?.isNew || !noteId;
+
+  // Initialize SyncManager
+  useEffect(() => {
+    const syncManager = new SyncManager({
+      api,
+      onSyncStatusChange: (status) => {
+        setIsOffline(status === 'offline');
+      },
+    });
+    syncManagerRef.current = syncManager;
+
+    return () => {
+      syncManager.destroy();
+      syncManagerRef.current = null;
+    };
+  }, [api]);
 
   const fetchNote = useCallback(async () => {
     if (!noteId) {
@@ -44,6 +64,17 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
       return;
     }
     try {
+      // First try to get from local storage
+      const localNote = await getLocalNote(noteId);
+      if (localNote) {
+        setNote(localNote);
+        setContent(localNote.content);
+        setSelectedCategoryId(localNote.categoryId);
+        setIsLoading(false);
+        return;
+      }
+
+      // Fall back to API if not in local storage
       const fetchedNote = await api.getNote(noteId);
       setNote(fetchedNote);
       setContent(fetchedNote.content);
@@ -58,18 +89,24 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
   }, [api, noteId, navigation]);
 
   const fetchCategories = useCallback(async () => {
+    if (!syncManagerRef.current) return;
     try {
-      const cats = await api.getCategories();
+      const cats = await syncManagerRef.current.getCategories();
       setCategories(cats);
     } catch (error) {
       console.error('Failed to fetch categories:', error);
     }
-  }, [api]);
+  }, []);
 
   useEffect(() => {
     fetchNote();
-    fetchCategories();
-  }, [fetchNote, fetchCategories]);
+  }, [fetchNote]);
+
+  useEffect(() => {
+    if (syncManagerRef.current) {
+      fetchCategories();
+    }
+  }, [fetchCategories]);
 
   useEffect(() => {
     if (isNew) {
@@ -78,12 +115,12 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
   }, [isNew]);
 
   const saveNote = useCallback(async () => {
-    if (!content.trim()) return;
+    if (!content.trim() || !syncManagerRef.current) return;
 
     setIsSaving(true);
     try {
       if (isNew) {
-        const newNote = await api.createNote({
+        const newNote = await syncManagerRef.current.createNote({
           content: content.trim(),
           categoryId: selectedCategoryId,
           deviceId: 'mobile',
@@ -92,7 +129,7 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
         setHasChanges(false);
         navigation.setParams({ noteId: newNote.id, isNew: false });
       } else if (noteId) {
-        const updatedNote = await api.updateNote(noteId, {
+        const updatedNote = await syncManagerRef.current.updateNote(noteId, {
           content: content.trim(),
           categoryId: selectedCategoryId,
           deviceId: 'mobile',
@@ -106,7 +143,7 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
     } finally {
       setIsSaving(false);
     }
-  }, [api, content, selectedCategoryId, isNew, noteId, navigation]);
+  }, [content, selectedCategoryId, isNew, noteId, navigation]);
 
   const debouncedSave = useCallback(() => {
     if (saveTimeoutRef.current) {
@@ -128,9 +165,9 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
   };
 
   const handleArchive = async () => {
-    if (!noteId) return;
+    if (!noteId || !syncManagerRef.current) return;
     try {
-      await api.archiveNote(noteId);
+      await syncManagerRef.current.archiveNote(noteId);
       navigation.goBack();
     } catch (error) {
       Alert.alert('Error', 'Failed to archive note');
@@ -138,9 +175,9 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
   };
 
   const handleRestore = async () => {
-    if (!noteId) return;
+    if (!noteId || !syncManagerRef.current) return;
     try {
-      await api.restoreNote(noteId);
+      await syncManagerRef.current.restoreNote(noteId);
       navigation.goBack();
     } catch (error) {
       Alert.alert('Error', 'Failed to restore note');
@@ -148,7 +185,7 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
   };
 
   const handleTrash = async () => {
-    if (!noteId) return;
+    if (!noteId || !syncManagerRef.current) return;
     Alert.alert('Move to Trash', 'Are you sure you want to move this note to trash?', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -156,7 +193,7 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
         style: 'destructive',
         onPress: async () => {
           try {
-            await api.trashNote(noteId);
+            await syncManagerRef.current?.trashNote(noteId);
             navigation.goBack();
           } catch (error) {
             Alert.alert('Error', 'Failed to move note to trash');
@@ -167,7 +204,7 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
   };
 
   const handleDelete = async () => {
-    if (!noteId) return;
+    if (!noteId || !syncManagerRef.current) return;
     Alert.alert(
       'Delete Permanently',
       'This action cannot be undone. Are you sure?',
@@ -178,7 +215,7 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
           style: 'destructive',
           onPress: async () => {
             try {
-              await api.deleteNotePermanently(noteId);
+              await syncManagerRef.current?.deleteNotePermanently(noteId);
               navigation.goBack();
             } catch (error) {
               Alert.alert('Error', 'Failed to delete note');
@@ -193,6 +230,11 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
     navigation.setOptions({
       headerRight: () => (
         <View style={styles.headerActions}>
+          {isOffline && (
+            <View style={styles.offlineBadge}>
+              <Text style={styles.offlineBadgeText}>Offline</Text>
+            </View>
+          )}
           {isSaving && <Text style={styles.savingText}>Saving...</Text>}
           {!isNew && note && (
             <>
@@ -220,7 +262,7 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
         </View>
       ),
     });
-  }, [navigation, note, isNew, isSaving]);
+  }, [navigation, note, isNew, isSaving, isOffline]);
 
   if (isLoading) {
     return (
@@ -236,6 +278,13 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
     >
+      {note?.id.startsWith('local_') && (
+        <View style={styles.localNoteBanner}>
+          <Text style={styles.localNoteBannerText}>
+            This note hasn't been synced yet
+          </Text>
+        </View>
+      )}
       <TextInput
         ref={textInputRef}
         style={styles.editor}
@@ -255,7 +304,7 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
             disabled={!content.trim() || isSaving}
           >
             <Text style={styles.saveButtonText}>
-              {isSaving ? 'Saving...' : 'Save Note'}
+              {isSaving ? 'Saving...' : isOffline ? 'Save Offline' : 'Save Note'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -278,6 +327,18 @@ const styles = StyleSheet.create({
   loadingText: {
     color: colors.textSecondary,
     fontSize: 16,
+  },
+  localNoteBanner: {
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(245, 158, 11, 0.3)',
+  },
+  localNoteBannerText: {
+    color: '#f59e0b',
+    fontSize: 13,
+    textAlign: 'center',
   },
   editor: {
     flex: 1,
@@ -305,6 +366,17 @@ const styles = StyleSheet.create({
   savingText: {
     color: colors.textMuted,
     fontSize: 14,
+  },
+  offlineBadge: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  offlineBadgeText: {
+    color: '#ef4444',
+    fontSize: 12,
+    fontWeight: '600',
   },
   newNoteActions: {
     padding: 16,

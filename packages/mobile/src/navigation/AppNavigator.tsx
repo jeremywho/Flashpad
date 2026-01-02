@@ -1,8 +1,8 @@
 import React from 'react';
-import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../contexts/AuthContext';
-import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { ActivityIndicator, View, StyleSheet, Linking } from 'react-native';
 import { colors } from '../theme/colors';
 
 import LoginScreen from '../screens/LoginScreen';
@@ -10,8 +10,18 @@ import RegisterScreen from '../screens/RegisterScreen';
 import HomeScreen from '../screens/HomeScreen';
 import AccountScreen from '../screens/AccountScreen';
 import NoteEditorScreen from '../screens/NoteEditorScreen';
+import QuickCaptureScreen from '../screens/QuickCaptureScreen';
 
-const Stack = createNativeStackNavigator();
+export type RootStackParamList = {
+  Login: undefined;
+  Register: undefined;
+  Home: undefined;
+  Account: undefined;
+  NoteEditor: { noteId?: string; isNew?: boolean };
+  QuickCapture: undefined;
+};
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const DarkTheme = {
   ...DefaultTheme,
@@ -23,6 +33,41 @@ const DarkTheme = {
     text: colors.text,
     border: colors.border,
     notification: colors.accent,
+  },
+};
+
+// Deep linking configuration
+const linking: LinkingOptions<RootStackParamList> = {
+  prefixes: ['flashpad://', 'https://flashpad.app'],
+  config: {
+    screens: {
+      QuickCapture: 'quick-capture',
+      Home: 'home',
+      NoteEditor: {
+        path: 'note/:noteId?',
+        parse: {
+          noteId: (noteId: string) => noteId,
+        },
+      },
+    },
+  },
+  async getInitialURL() {
+    // Check if app was opened from a deep link
+    const url = await Linking.getInitialURL();
+    if (url != null) {
+      return url;
+    }
+    return null;
+  },
+  subscribe(listener) {
+    // Listen to incoming links from deep linking
+    const linkingSubscription = Linking.addEventListener('url', ({ url }) => {
+      listener(url);
+    });
+
+    return () => {
+      linkingSubscription.remove();
+    };
   },
 };
 
@@ -38,7 +83,7 @@ function AppNavigator() {
   }
 
   return (
-    <NavigationContainer theme={DarkTheme}>
+    <NavigationContainer theme={DarkTheme} linking={linking}>
       <Stack.Navigator
         screenOptions={{
           headerStyle: {
@@ -64,10 +109,19 @@ function AppNavigator() {
             <Stack.Screen
               name="NoteEditor"
               component={NoteEditorScreen}
-              options={({ route }: any) => ({
+              options={({ route }) => ({
                 title: route.params?.isNew ? 'New Note' : 'Edit Note',
                 headerBackTitle: 'Back',
               })}
+            />
+            <Stack.Screen
+              name="QuickCapture"
+              component={QuickCaptureScreen}
+              options={{
+                headerShown: false,
+                presentation: 'modal',
+                animation: 'slide_from_bottom',
+              }}
             />
             <Stack.Screen
               name="Account"
@@ -86,6 +140,15 @@ function AppNavigator() {
               name="Register"
               component={RegisterScreen}
               options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="QuickCapture"
+              component={QuickCaptureScreen}
+              options={{
+                headerShown: false,
+                presentation: 'modal',
+                animation: 'slide_from_bottom',
+              }}
             />
           </>
         )}

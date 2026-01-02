@@ -664,6 +664,17 @@ h1, h2, h3 {
   margin-top: 8px;
 }
 
+.quick-capture-offline-badge {
+  background: rgba(245, 158, 11, 0.2);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  color: #f59e0b;
+  font-size: 11px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
 .quick-capture-auth-message {
   color: #999;
   text-align: center;
@@ -1059,4 +1070,21 @@ h1, h2, h3 {
 
 .connection-status.disconnected .connection-status-label {
   color: #ef4444;
+}
+
+.connection-status.syncing .connection-status-dot {
+  background: var(--accent-color);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.connection-status.syncing .connection-status-label {
+  color: var(--accent-color);
+}
+
+.connection-status.pending .connection-status-dot {
+  background: #f59e0b;
+}
+
+.connection-status.pending .connection-status-label {
+  color: #f59e0b;
 }

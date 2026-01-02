@@ -6,6 +6,7 @@ import NotesList from '../components/NotesList';
 import NoteEditor from '../components/NoteEditor';
 import CategoryManager from '../components/CategoryManager';
 import ConnectionStatus from '../components/ConnectionStatus';
+import { SyncManager, SyncStatus } from '../services/syncManager';
 
 type ViewType = 'inbox' | 'archive' | 'trash' | string;
 
@@ -23,9 +24,44 @@ function Home() {
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [inboxCount, setInboxCount] = useState(0);
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
+  const [pendingCount, setPendingCount] = useState(0);
+
   const signalRRef = useRef<SignalRClient | null>(null);
+  const syncManagerRef = useRef<SyncManager | null>(null);
+
+  // Initialize SyncManager
+  useEffect(() => {
+    const syncManager = new SyncManager({
+      api,
+      onSyncStatusChange: setSyncStatus,
+      onPendingCountChange: setPendingCount,
+      onDataRefresh: () => {
+        // Refresh data after sync completes
+        fetchNotes();
+        fetchCategories();
+        fetchInboxCount();
+      },
+    });
+
+    syncManagerRef.current = syncManager;
+
+    // Perform initial sync
+    syncManager.initialSync().then(() => {
+      fetchNotes();
+      fetchCategories();
+      fetchInboxCount();
+    });
+
+    return () => {
+      syncManager.destroy();
+      syncManagerRef.current = null;
+    };
+  }, [api]);
 
   const fetchNotes = useCallback(async () => {
+    if (!syncManagerRef.current) return;
+
     try {
       let status: NoteStatus | undefined;
       let categoryId: string | undefined;
@@ -41,40 +77,55 @@ function Home() {
         status = NoteStatus.Inbox;
       }
 
-      const response = await api.getNotes({ status, categoryId });
-      setNotes(response.notes);
+      // Get notes from local database via SyncManager
+      const localNotes = await syncManagerRef.current.getNotes({ status, categoryId });
+
+      // Filter inbox notes to exclude those with categories
+      if (selectedView === 'inbox') {
+        setNotes(localNotes.filter((n) => !n.categoryId));
+      } else {
+        setNotes(localNotes);
+      }
     } catch (error) {
       console.error('Failed to fetch notes:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [api, selectedView]);
+  }, [selectedView]);
 
   const fetchCategories = useCallback(async () => {
+    if (!syncManagerRef.current) return;
+
     try {
-      const cats = await api.getCategories();
+      const cats = await syncManagerRef.current.getCategories();
       setCategories(cats);
     } catch (error) {
       console.error('Failed to fetch categories:', error);
     }
-  }, [api]);
+  }, []);
 
   const fetchInboxCount = useCallback(async () => {
+    if (!syncManagerRef.current) return;
+
     try {
-      const response = await api.getNotes({ status: NoteStatus.Inbox, pageSize: 1 });
-      setInboxCount(response.totalCount);
+      const count = await syncManagerRef.current.getInboxCount();
+      setInboxCount(count);
     } catch (error) {
       console.error('Failed to fetch inbox count:', error);
     }
-  }, [api]);
+  }, []);
 
   useEffect(() => {
-    fetchNotes();
+    if (syncManagerRef.current) {
+      fetchNotes();
+    }
   }, [fetchNotes]);
 
   useEffect(() => {
-    fetchCategories();
-    fetchInboxCount();
+    if (syncManagerRef.current) {
+      fetchCategories();
+      fetchInboxCount();
+    }
   }, [fetchCategories, fetchInboxCount]);
 
   useEffect(() => {
@@ -191,10 +242,12 @@ function Home() {
   };
 
   const handleSave = async (content: string, categoryId?: string) => {
+    if (!syncManagerRef.current) return;
+
     setIsSaving(true);
     try {
       if (isNewNote) {
-        const newNote = await api.createNote({
+        const newNote = await syncManagerRef.current.createNote({
           content,
           categoryId,
           deviceId: 'electron-desktop',
@@ -205,7 +258,7 @@ function Home() {
         fetchInboxCount();
         fetchCategories();
       } else if (selectedNote) {
-        const updatedNote = await api.updateNote(selectedNote.id, {
+        const updatedNote = await syncManagerRef.current.updateNote(selectedNote.id, {
           content,
           categoryId,
           deviceId: 'electron-desktop',
@@ -225,9 +278,9 @@ function Home() {
   };
 
   const handleArchive = async () => {
-    if (!selectedNote) return;
+    if (!selectedNote || !syncManagerRef.current) return;
     try {
-      await api.archiveNote(selectedNote.id);
+      await syncManagerRef.current.archiveNote(selectedNote.id);
       setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
       setSelectedNote(null);
       fetchCategories();
@@ -237,9 +290,9 @@ function Home() {
   };
 
   const handleRestore = async () => {
-    if (!selectedNote) return;
+    if (!selectedNote || !syncManagerRef.current) return;
     try {
-      await api.restoreNote(selectedNote.id);
+      await syncManagerRef.current.restoreNote(selectedNote.id);
       setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
       setSelectedNote(null);
       fetchCategories();
@@ -249,9 +302,9 @@ function Home() {
   };
 
   const handleTrash = async () => {
-    if (!selectedNote) return;
+    if (!selectedNote || !syncManagerRef.current) return;
     try {
-      await api.trashNote(selectedNote.id);
+      await syncManagerRef.current.trashNote(selectedNote.id);
       setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
       setSelectedNote(null);
       fetchCategories();
@@ -261,10 +314,10 @@ function Home() {
   };
 
   const handleDelete = async () => {
-    if (!selectedNote) return;
+    if (!selectedNote || !syncManagerRef.current) return;
     if (!confirm('Are you sure you want to permanently delete this note?')) return;
     try {
-      await api.deleteNotePermanently(selectedNote.id);
+      await syncManagerRef.current.deleteNotePermanently(selectedNote.id);
       setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
       setSelectedNote(null);
     } catch (error) {
@@ -273,17 +326,20 @@ function Home() {
   };
 
   const handleCreateCategory = async (data: CreateCategoryDto) => {
-    await api.createCategory(data);
+    if (!syncManagerRef.current) return;
+    await syncManagerRef.current.createCategory(data);
     fetchCategories();
   };
 
   const handleUpdateCategory = async (id: string, data: CreateCategoryDto) => {
-    await api.updateCategory(id, { ...data, sortOrder: undefined });
+    if (!syncManagerRef.current) return;
+    await syncManagerRef.current.updateCategory(id, { ...data, sortOrder: undefined });
     fetchCategories();
   };
 
   const handleDeleteCategory = async (id: string) => {
-    await api.deleteCategory(id);
+    if (!syncManagerRef.current) return;
+    await syncManagerRef.current.deleteCategory(id);
     if (selectedView === id) {
       setSelectedView('inbox');
     }
@@ -330,7 +386,11 @@ function Home() {
           onClose={() => setShowCategoryManager(false)}
         />
       )}
-      <ConnectionStatus state={connectionState} />
+      <ConnectionStatus
+        connectionState={connectionState}
+        syncStatus={syncStatus}
+        pendingCount={pendingCount}
+      />
     </div>
   );
 }
