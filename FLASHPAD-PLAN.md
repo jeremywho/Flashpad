@@ -255,7 +255,7 @@ Basic note capture and sync across all platforms with offline support.
 - [x] Add connection status indicator
 
 ### 1.11 Mobile (React Native) - Quick Capture
-- [ ] **iOS Widget** (Home/Lock screen):
+- [x] **iOS Widget** (Home/Lock screen):
   - Simple text input widget
   - "Add Note" button widget that opens app to quick capture
   - Requires WidgetKit / React Native Widget extension

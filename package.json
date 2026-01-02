@@ -29,5 +29,8 @@
     "cross-platform"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@babel/runtime": "^7.28.4"
+  }
 }
