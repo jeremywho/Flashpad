@@ -117,17 +117,17 @@ Flashpad is a lightweight, fast note-capture application designed to quickly cap
 Basic note capture and sync across all platforms with offline support.
 
 ### 1.1 Project Setup
-- [ ] Clone StarterTemplates to Flashpad
-- [ ] Update all branding (package names, app IDs, bundle identifiers)
-- [ ] Generate new JWT secret
-- [ ] Set up development environment
-- [ ] Configure GitHub repo and CI/CD
+- [x] Clone StarterTemplates to Flashpad
+- [x] Update all branding (package names, app IDs, bundle identifiers)
+- [x] Generate new JWT secret
+- [x] Set up development environment
+- [x] Configure GitHub repo and CI/CD
 
 ### 1.2 Backend - Core API
-- [ ] Create Note model and migrations
-- [ ] Create Category model and migrations
-- [ ] Create NoteHistory model for revision tracking
-- [ ] Implement REST endpoints:
+- [x] Create Note model and migrations
+- [x] Create Category model and migrations
+- [x] Create NoteHistory model for revision tracking
+- [x] Implement REST endpoints:
   - `POST /api/notes` - Create note
   - `GET /api/notes` - List notes (with filters: status, category, search)
   - `GET /api/notes/{id}` - Get single note
@@ -137,75 +137,75 @@ Basic note capture and sync across all platforms with offline support.
   - `POST /api/notes/{id}/restore` - Restore from trash/archive
   - `DELETE /api/notes/{id}/permanent` - Permanent delete
   - `POST /api/notes/empty-trash` - Empty trash
-- [ ] Implement Category endpoints:
+- [x] Implement Category endpoints:
   - `POST /api/categories` - Create category
   - `GET /api/categories` - List categories
   - `PUT /api/categories/{id}` - Update category
   - `DELETE /api/categories/{id}` - Delete category
-- [ ] Add version tracking and history recording on updates
-- [ ] Add pagination support for note listing
+- [x] Add version tracking and history recording on updates
+- [x] Add pagination support for note listing
 
 ### 1.3 Backend - Real-time Sync (SignalR)
-- [ ] Add SignalR NuGet package
-- [ ] Create NotesHub for real-time communication
-- [ ] Implement hub methods:
+- [x] Add SignalR NuGet package
+- [x] Create NotesHub for real-time communication
+- [x] Implement hub methods:
   - `JoinUserGroup` - Subscribe to user's notes
   - `NoteCreated` - Broadcast new note
   - `NoteUpdated` - Broadcast note update
   - `NoteDeleted` - Broadcast note deletion
   - `NoteStatusChanged` - Broadcast archive/restore
-- [ ] Add JWT authentication for SignalR hub
-- [ ] Handle connection/disconnection events
+- [x] Add JWT authentication for SignalR hub
+- [x] Handle connection/disconnection events
 - [ ] Implement presence tracking (which devices are online)
 
 ### 1.4 Shared Package Updates
-- [ ] Add Note, Category, NoteHistory types
-- [ ] Add NoteStatus enum
-- [ ] Add API client methods for notes and categories
-- [ ] Add SignalR client helper/types
-- [ ] Add sync-related types (SyncQueue, SyncOperation)
+- [x] Add Note, Category, NoteHistory types
+- [x] Add NoteStatus enum
+- [x] Add API client methods for notes and categories
+- [x] Add SignalR client helper/types
+- [x] Add sync-related types (SyncQueue, SyncOperation)
 
 ### 1.5 Desktop (Electron) - Quick Capture
-- [ ] Implement global hotkey registration (Ctrl+Shift+N or configurable)
-- [ ] Create QuickCapture popup window:
+- [x] Implement global hotkey registration (Ctrl+Shift+N or configurable)
+- [x] Create QuickCapture popup window:
   - Small, floating window (300x200 or similar)
   - Auto-focus textarea
   - Submit on Ctrl+Enter or button
   - Cancel on Escape
   - Optional: category quick-select
-- [ ] Window behavior:
+- [x] Window behavior:
   - Appears at cursor position or center screen
   - Always on top
   - No taskbar entry
   - Disappears after submit
-- [ ] Add hotkey configuration to Settings page
-- [ ] Update system tray menu:
+- [x] Add hotkey configuration to Settings page
+- [x] Update system tray menu:
   - "Quick Note" - opens popup
   - "Open Flashpad" - opens main window
   - "Quit"
 
 ### 1.6 Desktop (Electron) - Main Window
-- [ ] Create Inbox view:
+- [x] Create Inbox view:
   - Note list with preview
   - Quick actions (archive, delete, categorize)
   - Click to edit
-- [ ] Create Note editor:
+- [x] Create Note editor:
   - Full-width textarea
   - Save button / auto-save
   - Category selector
   - Created/updated timestamps
   - Version indicator
-- [ ] Create sidebar navigation:
+- [x] Create sidebar navigation:
   - Inbox (with count)
   - Categories (collapsible list)
   - Archive
   - Trash (with count)
-- [ ] Create Category management:
+- [x] Create Category management:
   - Add/edit/delete categories
   - Color picker
   - Icon selector
-- [ ] Create Archive view (same as inbox, filtered)
-- [ ] Create Trash view:
+- [x] Create Archive view (same as inbox, filtered)
+- [x] Create Trash view:
   - Note list
   - Restore / permanent delete actions
   - "Empty Trash" button
@@ -215,58 +215,58 @@ Basic note capture and sync across all platforms with offline support.
   - Filter by status/category
 
 ### 1.7 Desktop (Electron) - Local Storage & Sync
-- [ ] Set up local SQLite database (better-sqlite3 or sql.js)
-- [ ] Create local database schema mirroring server
-- [ ] Implement offline queue (SyncQueue table)
-- [ ] Create sync manager:
+- [x] Set up local SQLite database (better-sqlite3 or sql.js)
+- [x] Create local database schema mirroring server
+- [x] Implement offline queue (SyncQueue table)
+- [x] Create sync manager:
   - Queue operations when offline
   - Process queue when online
   - Handle conflicts (Phase 1: last-write-wins with history)
-- [ ] Implement SignalR client connection:
+- [x] Implement SignalR client connection:
   - Auto-reconnect on disconnect
   - Join user group on auth
   - Handle incoming updates
-- [ ] Add connection status indicator (online/offline/syncing)
+- [x] Add connection status indicator (online/offline/syncing)
 
 ### 1.8 Desktop (Electron) - Theming
-- [ ] Implement CSS variables for theming
-- [ ] Create dark theme (default)
-- [ ] Create light theme
-- [ ] Add theme toggle in Settings
-- [ ] Persist theme preference
-- [ ] Support system preference detection
+- [x] Implement CSS variables for theming
+- [x] Create dark theme (default)
+- [x] Create light theme
+- [x] Add theme toggle in Settings
+- [x] Persist theme preference
+- [x] Support system preference detection
 
 ### 1.9 Mobile (React Native) - Core App
-- [ ] Create Inbox screen with note list
-- [ ] Create Note editor screen
-- [ ] Create Sidebar/drawer navigation:
+- [x] Create Inbox screen with note list
+- [x] Create Note editor screen
+- [x] Create Sidebar/drawer navigation:
   - Inbox, Categories, Archive, Trash
 - [ ] Create Category management screen
 - [ ] Create Search functionality
-- [ ] Implement dark/light theme
+- [x] Implement dark/light theme
 - [ ] Add theme toggle in Settings
 
 ### 1.10 Mobile (React Native) - Local Storage & Sync
-- [ ] Set up local SQLite (expo-sqlite or react-native-sqlite-storage)
-- [ ] Create local database schema
-- [ ] Implement offline queue
-- [ ] Create sync manager (same logic as desktop)
+- [x] Set up local SQLite (expo-sqlite or react-native-sqlite-storage)
+- [x] Create local database schema
+- [x] Implement offline queue
+- [x] Create sync manager (same logic as desktop)
 - [ ] Implement SignalR client connection
-- [ ] Add connection status indicator
+- [x] Add connection status indicator
 
 ### 1.11 Mobile (React Native) - Quick Capture
 - [ ] **iOS Widget** (Home/Lock screen):
   - Simple text input widget
   - "Add Note" button widget that opens app to quick capture
   - Requires WidgetKit / React Native Widget extension
-- [ ] **Android Quick Settings Tile**:
+- [x] **Android Quick Settings Tile**:
   - Tile in notification shade
   - Opens app to quick capture screen
   - Requires TileService / React Native Module
 - [ ] **Android Notification Action**:
   - Persistent notification with "Add Note" action
   - Optional based on user preference
-- [ ] Create QuickCapture screen:
+- [x] Create QuickCapture screen:
   - Minimal UI - just textarea and save button
   - Deep link support for widgets
 
