@@ -11,6 +11,7 @@
       android:theme="@style/AppTheme"
       android:usesCleartextTraffic="${usesCleartextTraffic}"
       android:supportsRtl="true">
+
       <activity
         android:name=".MainActivity"
         android:label="@string/app_name"
@@ -22,6 +23,38 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
+
+        <!-- Deep linking for flashpad:// scheme -->
+        <intent-filter android:autoVerify="true">
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="flashpad" />
+        </intent-filter>
+
+        <!-- Deep linking for https://flashpad.app -->
+        <intent-filter android:autoVerify="true">
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" android:host="flashpad.app" />
+        </intent-filter>
       </activity>
+
+      <!-- Quick Settings Tile Service -->
+      <service
+        android:name=".QuickCaptureTileService"
+        android:label="Quick Note"
+        android:icon="@drawable/ic_quick_note"
+        android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+        android:exported="true">
+        <intent-filter>
+            <action android:name="android.service.quicksettings.action.QS_TILE" />
+        </intent-filter>
+        <meta-data
+            android:name="android.service.quicksettings.ACTIVE_TILE"
+            android:value="true" />
+      </service>
+
     </application>
 </manifest>
