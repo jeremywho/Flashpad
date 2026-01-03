@@ -241,7 +241,7 @@ Basic note capture and sync across all platforms with offline support.
 - [x] Create Note editor screen
 - [x] Create Sidebar/drawer navigation:
   - Inbox, Categories, Archive, Trash
-- [ ] Create Category management screen
+- [x] Create Category management screen
 - [x] Create Search functionality
 - [x] Implement dark/light theme
 - [ ] Add theme toggle in Settings

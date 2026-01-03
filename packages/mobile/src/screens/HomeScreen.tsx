@@ -348,12 +348,15 @@ function HomeScreen({ navigation }: HomeScreenProps) {
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.headerButton}
+            onPress={() => navigation.navigate('CategoryManager')}
+          >
+            <Text style={styles.headerButtonText}>Categories</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerButton}
             onPress={() => navigation.navigate('Account')}
           >
             <Text style={styles.headerButtonText}>Account</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Text style={styles.logoutButtonText}>Logout</Text>
           </TouchableOpacity>
         </View>
       </View>

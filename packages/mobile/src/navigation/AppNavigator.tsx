@@ -11,6 +11,7 @@ import HomeScreen from '../screens/HomeScreen';
 import AccountScreen from '../screens/AccountScreen';
 import NoteEditorScreen from '../screens/NoteEditorScreen';
 import QuickCaptureScreen from '../screens/QuickCaptureScreen';
+import CategoryManagerScreen from '../screens/CategoryManagerScreen';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -19,6 +20,7 @@ export type RootStackParamList = {
   Account: undefined;
   NoteEditor: { noteId?: string; isNew?: boolean };
   QuickCapture: undefined;
+  CategoryManager: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -127,6 +129,11 @@ function AppNavigator() {
               name="Account"
               component={AccountScreen}
               options={{ title: 'Account Settings' }}
+            />
+            <Stack.Screen
+              name="CategoryManager"
+              component={CategoryManagerScreen}
+              options={{ title: 'Manage Categories' }}
             />
           </>
         ) : (
