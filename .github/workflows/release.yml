@@ -37,7 +37,7 @@ jobs:
 
       - name: Install electron package dependencies
         working-directory: packages/electron
-        run: npm install
+        run: npm install --include=dev
 
       - name: Build shared package
         working-directory: packages/shared
