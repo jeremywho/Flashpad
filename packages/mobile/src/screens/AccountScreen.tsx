@@ -12,9 +12,11 @@ import {
   Alert,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 function AccountScreen() {
-  const { user, api } = useAuth();
+  const { user, api, logout } = useAuth();
+  const { theme, themeMode, setThemeMode } = useTheme();
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
@@ -53,6 +55,132 @@ function AccountScreen() {
     }
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
+    scrollContainer: {
+      flexGrow: 1,
+      paddingBottom: 40,
+    },
+    formContainer: {
+      margin: 16,
+      padding: 20,
+      backgroundColor: theme.surface,
+      borderRadius: 12,
+    },
+    section: {
+      marginHorizontal: 16,
+      marginTop: 16,
+      padding: 20,
+      backgroundColor: theme.surface,
+      borderRadius: 12,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: theme.text,
+      marginBottom: 16,
+    },
+    title: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      marginBottom: 20,
+      color: theme.text,
+    },
+    formGroup: {
+      marginBottom: 16,
+    },
+    label: {
+      marginBottom: 6,
+      fontWeight: '500',
+      color: theme.text,
+      fontSize: 14,
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 16,
+      backgroundColor: theme.surfaceElevated,
+      color: theme.text,
+    },
+    inputDisabled: {
+      backgroundColor: theme.surfaceHover,
+      color: theme.textSecondary,
+    },
+    helperText: {
+      fontSize: 12,
+      color: theme.textMuted,
+      marginTop: 4,
+    },
+    button: {
+      backgroundColor: theme.accent,
+      padding: 14,
+      borderRadius: 8,
+      alignItems: 'center',
+      marginTop: 10,
+    },
+    buttonDisabled: {
+      backgroundColor: theme.surfaceHover,
+    },
+    buttonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    error: {
+      color: theme.danger,
+      marginBottom: 10,
+      textAlign: 'center',
+    },
+    success: {
+      color: theme.success,
+      marginBottom: 10,
+      textAlign: 'center',
+    },
+    themeOptions: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    themeOption: {
+      flex: 1,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      backgroundColor: theme.surfaceElevated,
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: 'transparent',
+    },
+    themeOptionActive: {
+      borderColor: theme.accent,
+      backgroundColor: theme.surfaceHover,
+    },
+    themeOptionText: {
+      fontSize: 14,
+      color: theme.textSecondary,
+      fontWeight: '500',
+    },
+    themeOptionTextActive: {
+      color: theme.accent,
+      fontWeight: '600',
+    },
+    logoutButton: {
+      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+      padding: 14,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    logoutButtonText: {
+      color: theme.danger,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+  });
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -67,6 +195,7 @@ function AccountScreen() {
               style={[styles.input, styles.inputDisabled]}
               value={user?.username || ''}
               editable={false}
+              placeholderTextColor={theme.textMuted}
             />
             <Text style={styles.helperText}>Username cannot be changed</Text>
           </View>
@@ -80,6 +209,7 @@ function AccountScreen() {
               autoCapitalize="none"
               keyboardType="email-address"
               autoCorrect={false}
+              placeholderTextColor={theme.textMuted}
             />
           </View>
 
@@ -90,6 +220,7 @@ function AccountScreen() {
               value={fullName}
               onChangeText={setFullName}
               autoCorrect={false}
+              placeholderTextColor={theme.textMuted}
             />
           </View>
 
@@ -102,6 +233,7 @@ function AccountScreen() {
               secureTextEntry
               autoCapitalize="none"
               placeholder="Leave blank to keep current"
+              placeholderTextColor={theme.textMuted}
             />
           </View>
 
@@ -119,86 +251,49 @@ function AccountScreen() {
             )}
           </TouchableOpacity>
         </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Appearance</Text>
+
+          <View style={styles.themeOptions}>
+            {(['system', 'light', 'dark'] as const).map((mode) => (
+              <TouchableOpacity
+                key={mode}
+                style={[
+                  styles.themeOption,
+                  themeMode === mode && styles.themeOptionActive,
+                ]}
+                onPress={() => setThemeMode(mode)}
+              >
+                <Text
+                  style={[
+                    styles.themeOptionText,
+                    themeMode === mode && styles.themeOptionTextActive,
+                  ]}
+                >
+                  {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={() => {
+              Alert.alert('Logout', 'Are you sure you want to logout?', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Logout', style: 'destructive', onPress: logout },
+              ]);
+            }}
+          >
+            <Text style={styles.logoutButtonText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  scrollContainer: {
-    flexGrow: 1,
-  },
-  formContainer: {
-    margin: 20,
-    padding: 30,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-    color: '#333',
-  },
-  formGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    marginBottom: 5,
-    fontWeight: '500',
-    color: '#333',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 4,
-    padding: 10,
-    fontSize: 16,
-  },
-  inputDisabled: {
-    backgroundColor: '#f5f5f5',
-    color: '#666',
-  },
-  helperText: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 5,
-  },
-  button: {
-    backgroundColor: '#007bff',
-    padding: 15,
-    borderRadius: 4,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  buttonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  error: {
-    color: '#dc3545',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  success: {
-    color: '#28a745',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-});
 
 export default AccountScreen;

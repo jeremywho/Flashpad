@@ -244,7 +244,7 @@ Basic note capture and sync across all platforms with offline support.
 - [x] Create Category management screen
 - [x] Create Search functionality
 - [x] Implement dark/light theme
-- [ ] Add theme toggle in Settings
+- [x] Add theme toggle in Settings
 
 ### 1.10 Mobile (React Native) - Local Storage & Sync
 - [x] Set up local SQLite (expo-sqlite or react-native-sqlite-storage)
