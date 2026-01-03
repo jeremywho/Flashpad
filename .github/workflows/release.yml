@@ -35,6 +35,10 @@ jobs:
       - name: Install all dependencies
         run: npm ci
 
+      - name: Install electron package dependencies
+        working-directory: packages/electron
+        run: npm install
+
       - name: Build shared package
         working-directory: packages/shared
         run: npm run build
