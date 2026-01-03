@@ -72,7 +72,9 @@
       "target": [
         "AppImage",
         "deb"
-      ]
+      ],
+      "category": "Utility",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "publish": {
       "provider": "github",
