@@ -26,6 +26,7 @@
       "@shared": ["../shared/src/index.ts"]
     }
   },
-  "include": ["src", "electron"],
+  "include": ["src", "electron", "src/types"],
+  "typeRoots": ["./node_modules/@types", "./src/types"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

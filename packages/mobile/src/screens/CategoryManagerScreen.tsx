@@ -11,6 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/Toast';
 import { colors } from '../theme/colors';
 import { SyncManager } from '../services/syncManager';
 import type { Category, CreateCategoryDto } from '@flashpad/shared';
@@ -34,6 +35,7 @@ const PRESET_COLORS = [
 
 function CategoryManagerScreen({ navigation }: CategoryManagerScreenProps) {
   const { api } = useAuth();
+  const toast = useToast();
   const [categories, setCategories] = useState<Category[]>([]);
   const [name, setName] = useState('');
   const [selectedColor, setSelectedColor] = useState(PRESET_COLORS[0]);
@@ -85,8 +87,9 @@ function CategoryManagerScreen({ navigation }: CategoryManagerScreenProps) {
       setSelectedColor(PRESET_COLORS[0]);
       setEditingId(null);
       await fetchCategories();
+      toast.success(editingId ? 'Category updated' : 'Category created');
     } catch (error) {
-      Alert.alert('Error', 'Failed to save category');
+      toast.error('Failed to save category');
     } finally {
       setIsSubmitting(false);
     }
@@ -118,8 +121,9 @@ function CategoryManagerScreen({ navigation }: CategoryManagerScreenProps) {
             try {
               await syncManagerRef.current.deleteCategory(category.id);
               await fetchCategories();
+              toast.success('Category deleted');
             } catch (error) {
-              Alert.alert('Error', 'Failed to delete category');
+              toast.error('Failed to delete category');
             }
           },
         },

@@ -164,7 +164,7 @@ export async function getLocalNotes(params: {
   if (results.length === 0) return [];
 
   const columns = results[0].columns;
-  return results[0].values.map((row) => rowToNote(columns, row));
+  return results[0].values.map((row: unknown[]) => rowToNote(columns, row));
 }
 
 export async function getLocalNote(id: string): Promise<Note | null> {
@@ -280,7 +280,7 @@ export async function getLocalCategories(): Promise<Category[]> {
   if (results.length === 0) return [];
 
   const columns = results[0].columns;
-  return results[0].values.map((row) => rowToCategory(columns, row));
+  return results[0].values.map((row: unknown[]) => rowToCategory(columns, row));
 }
 
 export async function saveLocalCategory(category: Category, isLocal = false): Promise<void> {
@@ -407,9 +407,9 @@ export async function getSyncQueue(): Promise<SyncQueueItem[]> {
   if (results.length === 0) return [];
 
   const columns = results[0].columns;
-  return results[0].values.map((row) => {
+  return results[0].values.map((row: unknown[]) => {
     const obj: Record<string, unknown> = {};
-    columns.forEach((col, i) => {
+    columns.forEach((col: string, i: number) => {
       obj[col] = row[i];
     });
     return {
@@ -502,7 +502,7 @@ export async function getCategoryCounts(): Promise<Record<string, number>> {
 
   const counts: Record<string, number> = {};
   if (results.length > 0) {
-    results[0].values.forEach((row) => {
+    results[0].values.forEach((row: unknown[]) => {
       counts[row[0] as string] = row[1] as number;
     });
   }

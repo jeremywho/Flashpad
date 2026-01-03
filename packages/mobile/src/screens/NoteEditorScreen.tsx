@@ -10,6 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/Toast';
 import { colors } from '../theme/colors';
 import { SyncManager } from '../services/syncManager';
 import { getLocalNote } from '../services/database';
@@ -27,6 +28,7 @@ interface NoteEditorScreenProps {
 
 function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
   const { api } = useAuth();
+  const toast = useToast();
   const [note, setNote] = useState<Note | null>(null);
   const [content, setContent] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
@@ -81,7 +83,7 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
       setSelectedCategoryId(fetchedNote.categoryId);
     } catch (error) {
       console.error('Failed to fetch note:', error);
-      Alert.alert('Error', 'Failed to load note');
+      toast.error('Failed to load note');
       navigation.goBack();
     } finally {
       setIsLoading(false);
@@ -139,11 +141,11 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
       }
     } catch (error) {
       console.error('Failed to save note:', error);
-      Alert.alert('Error', 'Failed to save note');
+      toast.error('Failed to save note');
     } finally {
       setIsSaving(false);
     }
-  }, [content, selectedCategoryId, isNew, noteId, navigation]);
+  }, [content, selectedCategoryId, isNew, noteId, navigation, toast]);
 
   const debouncedSave = useCallback(() => {
     if (saveTimeoutRef.current) {
@@ -168,9 +170,10 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
     if (!noteId || !syncManagerRef.current) return;
     try {
       await syncManagerRef.current.archiveNote(noteId);
+      toast.success('Note archived');
       navigation.goBack();
     } catch (error) {
-      Alert.alert('Error', 'Failed to archive note');
+      toast.error('Failed to archive note');
     }
   };
 
@@ -178,9 +181,10 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
     if (!noteId || !syncManagerRef.current) return;
     try {
       await syncManagerRef.current.restoreNote(noteId);
+      toast.success('Note restored');
       navigation.goBack();
     } catch (error) {
-      Alert.alert('Error', 'Failed to restore note');
+      toast.error('Failed to restore note');
     }
   };
 
@@ -194,9 +198,10 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
         onPress: async () => {
           try {
             await syncManagerRef.current?.trashNote(noteId);
+            toast.success('Note moved to trash');
             navigation.goBack();
           } catch (error) {
-            Alert.alert('Error', 'Failed to move note to trash');
+            toast.error('Failed to move note to trash');
           }
         },
       },
@@ -216,9 +221,10 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
           onPress: async () => {
             try {
               await syncManagerRef.current?.deleteNotePermanently(noteId);
+              toast.success('Note deleted permanently');
               navigation.goBack();
             } catch (error) {
-              Alert.alert('Error', 'Failed to delete note');
+              toast.error('Failed to delete note');
             }
           },
         },

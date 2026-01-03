@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Category, NoteStatus } from '@shared/types';
+import { Category } from '@shared/types';
 
 interface SidebarProps {
   categories: Category[];

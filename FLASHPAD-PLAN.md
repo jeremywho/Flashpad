@@ -277,7 +277,7 @@ Basic note capture and sync across all platforms with offline support.
 - [ ] Add component tests (React Native)
 - [ ] Performance optimization
 - [ ] Accessibility review
-- [ ] Error handling and user feedback
+- [x] Error handling and user feedback (Toast notifications, error boundaries)
 
 ---
 
@@ -646,13 +646,260 @@ Flashpad/
 
 ---
 
+## Deployment Strategy
+
+### Domain Structure
+
+| Domain | Purpose |
+|--------|---------|
+| `api.flashpad.cc` | Backend API + SignalR WebSocket |
+| `flashpad.cc` | Web application (React SPA) |
+
+### Environment Configuration
+
+#### Environment Variables Strategy
+
+All client apps will use environment variables/build-time config to determine the API URL:
+
+| Environment | API URL |
+|-------------|---------|
+| Local Development | `http://localhost:5000` |
+| Production | `https://api.flashpad.cc` |
+| Android Emulator (local) | `http://10.0.2.2:5000` |
+| iOS Simulator (local) | `http://localhost:5000` |
+
+**Implementation:**
+- **Web**: Use Vite's `import.meta.env.VITE_API_URL` with `.env` files
+- **Electron**: Use Vite env vars, bundled at build time
+- **Mobile**: Use react-native-config or build-time constants
+- **Backend**: Use `appsettings.json` / `appsettings.Production.json`
+
+#### Files to Modify for Environment Support
+
+1. **Create `.env` files** for web and electron:
+   - `.env.development` - local API URL
+   - `.env.production` - production API URL
+
+2. **Centralize API URL** in each package (currently hardcoded in multiple files)
+
+3. **Backend CORS** - Move from hardcoded to appsettings.json
+
+### Server Setup (Ubuntu 24.04)
+
+#### Prerequisites to Install
+
+```bash
+# Install .NET 9 Runtime
+wget https://dot.net/v1/dotnet-install.sh
+chmod +x dotnet-install.sh
+./dotnet-install.sh --channel 9.0 --runtime aspnetcore
+
+# Or via apt (if available)
+sudo apt update
+sudo apt install -y aspnetcore-runtime-9.0
+```
+
+#### Directory Structure
+
+```
+/var/www/flashpad/
+├── api/                    # Backend API
+│   ├── Flashpad.dll
+│   ├── appsettings.json
+│   ├── appsettings.Production.json
+│   └── flashpad.db         # SQLite database
+├── web/                    # Web app static files
+│   ├── index.html
+│   └── assets/
+└── backups/                # Database backups
+```
+
+#### Systemd Service
+
+Create `/etc/systemd/system/flashpad-api.service`:
+
+```ini
+[Unit]
+Description=Flashpad API
+After=network.target
+
+[Service]
+WorkingDirectory=/var/www/flashpad/api
+ExecStart=/usr/bin/dotnet Flashpad.dll
+Restart=always
+RestartSec=10
+SyslogIdentifier=flashpad-api
+User=www-data
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://localhost:5000
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### Caddy Configuration
+
+Update `/etc/caddy/Caddyfile`:
+
+```caddyfile
+# API with WebSocket support for SignalR
+api.flashpad.cc {
+    reverse_proxy localhost:5000
+
+    # SignalR requires these headers
+    header {
+        # Enable WebSocket
+        Connection *Upgrade*
+        Upgrade *websocket*
+    }
+}
+
+# Web application
+flashpad.cc {
+    root * /var/www/flashpad/web
+    file_server
+
+    # SPA fallback - serve index.html for client-side routing
+    try_files {path} /index.html
+}
+
+# Redirect www to non-www
+www.flashpad.cc {
+    redir https://flashpad.cc{uri} permanent
+}
+```
+
+### Backend Configuration
+
+#### appsettings.Production.json
+
+```json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Warning",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*",
+  "ConnectionStrings": {
+    "DefaultConnection": "Data Source=/var/www/flashpad/api/flashpad.db"
+  },
+  "JwtSettings": {
+    "SecretKey": "${GENERATE_NEW_SECRET}",
+    "Issuer": "FlashpadAPI",
+    "Audience": "FlashpadClients"
+  },
+  "Cors": {
+    "AllowedOrigins": [
+      "https://flashpad.cc",
+      "https://api.flashpad.cc",
+      "capacitor://localhost",
+      "http://localhost"
+    ]
+  }
+}
+```
+
+### Build & Deploy Process
+
+#### Backend Deployment
+
+```bash
+# On development machine
+cd packages/backend
+dotnet publish -c Release -o ./publish
+
+# Copy to server
+scp -r ./publish/* jeremy@flashpad.cc:/var/www/flashpad/api/
+
+# On server
+sudo systemctl restart flashpad-api
+```
+
+#### Web Deployment
+
+```bash
+# On development machine
+cd packages/web
+npm run build
+
+# Copy to server
+scp -r ./dist/* jeremy@flashpad.cc:/var/www/flashpad/web/
+```
+
+#### Electron Releases (Auto-Update)
+
+Electron is configured to use GitHub Releases for auto-update:
+- Repository: `jeremywho/flashpad`
+- Provider: GitHub
+
+**Release process:**
+1. Update version in `packages/electron/package.json`
+2. Build: `npm run build` (creates installers in `release/`)
+3. Create GitHub Release with the built artifacts
+4. electron-updater will automatically notify users of updates
+
+### Database Backups
+
+Create `/etc/cron.daily/flashpad-backup`:
+
+```bash
+#!/bin/bash
+BACKUP_DIR=/var/www/flashpad/backups
+DATE=$(date +%Y%m%d_%H%M%S)
+cp /var/www/flashpad/api/flashpad.db $BACKUP_DIR/flashpad_$DATE.db
+# Keep last 30 days
+find $BACKUP_DIR -name "flashpad_*.db" -mtime +30 -delete
+```
+
+### Deployment Checklist
+
+- [ ] **Server Setup**
+  - [ ] Install .NET 9 ASP.NET Core Runtime
+  - [ ] Create directory structure
+  - [ ] Create systemd service
+  - [ ] Set up backup cron job
+
+- [ ] **DNS Configuration**
+  - [ ] A record for `flashpad.cc` → server IP
+  - [ ] A record for `api.flashpad.cc` → server IP
+
+- [ ] **Caddy Configuration**
+  - [ ] Update Caddyfile with new configuration
+  - [ ] Reload Caddy (`sudo systemctl reload caddy`)
+
+- [ ] **Code Changes**
+  - [ ] Add environment variable support to all packages
+  - [ ] Create .env.development and .env.production files
+  - [ ] Update backend CORS configuration
+  - [ ] Update backend to read CORS from config
+
+- [ ] **Initial Deployment**
+  - [ ] Deploy backend
+  - [ ] Deploy web app
+  - [ ] Test API endpoints
+  - [ ] Test SignalR connection
+  - [ ] Test web app
+
+- [ ] **Electron**
+  - [ ] Create first GitHub Release with installers
+  - [ ] Test auto-update flow
+
+---
+
 ## Next Steps
 
-1. Review and approve this plan
-2. Discuss and answer the questions above
-3. Clone template and set up project
-4. Begin Phase 1 implementation
+1. ~~Review and approve this plan~~
+2. ~~Discuss and answer the questions above~~
+3. ~~Clone template and set up project~~
+4. ~~Begin Phase 1 implementation~~
+5. **Implement deployment configuration** (environment variables, CORS)
+6. **Set up production server** (install .NET, configure Caddy)
+7. **Deploy to production**
+8. Continue with Phase 2 or remaining Phase 1 items
 
 ---
 
 *Plan created: January 2026*
+*Deployment section added: January 2026*
