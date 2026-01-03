@@ -17,7 +17,11 @@
     "notes",
     "quick-capture"
   ],
-  "author": "",
+  "author": {
+    "name": "Jeremy",
+    "email": "jeremy@flashpad.cc"
+  },
+  "homepage": "https://flashpad.cc",
   "license": "MIT",
   "dependencies": {
     "electron-store": "^11.0.2",
