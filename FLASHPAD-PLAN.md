@@ -156,7 +156,7 @@ Basic note capture and sync across all platforms with offline support.
   - `NoteStatusChanged` - Broadcast archive/restore
 - [x] Add JWT authentication for SignalR hub
 - [x] Handle connection/disconnection events
-- [ ] Implement presence tracking (which devices are online)
+- [x] Implement presence tracking (which devices are online)
 
 ### 1.4 Shared Package Updates
 - [x] Add Note, Category, NoteHistory types

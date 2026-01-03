@@ -1140,3 +1140,74 @@ h1, h2, h3 {
 .connection-status.pending .connection-status-label {
   color: #f59e0b;
 }
+
+.connection-status.connected .connection-status-dot {
+  background: #22c55e;
+}
+
+.connection-status.connected .connection-status-label {
+  color: #22c55e;
+}
+
+.connection-status-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  width: 100%;
+}
+
+.connection-status-button:hover {
+  opacity: 0.8;
+}
+
+.connection-status-dropdown {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 8px;
+  min-width: 200px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+.connection-status-dropdown-header {
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.connection-status-device {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.connection-status-device:last-child {
+  border-bottom: none;
+}
+
+.connection-status-device-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.connection-status-device-time {
+  font-size: 11px;
+  color: var(--text-muted);
+}

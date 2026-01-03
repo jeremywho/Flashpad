@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../AuthContext';
-import { Note, Category, NoteStatus, CreateCategoryDto, SignalRClient, ConnectionState } from '@shared/index';
+import { Note, Category, NoteStatus, CreateCategoryDto, SignalRClient, ConnectionState, DevicePresence } from '@shared/index';
 import Sidebar from '../components/Sidebar';
 import NotesList from '../components/NotesList';
 import NoteEditor from '../components/NoteEditor';
@@ -27,6 +27,7 @@ function Home() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [pendingCount, setPendingCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [connectedDevices, setConnectedDevices] = useState<DevicePresence[]>([]);
 
   const signalRRef = useRef<SignalRClient | null>(null);
   const syncManagerRef = useRef<SyncManager | null>(null);
@@ -156,10 +157,25 @@ function Home() {
     const token = api.getToken();
     if (!token) return;
 
+    // Generate a unique device ID for this instance
+    const deviceId = `electron-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const deviceName = 'Desktop App';
+
     const client = new SignalRClient({
       baseUrl: API_URL,
       getToken: () => api.getToken(),
+      deviceId,
+      deviceName,
       onConnectionStateChange: setConnectionState,
+      onPresenceUpdated: (devices) => {
+        setConnectedDevices(devices);
+      },
+      onDeviceConnected: (device) => {
+        console.log('Device connected:', device.deviceName);
+      },
+      onDeviceDisconnected: (device) => {
+        console.log('Device disconnected:', device.deviceName);
+      },
       onNoteCreated: (note) => {
         // Only add if it matches current view
         if (shouldShowNoteInCurrentView(note)) {
@@ -402,6 +418,7 @@ function Home() {
         connectionState={connectionState}
         syncStatus={syncStatus}
         pendingCount={pendingCount}
+        connectedDevices={connectedDevices}
       />
     </div>
   );

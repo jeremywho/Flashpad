@@ -3,9 +3,18 @@ import { Note, Category } from './types';
 
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
 
+export interface DevicePresence {
+  deviceId: string;
+  deviceName: string;
+  connectedAt: string;
+  lastSeen: string;
+}
+
 export interface SignalRClientOptions {
   baseUrl: string;
   getToken: () => string | null;
+  deviceId?: string;
+  deviceName?: string;
   onConnectionStateChange?: (state: ConnectionState) => void;
   onNoteCreated?: (note: Note) => void;
   onNoteUpdated?: (note: Note) => void;
@@ -14,6 +23,9 @@ export interface SignalRClientOptions {
   onCategoryCreated?: (category: Category) => void;
   onCategoryUpdated?: (category: Category) => void;
   onCategoryDeleted?: (categoryId: string) => void;
+  onPresenceUpdated?: (devices: DevicePresence[]) => void;
+  onDeviceConnected?: (device: DevicePresence) => void;
+  onDeviceDisconnected?: (device: DevicePresence) => void;
 }
 
 export class SignalRClient {
@@ -95,6 +107,19 @@ export class SignalRClient {
       this.options.onCategoryDeleted?.(categoryId);
     });
 
+    // Presence event handlers
+    this.connection.on('PresenceUpdated', (devices: DevicePresence[]) => {
+      this.options.onPresenceUpdated?.(devices);
+    });
+
+    this.connection.on('DeviceConnected', (device: DevicePresence) => {
+      this.options.onDeviceConnected?.(device);
+    });
+
+    this.connection.on('DeviceDisconnected', (device: DevicePresence) => {
+      this.options.onDeviceDisconnected?.(device);
+    });
+
     // Handle connection state changes
     this.connection.onreconnecting(() => {
       this.setConnectionState('reconnecting');
@@ -118,10 +143,39 @@ export class SignalRClient {
       this.setConnectionState('connected');
       this.reconnectAttempts = 0;
       console.log('SignalR: Connected successfully');
+
+      // Register device for presence tracking if device info provided
+      if (this.options.deviceId && this.options.deviceName) {
+        await this.registerDevice(this.options.deviceId, this.options.deviceName);
+      }
     } catch (error) {
       this.setConnectionState('disconnected');
       console.error('SignalR: Failed to connect:', error);
       throw error;
+    }
+  }
+
+  async registerDevice(deviceId: string, deviceName: string): Promise<void> {
+    if (!this.connection || this.connectionState !== 'connected') {
+      console.warn('SignalR: Cannot register device - not connected');
+      return;
+    }
+    try {
+      await this.connection.invoke('RegisterDevice', deviceId, deviceName);
+    } catch (error) {
+      console.error('SignalR: Failed to register device:', error);
+    }
+  }
+
+  async getPresence(): Promise<void> {
+    if (!this.connection || this.connectionState !== 'connected') {
+      console.warn('SignalR: Cannot get presence - not connected');
+      return;
+    }
+    try {
+      await this.connection.invoke('GetPresence');
+    } catch (error) {
+      console.error('SignalR: Failed to get presence:', error);
     }
   }
 
