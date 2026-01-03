@@ -7,6 +7,7 @@ import {
   StyleSheet,
   RefreshControl,
   Platform,
+  TextInput,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/colors';
@@ -61,6 +62,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [pendingCount, setPendingCount] = useState(0);
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
+  const [searchQuery, setSearchQuery] = useState('');
   const syncManagerRef = useRef<SyncManager | null>(null);
   const signalRRef = useRef<SignalRClient | null>(null);
 
@@ -108,14 +110,24 @@ function HomeScreen({ navigation }: HomeScreenProps) {
       const localNotes = await syncManagerRef.current.getNotes({
         status: getStatusForTab(selectedTab),
       });
-      setNotes(localNotes);
+
+      // Filter by search query if present
+      let filteredNotes = localNotes;
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase().trim();
+        filteredNotes = localNotes.filter((n) =>
+          n.content.toLowerCase().includes(query)
+        );
+      }
+
+      setNotes(filteredNotes);
     } catch (error) {
       console.error('Failed to fetch notes:', error);
     } finally {
       setIsLoading(false);
       setRefreshing(false);
     }
-  }, [selectedTab]);
+  }, [selectedTab, searchQuery]);
 
   const fetchCategories = useCallback(async () => {
     if (!syncManagerRef.current) return;
@@ -346,6 +358,25 @@ function HomeScreen({ navigation }: HomeScreenProps) {
         </View>
       </View>
 
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search notes..."
+          placeholderTextColor={colors.textMuted}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          returnKeyType="search"
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity
+            style={styles.searchClear}
+            onPress={() => setSearchQuery('')}
+          >
+            <Text style={styles.searchClearText}>×</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
       {isLoading ? (
         <View style={styles.centered}>
           <Text style={styles.loadingText}>Loading notes...</Text>
@@ -365,13 +396,15 @@ function HomeScreen({ navigation }: HomeScreenProps) {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>
-                {selectedTab === 'trash'
+                {searchQuery
+                  ? `No notes match "${searchQuery}"`
+                  : selectedTab === 'trash'
                   ? 'Trash is empty'
                   : selectedTab === 'archive'
                   ? 'No archived notes'
                   : 'No notes yet'}
               </Text>
-              {selectedTab === 'inbox' && (
+              {selectedTab === 'inbox' && !searchQuery && (
                 <TouchableOpacity style={styles.emptyButton} onPress={handleNewNote}>
                   <Text style={styles.emptyButtonText}>Create your first note</Text>
                 </TouchableOpacity>
@@ -467,6 +500,42 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  searchContainer: {
+    padding: 12,
+    paddingHorizontal: 16,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    position: 'relative',
+  },
+  searchInput: {
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    paddingRight: 40,
+    fontSize: 15,
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchClear: {
+    position: 'absolute',
+    right: 26,
+    top: '50%',
+    marginTop: -12,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.surfaceHover,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchClearText: {
+    fontSize: 18,
+    color: colors.textSecondary,
+    lineHeight: 20,
   },
   syncBadge: {
     flexDirection: 'row',

@@ -315,6 +315,58 @@ h1, h2, h3 {
   background: var(--accent-hover);
 }
 
+.notes-list-search {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  position: relative;
+}
+
+.notes-list-search-input {
+  width: 100%;
+  padding: 8px 32px 8px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--text-primary);
+  transition: border-color 0.15s;
+}
+
+.notes-list-search-input:focus {
+  border-color: var(--accent-color);
+  outline: none;
+}
+
+.notes-list-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.notes-list-search-clear {
+  position: absolute;
+  right: 22px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: var(--bg-active);
+  border: none;
+  border-radius: 50%;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.notes-list-search-clear:hover {
+  background: var(--accent-color);
+  color: white;
+}
+
 .notes-list-items {
   flex: 1;
   overflow-y: auto;

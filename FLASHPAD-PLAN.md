@@ -209,7 +209,7 @@ Basic note capture and sync across all platforms with offline support.
   - Note list
   - Restore / permanent delete actions
   - "Empty Trash" button
-- [ ] Create Search functionality:
+- [x] Create Search functionality:
   - Search input in header
   - Search across all notes
   - Filter by status/category
@@ -242,7 +242,7 @@ Basic note capture and sync across all platforms with offline support.
 - [x] Create Sidebar/drawer navigation:
   - Inbox, Categories, Archive, Trash
 - [ ] Create Category management screen
-- [ ] Create Search functionality
+- [x] Create Search functionality
 - [x] Implement dark/light theme
 - [ ] Add theme toggle in Settings
 

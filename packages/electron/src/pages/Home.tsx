@@ -26,6 +26,7 @@ function Home() {
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [pendingCount, setPendingCount] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const signalRRef = useRef<SignalRClient | null>(null);
   const syncManagerRef = useRef<SyncManager | null>(null);
@@ -80,18 +81,27 @@ function Home() {
       // Get notes from local database via SyncManager
       const localNotes = await syncManagerRef.current.getNotes({ status, categoryId });
 
+      // Filter by search query if present
+      let filteredNotes = localNotes;
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase().trim();
+        filteredNotes = localNotes.filter((n) =>
+          n.content.toLowerCase().includes(query)
+        );
+      }
+
       // Filter inbox notes to exclude those with categories
       if (selectedView === 'inbox') {
-        setNotes(localNotes.filter((n) => !n.categoryId));
+        setNotes(filteredNotes.filter((n) => !n.categoryId));
       } else {
-        setNotes(localNotes);
+        setNotes(filteredNotes);
       }
     } catch (error) {
       console.error('Failed to fetch notes:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [selectedView]);
+  }, [selectedView, searchQuery]);
 
   const fetchCategories = useCallback(async () => {
     if (!syncManagerRef.current) return;
@@ -365,6 +375,8 @@ function Home() {
         onNewNote={handleNewNote}
         isLoading={isLoading}
         viewTitle={getViewTitle()}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
       />
       <NoteEditor
         note={selectedNote}
