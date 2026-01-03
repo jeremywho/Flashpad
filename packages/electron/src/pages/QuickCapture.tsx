@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { ApiClient } from '@shared/api-client';
 import { SyncManager } from '../services/syncManager';
 
-const API_URL = 'http://localhost:5000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function QuickCapture() {
   const [content, setContent] = useState('');

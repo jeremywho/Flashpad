@@ -65,18 +65,15 @@ builder.Services.AddAuthorization();
 // Services
 builder.Services.AddScoped<IAuthService, AuthService>();
 
-// CORS for development (must allow credentials for SignalR)
+// CORS (must allow credentials for SignalR)
+var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+    ?? new[] { "http://localhost:5173", "http://localhost:5174", "http://localhost:5000" };
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.WithOrigins(
-                "http://localhost:5173",  // Electron dev server
-                "http://localhost:5174",  // Web dev server
-                "http://localhost:5000",
-                "http://localhost:8081",  // React Native Metro
-                "http://10.0.2.2:5000"    // Android emulator
-            )
+        policy.WithOrigins(corsOrigins)
             .AllowAnyMethod()
             .AllowAnyHeader()
             .AllowCredentials();

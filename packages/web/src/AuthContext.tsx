@@ -13,8 +13,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Use relative URL in production (served from same origin), absolute in dev
-const API_URL = import.meta.env.DEV ? 'http://localhost:5000' : '';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const api = new ApiClient(API_URL);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {

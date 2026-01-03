@@ -23,6 +23,7 @@ release/
 *.db
 *.db-shm
 *.db-wal
+appsettings.Production.json
 
 # React Native
 .expo/

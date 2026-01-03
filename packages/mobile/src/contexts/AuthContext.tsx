@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ApiClient } from '@flashpad/shared';
 import type { User } from '@flashpad/shared';
+import { API_URL } from '../config';
 
 interface AuthContextType {
   user: User | null;
@@ -14,9 +14,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// API URL based on platform
-// iOS simulator can use localhost, Android emulator needs 10.0.2.2
-const API_URL = Platform.OS === 'ios' ? 'http://localhost:5000' : 'http://10.0.2.2:5000';
 const api = new ApiClient(API_URL);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {

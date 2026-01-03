@@ -10,8 +10,7 @@ import ConnectionStatus from '../components/ConnectionStatus';
 
 type ViewType = 'inbox' | 'archive' | 'trash' | string;
 
-// Use relative URL in production (served from same origin), absolute in dev
-const API_URL = import.meta.env.DEV ? 'http://localhost:5000' : '';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 function Home() {
   const { api } = useAuth();

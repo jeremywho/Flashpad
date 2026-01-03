@@ -8,8 +8,10 @@
   ],
   "scripts": {
     "backend": "cd packages/backend && dotnet run",
-    "electron": "cd packages/electron && npm run dev",
+    "electron": "cd packages/electron && npm run electron:dev",
+    "electron:prod": "cd packages/electron && npm run electron:prod",
     "web": "cd packages/web && npm run dev",
+    "web:prod": "cd packages/web && npm run dev:prod",
     "mobile": "cd packages/mobile && npm run start",
     "mobile:android": "cd packages/mobile && npm run android",
     "mobile:ios": "cd packages/mobile && npm run ios",

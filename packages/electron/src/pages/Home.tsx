@@ -6,14 +6,16 @@ import NotesList from '../components/NotesList';
 import NoteEditor from '../components/NoteEditor';
 import CategoryManager from '../components/CategoryManager';
 import ConnectionStatus from '../components/ConnectionStatus';
+import { useToast } from '../components/Toast';
 import { SyncManager, SyncStatus } from '../services/syncManager';
 
 type ViewType = 'inbox' | 'archive' | 'trash' | string;
 
-const API_URL = 'http://localhost:5000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 function Home() {
   const { api } = useAuth();
+  const toast = useToast();
   const [notes, setNotes] = useState<Note[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedView, setSelectedView] = useState<ViewType>('inbox');
@@ -298,6 +300,7 @@ function Home() {
       }
     } catch (error) {
       console.error('Failed to save note:', error);
+      toast.error('Failed to save note');
     } finally {
       setIsSaving(false);
     }
@@ -310,8 +313,10 @@ function Home() {
       setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
       setSelectedNote(null);
       fetchCategories();
+      toast.success('Note archived');
     } catch (error) {
       console.error('Failed to archive note:', error);
+      toast.error('Failed to archive note');
     }
   };
 
@@ -322,8 +327,10 @@ function Home() {
       setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
       setSelectedNote(null);
       fetchCategories();
+      toast.success('Note restored');
     } catch (error) {
       console.error('Failed to restore note:', error);
+      toast.error('Failed to restore note');
     }
   };
 
@@ -334,8 +341,10 @@ function Home() {
       setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
       setSelectedNote(null);
       fetchCategories();
+      toast.success('Note moved to trash');
     } catch (error) {
       console.error('Failed to trash note:', error);
+      toast.error('Failed to move note to trash');
     }
   };
 
@@ -346,31 +355,51 @@ function Home() {
       await syncManagerRef.current.deleteNotePermanently(selectedNote.id);
       setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
       setSelectedNote(null);
+      toast.success('Note deleted permanently');
     } catch (error) {
       console.error('Failed to delete note:', error);
+      toast.error('Failed to delete note');
     }
   };
 
   const handleCreateCategory = async (data: CreateCategoryDto) => {
     if (!syncManagerRef.current) return;
-    await syncManagerRef.current.createCategory(data);
-    fetchCategories();
+    try {
+      await syncManagerRef.current.createCategory(data);
+      fetchCategories();
+      toast.success('Category created');
+    } catch (error) {
+      console.error('Failed to create category:', error);
+      toast.error('Failed to create category');
+    }
   };
 
   const handleUpdateCategory = async (id: string, data: CreateCategoryDto) => {
     if (!syncManagerRef.current) return;
-    await syncManagerRef.current.updateCategory(id, { ...data, sortOrder: undefined });
-    fetchCategories();
+    try {
+      await syncManagerRef.current.updateCategory(id, { ...data, sortOrder: undefined });
+      fetchCategories();
+      toast.success('Category updated');
+    } catch (error) {
+      console.error('Failed to update category:', error);
+      toast.error('Failed to update category');
+    }
   };
 
   const handleDeleteCategory = async (id: string) => {
     if (!syncManagerRef.current) return;
-    await syncManagerRef.current.deleteCategory(id);
-    if (selectedView === id) {
-      setSelectedView('inbox');
+    try {
+      await syncManagerRef.current.deleteCategory(id);
+      if (selectedView === id) {
+        setSelectedView('inbox');
+      }
+      fetchCategories();
+      fetchNotes();
+      toast.success('Category deleted');
+    } catch (error) {
+      console.error('Failed to delete category:', error);
+      toast.error('Failed to delete category');
     }
-    fetchCategories();
-    fetchNotes();
   };
 
   return (

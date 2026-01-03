@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
-  Platform,
   TextInput,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
@@ -14,9 +13,7 @@ import { colors } from '../theme/colors';
 import { SyncManager, SyncStatus } from '../services/syncManager';
 import type { Note, Category, NoteStatus } from '@flashpad/shared';
 import { SignalRClient, ConnectionState } from '@flashpad/shared';
-
-// API URL based on platform - iOS simulator uses localhost, Android emulator needs 10.0.2.2
-const API_URL = Platform.OS === 'ios' ? 'http://localhost:5000' : 'http://10.0.2.2:5000';
+import { API_URL } from '../config';
 
 interface HomeScreenProps {
   navigation: any;
