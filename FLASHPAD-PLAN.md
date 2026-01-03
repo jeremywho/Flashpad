@@ -251,7 +251,7 @@ Basic note capture and sync across all platforms with offline support.
 - [x] Create local database schema
 - [x] Implement offline queue
 - [x] Create sync manager (same logic as desktop)
-- [ ] Implement SignalR client connection
+- [x] Implement SignalR client connection
 - [x] Add connection status indicator
 
 ### 1.11 Mobile (React Native) - Quick Capture

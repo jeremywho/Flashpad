@@ -6,11 +6,16 @@ import {
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/colors';
 import { SyncManager, SyncStatus } from '../services/syncManager';
 import type { Note, Category, NoteStatus } from '@flashpad/shared';
+import { SignalRClient, ConnectionState } from '@flashpad/shared';
+
+// API URL based on platform - iOS simulator uses localhost, Android emulator needs 10.0.2.2
+const API_URL = Platform.OS === 'ios' ? 'http://localhost:5000' : 'http://10.0.2.2:5000';
 
 interface HomeScreenProps {
   navigation: any;
@@ -55,7 +60,9 @@ function HomeScreen({ navigation }: HomeScreenProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [pendingCount, setPendingCount] = useState(0);
+  const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
   const syncManagerRef = useRef<SyncManager | null>(null);
+  const signalRRef = useRef<SignalRClient | null>(null);
 
   const getStatusForTab = (tab: TabType): NoteStatus => {
     switch (tab) {
@@ -143,6 +150,71 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     });
     return unsubscribe;
   }, [navigation, fetchNotes, fetchCategories]);
+
+  // Helper to check if a note should show in current view
+  const shouldShowNoteInCurrentView = useCallback((note: Note): boolean => {
+    if (selectedTab === 'inbox') {
+      return note.status === 0; // NoteStatus.Inbox
+    }
+    if (selectedTab === 'archive') {
+      return note.status === 1; // NoteStatus.Archived
+    }
+    if (selectedTab === 'trash') {
+      return note.status === 2; // NoteStatus.Trash
+    }
+    return false;
+  }, [selectedTab]);
+
+  // SignalR real-time sync
+  useEffect(() => {
+    const token = api.getToken();
+    if (!token) return;
+
+    const client = new SignalRClient({
+      baseUrl: API_URL,
+      getToken: () => api.getToken(),
+      onConnectionStateChange: setConnectionState,
+      onNoteCreated: (note) => {
+        // Only add if it matches current view
+        if (shouldShowNoteInCurrentView(note)) {
+          setNotes((prev) => {
+            if (prev.some((n) => n.id === note.id)) return prev;
+            return [note, ...prev];
+          });
+        }
+        fetchCategories();
+      },
+      onNoteUpdated: (note) => {
+        setNotes((prev) => prev.map((n) => (n.id === note.id ? note : n)));
+        fetchCategories();
+      },
+      onNoteDeleted: (noteId) => {
+        setNotes((prev) => prev.filter((n) => n.id !== noteId));
+      },
+      onNoteStatusChanged: (note) => {
+        // Remove from current view if status changed
+        setNotes((prev) => prev.filter((n) => n.id !== note.id));
+        fetchCategories();
+      },
+      onCategoryCreated: (category) => {
+        setCategories((prev) => [...prev, category]);
+      },
+      onCategoryUpdated: (category) => {
+        setCategories((prev) => prev.map((c) => (c.id === category.id ? category : c)));
+      },
+      onCategoryDeleted: (categoryId) => {
+        setCategories((prev) => prev.filter((c) => c.id !== categoryId));
+      },
+    });
+
+    signalRRef.current = client;
+    client.start().catch(console.error);
+
+    return () => {
+      client.stop();
+      signalRRef.current = null;
+    };
+  }, [api, shouldShowNoteInCurrentView, fetchCategories]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -232,6 +304,22 @@ function HomeScreen({ navigation }: HomeScreenProps) {
         <View style={styles.syncBadge}>
           <View style={[styles.syncDot, styles.syncDotOffline]} />
           <Text style={styles.syncText}>Offline</Text>
+        </View>
+      );
+    }
+    if (connectionState === 'connected') {
+      return (
+        <View style={styles.syncBadge}>
+          <View style={[styles.syncDot, styles.syncDotConnected]} />
+          <Text style={styles.syncText}>Live</Text>
+        </View>
+      );
+    }
+    if (connectionState === 'connecting' || connectionState === 'reconnecting') {
+      return (
+        <View style={styles.syncBadge}>
+          <View style={[styles.syncDot, styles.syncDotConnecting]} />
+          <Text style={styles.syncText}>Connecting...</Text>
         </View>
       );
     }
@@ -402,6 +490,12 @@ const styles = StyleSheet.create({
   },
   syncDotOffline: {
     backgroundColor: '#ef4444',
+  },
+  syncDotConnected: {
+    backgroundColor: '#22c55e',
+  },
+  syncDotConnecting: {
+    backgroundColor: '#6366f1',
   },
   syncText: {
     fontSize: 12,

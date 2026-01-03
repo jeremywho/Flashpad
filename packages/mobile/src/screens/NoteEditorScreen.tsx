@@ -36,7 +36,7 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
   const [hasChanges, setHasChanges] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
   const textInputRef = useRef<TextInput>(null);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const syncManagerRef = useRef<SyncManager | null>(null);
 
   const noteId = route.params?.noteId;
