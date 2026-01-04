@@ -9,6 +9,11 @@ import {
   TextInput,
   AppState,
   AppStateStatus,
+  Modal,
+  Pressable,
+  Animated,
+  PanResponder,
+  Dimensions,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/colors';
@@ -24,8 +29,12 @@ interface HomeScreenProps {
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+  // Compare calendar days, not raw time difference
+  const dateDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffTime = nowDay.getTime() - dateDay.getTime();
+  const days = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
   if (days === 0) {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -51,6 +60,61 @@ function getTitle(content: string): string {
 
 type TabType = 'inbox' | 'archive' | 'trash';
 
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
+
+interface SwipeableNoteItemProps {
+  children: React.ReactNode;
+  onSwipeLeft: () => void;
+  enabled: boolean;
+}
+
+function SwipeableNoteItem({ children, onSwipeLeft, enabled }: SwipeableNoteItemProps) {
+  const translateX = useRef(new Animated.Value(0)).current;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return enabled && Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dy) < 10;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dx < 0) {
+          translateX.setValue(gestureState.dx);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx < -SWIPE_THRESHOLD) {
+          Animated.timing(translateX, {
+            toValue: -SCREEN_WIDTH,
+            duration: 200,
+            useNativeDriver: true,
+          }).start(() => onSwipeLeft());
+        } else {
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
+  return (
+    <View style={styles.swipeContainer}>
+      <View style={styles.swipeBackground}>
+        <Text style={styles.swipeBackgroundText}>Trash</Text>
+      </View>
+      <Animated.View
+        style={{ transform: [{ translateX }] }}
+        {...panResponder.panHandlers}
+      >
+        {children}
+      </Animated.View>
+    </View>
+  );
+}
+
 function HomeScreen({ navigation }: HomeScreenProps) {
   const { api, logout } = useAuth();
   const [notes, setNotes] = useState<Note[]>([]);
@@ -62,6 +126,11 @@ function HomeScreen({ navigation }: HomeScreenProps) {
   const [pendingCount, setPendingCount] = useState(0);
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [showCategoryFilter, setShowCategoryFilter] = useState(false);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedNoteIds, setSelectedNoteIds] = useState<Set<string>>(new Set());
+  const [showBatchCategoryPicker, setShowBatchCategoryPicker] = useState(false);
   const syncManagerRef = useRef<SyncManager | null>(null);
   const signalRRef = useRef<SignalRClient | null>(null);
 
@@ -108,13 +177,21 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     try {
       const localNotes = await syncManagerRef.current.getNotes({
         status: getStatusForTab(selectedTab),
+        categoryId: selectedCategoryId || undefined,
       });
 
-      // Filter by search query if present
+      // Filter notes based on view
       let filteredNotes = localNotes;
+
+      // In Inbox view (no category selected), only show uncategorized notes
+      if (selectedTab === 'inbox' && !selectedCategoryId) {
+        filteredNotes = filteredNotes.filter((n) => !n.categoryId);
+      }
+
+      // Filter by search query if present
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
-        filteredNotes = localNotes.filter((n) =>
+        filteredNotes = filteredNotes.filter((n) =>
           n.content.toLowerCase().includes(query)
         );
       }
@@ -126,7 +203,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
       setIsLoading(false);
       setRefreshing(false);
     }
-  }, [selectedTab, searchQuery]);
+  }, [selectedTab, searchQuery, selectedCategoryId]);
 
   const fetchCategories = useCallback(async () => {
     if (!syncManagerRef.current) return;
@@ -199,7 +276,14 @@ function HomeScreen({ navigation }: HomeScreenProps) {
         fetchCategories();
       },
       onNoteUpdated: (note) => {
-        setNotes((prev) => prev.map((n) => (n.id === note.id ? note : n)));
+        // Move updated note to top (since it has the newest updatedAt)
+        setNotes((prev) => {
+          const filtered = prev.filter((n) => n.id !== note.id);
+          if (shouldShowNoteInCurrentView(note)) {
+            return [note, ...filtered];
+          }
+          return filtered;
+        });
         fetchCategories();
       },
       onNoteDeleted: (noteId) => {
@@ -260,43 +344,78 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     await logout();
   };
 
-  const renderNote = ({ item }: { item: Note }) => (
-    <TouchableOpacity
-      style={styles.noteItem}
-      onPress={() => handleNotePress(item)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.noteHeader}>
-        <Text style={styles.noteTitle} numberOfLines={1}>
-          {getTitle(item.content)}
-        </Text>
-        <View style={styles.noteMeta}>
-          {item.id.startsWith('local_') && (
-            <View style={styles.localBadge}>
-              <Text style={styles.localBadgeText}>Local</Text>
+  const renderNote = ({ item }: { item: Note }) => {
+    const isSelected = selectedNoteIds.has(item.id);
+    // Enable swipe for inbox/archive notes, not for trash or during selection mode
+    const swipeEnabled = selectedTab !== 'trash' && !isSelectionMode;
+
+    const noteContent = (
+      <TouchableOpacity
+        style={[styles.noteItem, isSelected && styles.noteItemSelected]}
+        onPress={() => {
+          if (isSelectionMode) {
+            toggleNoteSelection(item.id);
+          } else {
+            handleNotePress(item);
+          }
+        }}
+        onLongPress={() => {
+          if (!isSelectionMode) {
+            enterSelectionMode(item.id);
+          }
+        }}
+        activeOpacity={0.7}
+      >
+        <View style={styles.noteHeader}>
+          {isSelectionMode && (
+            <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
+              {isSelected && <Text style={styles.checkboxCheck}>✓</Text>}
             </View>
           )}
-          <Text style={styles.noteDate}>{formatDate(item.updatedAt)}</Text>
+          <Text style={[styles.noteTitle, isSelectionMode && styles.noteTitleWithCheckbox]} numberOfLines={1}>
+            {getTitle(item.content)}
+          </Text>
+          <View style={styles.noteMeta}>
+            {item.id.startsWith('local_') && (
+              <View style={styles.localBadge}>
+                <Text style={styles.localBadgeText}>Local</Text>
+              </View>
+            )}
+            <Text style={styles.noteDate}>{formatDate(item.updatedAt)}</Text>
+          </View>
         </View>
-      </View>
-      <Text style={styles.notePreview} numberOfLines={2}>
-        {getPreview(item.content)}
-      </Text>
-      {item.categoryName && (
-        <View style={styles.noteCategory}>
-          <View
-            style={[
-              styles.categoryDot,
-              { backgroundColor: item.categoryColor || colors.accent },
-            ]}
-          />
-          <Text style={styles.categoryName}>{item.categoryName}</Text>
-        </View>
-      )}
-    </TouchableOpacity>
-  );
+        <Text style={[styles.notePreview, isSelectionMode && styles.notePreviewWithCheckbox]} numberOfLines={2}>
+          {getPreview(item.content)}
+        </Text>
+        {item.categoryName && (
+          <View style={[styles.noteCategory, isSelectionMode && styles.noteCategoryWithCheckbox]}>
+            <View
+              style={[
+                styles.categoryDot,
+                { backgroundColor: item.categoryColor || colors.accent },
+              ]}
+            />
+            <Text style={styles.categoryName}>{item.categoryName}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+
+    return (
+      <SwipeableNoteItem
+        onSwipeLeft={() => handleSwipeToTrash(item.id)}
+        enabled={swipeEnabled}
+      >
+        {noteContent}
+      </SwipeableNoteItem>
+    );
+  };
 
   const getTabTitle = () => {
+    if (selectedCategoryId) {
+      const category = categories.find((c) => c.id === selectedCategoryId);
+      return category?.name || 'Category';
+    }
     switch (selectedTab) {
       case 'inbox':
         return 'Inbox';
@@ -304,6 +423,87 @@ function HomeScreen({ navigation }: HomeScreenProps) {
         return 'Archive';
       case 'trash':
         return 'Trash';
+    }
+  };
+
+  const selectedCategory = selectedCategoryId
+    ? categories.find((c) => c.id === selectedCategoryId)
+    : null;
+
+  const handleCategoryFilterSelect = (categoryId: string | null) => {
+    setSelectedCategoryId(categoryId);
+    setShowCategoryFilter(false);
+  };
+
+  const handleTabChange = (tab: TabType) => {
+    setSelectedTab(tab);
+    setSelectedCategoryId(null); // Clear category filter when switching tabs
+    exitSelectionMode(); // Exit selection mode when switching tabs
+    setShowCategoryFilter(false);
+  };
+
+  const handleStatusSelect = (tab: TabType) => {
+    handleTabChange(tab);
+  };
+
+  // Selection mode handlers
+  const enterSelectionMode = (noteId: string) => {
+    setIsSelectionMode(true);
+    setSelectedNoteIds(new Set([noteId]));
+  };
+
+  const exitSelectionMode = () => {
+    setIsSelectionMode(false);
+    setSelectedNoteIds(new Set());
+  };
+
+  const toggleNoteSelection = (noteId: string) => {
+    setSelectedNoteIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(noteId)) {
+        newSet.delete(noteId);
+        // Exit selection mode if no notes selected
+        if (newSet.size === 0) {
+          setIsSelectionMode(false);
+        }
+      } else {
+        newSet.add(noteId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllNotes = () => {
+    setSelectedNoteIds(new Set(notes.map((n) => n.id)));
+  };
+
+  const handleBatchCategoryMove = async (categoryId: string | undefined) => {
+    if (!syncManagerRef.current || selectedNoteIds.size === 0) return;
+
+    setShowBatchCategoryPicker(false);
+
+    try {
+      const promises = Array.from(selectedNoteIds).map((noteId) => {
+        return syncManagerRef.current!.moveNoteToCategory(noteId, categoryId);
+      });
+
+      await Promise.all(promises);
+      exitSelectionMode();
+      fetchNotes();
+      fetchCategories();
+    } catch (error) {
+      console.error('Failed to move notes:', error);
+    }
+  };
+
+  const handleSwipeToTrash = async (noteId: string) => {
+    if (!syncManagerRef.current) return;
+    try {
+      await syncManagerRef.current.trashNote(noteId);
+      setNotes((prev) => prev.filter((n) => n.id !== noteId));
+      fetchCategories();
+    } catch (error) {
+      console.error('Failed to trash note:', error);
     }
   };
 
@@ -355,21 +555,38 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>{getTabTitle()}</Text>
+          <TouchableOpacity
+            style={styles.headerTitleButton}
+            onPress={() => setShowCategoryFilter(true)}
+          >
+            {selectedCategory && (
+              <View
+                style={[
+                  styles.headerCategoryDot,
+                  { backgroundColor: selectedCategory.color },
+                ]}
+              />
+            )}
+            <Text style={styles.headerTitle}>{getTabTitle()}</Text>
+            <Text style={styles.headerTitleArrow}>▼</Text>
+          </TouchableOpacity>
           {renderSyncStatus()}
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity
-            style={styles.headerButton}
+            style={styles.headerIconButton}
             onPress={() => navigation.navigate('CategoryManager')}
           >
-            <Text style={styles.headerButtonText}>Categories</Text>
+            <Text style={styles.headerIcon}>≡</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.headerButton}
+            style={styles.headerIconButton}
             onPress={() => navigation.navigate('Account')}
           >
-            <Text style={styles.headerButtonText}>Account</Text>
+            <View style={styles.profileIcon}>
+              <View style={styles.profileIconHead} />
+              <View style={styles.profileIconBody} />
+            </View>
           </TouchableOpacity>
         </View>
       </View>
@@ -431,38 +648,208 @@ function HomeScreen({ navigation }: HomeScreenProps) {
         />
       )}
 
-      {selectedTab === 'inbox' && (
+      {selectedTab === 'inbox' && !isSelectionMode && (
         <TouchableOpacity style={styles.fab} onPress={handleNewNote}>
           <Text style={styles.fabText}>+</Text>
         </TouchableOpacity>
       )}
 
-      <View style={styles.tabBar}>
-        <TouchableOpacity
-          style={[styles.tab, selectedTab === 'inbox' && styles.tabActive]}
-          onPress={() => setSelectedTab('inbox')}
+      {/* Selection Action Bar */}
+      {isSelectionMode && (
+        <View style={styles.selectionBar}>
+          <View style={styles.selectionBarLeft}>
+            <TouchableOpacity onPress={exitSelectionMode} style={styles.selectionBarButton}>
+              <Text style={styles.selectionBarButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.selectionBarCount}>
+              {selectedNoteIds.size} selected
+            </Text>
+          </View>
+          <View style={styles.selectionBarRight}>
+            <TouchableOpacity onPress={selectAllNotes} style={styles.selectionBarButton}>
+              <Text style={styles.selectionBarButtonText}>All</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setShowBatchCategoryPicker(true)}
+              style={[styles.selectionBarButton, styles.selectionBarPrimary]}
+            >
+              <Text style={styles.selectionBarPrimaryText}>Move to...</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Category Filter Modal */}
+      <Modal
+        visible={showCategoryFilter}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCategoryFilter(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowCategoryFilter(false)}
         >
-          <Text style={[styles.tabText, selectedTab === 'inbox' && styles.tabTextActive]}>
-            Inbox
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, selectedTab === 'archive' && styles.tabActive]}
-          onPress={() => setSelectedTab('archive')}
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>View</Text>
+              <TouchableOpacity onPress={() => setShowCategoryFilter(false)}>
+                <Text style={styles.modalClose}>Done</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Status Section */}
+            <View style={styles.modalSectionHeader}>
+              <Text style={styles.modalSectionTitle}>Status</Text>
+            </View>
+            <TouchableOpacity
+              style={[
+                styles.filterOption,
+                selectedTab === 'inbox' && !selectedCategoryId && styles.filterOptionSelected,
+              ]}
+              onPress={() => handleStatusSelect('inbox')}
+            >
+              <Text style={styles.filterOptionIcon}>📥</Text>
+              <Text
+                style={[
+                  styles.filterOptionText,
+                  selectedTab === 'inbox' && !selectedCategoryId && styles.filterOptionTextSelected,
+                ]}
+              >
+                Inbox
+              </Text>
+              {selectedTab === 'inbox' && !selectedCategoryId && (
+                <Text style={styles.filterOptionCheck}>✓</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.filterOption,
+                selectedTab === 'archive' && styles.filterOptionSelected,
+              ]}
+              onPress={() => handleStatusSelect('archive')}
+            >
+              <Text style={styles.filterOptionIcon}>📦</Text>
+              <Text
+                style={[
+                  styles.filterOptionText,
+                  selectedTab === 'archive' && styles.filterOptionTextSelected,
+                ]}
+              >
+                Archive
+              </Text>
+              {selectedTab === 'archive' && (
+                <Text style={styles.filterOptionCheck}>✓</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.filterOption,
+                selectedTab === 'trash' && styles.filterOptionSelected,
+              ]}
+              onPress={() => handleStatusSelect('trash')}
+            >
+              <Text style={styles.filterOptionIcon}>🗑</Text>
+              <Text
+                style={[
+                  styles.filterOptionText,
+                  selectedTab === 'trash' && styles.filterOptionTextSelected,
+                ]}
+              >
+                Trash
+              </Text>
+              {selectedTab === 'trash' && (
+                <Text style={styles.filterOptionCheck}>✓</Text>
+              )}
+            </TouchableOpacity>
+
+            {/* Categories Section - only show for inbox */}
+            {selectedTab === 'inbox' && categories.length > 0 && (
+              <>
+                <View style={styles.modalSectionHeader}>
+                  <Text style={styles.modalSectionTitle}>Categories</Text>
+                </View>
+                <FlatList
+                  data={categories}
+                  keyExtractor={(item) => item.id}
+                  scrollEnabled={false}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={[
+                        styles.filterOption,
+                        selectedCategoryId === item.id && styles.filterOptionSelected,
+                      ]}
+                      onPress={() => handleCategoryFilterSelect(item.id)}
+                    >
+                      <View
+                        style={[styles.filterOptionDot, { backgroundColor: item.color }]}
+                      />
+                      <Text
+                        style={[
+                          styles.filterOptionText,
+                          selectedCategoryId === item.id && styles.filterOptionTextSelected,
+                        ]}
+                      >
+                        {item.name}
+                      </Text>
+                      {selectedCategoryId === item.id && (
+                        <Text style={styles.filterOptionCheck}>✓</Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                />
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Batch Category Picker Modal */}
+      <Modal
+        visible={showBatchCategoryPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowBatchCategoryPicker(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowBatchCategoryPicker(false)}
         >
-          <Text style={[styles.tabText, selectedTab === 'archive' && styles.tabTextActive]}>
-            Archive
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, selectedTab === 'trash' && styles.tabActive]}
-          onPress={() => setSelectedTab('trash')}
-        >
-          <Text style={[styles.tabText, selectedTab === 'trash' && styles.tabTextActive]}>
-            Trash
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                Move {selectedNoteIds.size} note{selectedNoteIds.size !== 1 ? 's' : ''} to...
+              </Text>
+              <TouchableOpacity onPress={() => setShowBatchCategoryPicker(false)}>
+                <Text style={styles.modalClose}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={[
+                { id: undefined, name: 'Inbox', color: undefined },
+                ...categories,
+              ]}
+              keyExtractor={(item) => item.id || 'inbox'}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.filterOption}
+                  onPress={() => handleBatchCategoryMove(item.id)}
+                >
+                  {item.color ? (
+                    <View
+                      style={[styles.filterOptionDot, { backgroundColor: item.color }]}
+                    />
+                  ) : (
+                    <View style={[styles.filterOptionDot, styles.filterOptionDotInbox]} />
+                  )}
+                  <Text style={styles.filterOptionText}>{item.name}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -495,27 +882,42 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
-  headerButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  headerButtonText: {
+  headerIcon: {
+    fontSize: 24,
     color: colors.accent,
-    fontSize: 16,
-    fontWeight: '500',
   },
-  logoutButton: {
+  profileIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  profileIconHead: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: colors.accent,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 6,
+    position: 'absolute',
+    top: 3,
   },
-  logoutButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+  profileIconBody: {
+    width: 16,
+    height: 10,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+    backgroundColor: colors.accent,
   },
   searchContainer: {
     padding: 12,
@@ -594,6 +996,26 @@ const styles = StyleSheet.create({
   loadingText: {
     color: colors.textSecondary,
     fontSize: 16,
+  },
+  swipeContainer: {
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  swipeBackground: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    backgroundColor: colors.danger,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    paddingRight: 30,
+  },
+  swipeBackgroundText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   noteItem: {
     padding: 16,
@@ -682,7 +1104,7 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 20,
-    bottom: 80,
+    bottom: 30,
     width: 56,
     height: 56,
     borderRadius: 28,
@@ -700,28 +1122,184 @@ const styles = StyleSheet.create({
     color: '#fff',
     lineHeight: 30,
   },
-  tabBar: {
+  // Header title button styles
+  headerTitleButton: {
     flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerCategoryDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 8,
+  },
+  headerTitleArrow: {
+    fontSize: 10,
+    color: colors.textMuted,
+    marginLeft: 6,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    width: '100%',
+    maxHeight: '70%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  modalClose: {
+    fontSize: 16,
+    color: colors.accent,
+    fontWeight: '500',
+  },
+  modalSectionHeader: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: colors.surfaceElevated,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalSectionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  filterOptionIcon: {
+    fontSize: 18,
+    marginRight: 12,
+  },
+  filterOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  filterOptionSelected: {
+    backgroundColor: colors.surfaceActive,
+  },
+  filterOptionDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 12,
+  },
+  filterOptionDotInbox: {
+    backgroundColor: colors.accent,
+  },
+  filterOptionText: {
+    fontSize: 16,
+    color: colors.text,
+    flex: 1,
+  },
+  filterOptionTextSelected: {
+    fontWeight: '600',
+    color: colors.accent,
+  },
+  filterOptionCount: {
+    fontSize: 14,
+    color: colors.textMuted,
+    marginRight: 8,
+  },
+  filterOptionCheck: {
+    fontSize: 16,
+    color: colors.accent,
+    fontWeight: '600',
+  },
+  // Selection mode styles
+  noteItemSelected: {
+    backgroundColor: colors.surfaceActive,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: colors.border,
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxSelected: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  checkboxCheck: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  noteTitleWithCheckbox: {
+    flex: 1,
+  },
+  notePreviewWithCheckbox: {
+    marginLeft: 34,
+  },
+  noteCategoryWithCheckbox: {
+    marginLeft: 34,
+  },
+  selectionBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    paddingBottom: 20,
   },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
+  selectionBarLeft: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
   },
-  tabActive: {
-    borderTopWidth: 2,
-    borderTopColor: colors.accent,
+  selectionBarRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
-  tabText: {
-    fontSize: 14,
-    color: colors.textSecondary,
+  selectionBarButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  tabTextActive: {
+  selectionBarButtonText: {
     color: colors.accent,
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  selectionBarCount: {
+    color: colors.textSecondary,
+    fontSize: 14,
+  },
+  selectionBarPrimary: {
+    backgroundColor: colors.accent,
+    borderRadius: 6,
+  },
+  selectionBarPrimaryText: {
+    color: '#fff',
+    fontSize: 15,
     fontWeight: '600',
   },
 });

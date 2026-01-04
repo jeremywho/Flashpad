@@ -26,6 +26,7 @@ import {
   updateSyncQueueItemError,
   getSyncQueueCount,
   clearLocalData,
+  clearSyncQueue,
   SyncOperation,
   getInboxCount as getLocalInboxCount,
   getCategoryCounts,
@@ -153,7 +154,22 @@ export class SyncManager {
 
       for (const item of queue) {
         try {
-          const payload = JSON.parse(item.payload);
+          let payload = {};
+          let payloadValid = true;
+          try {
+            payload = item.payload ? JSON.parse(item.payload) : {};
+          } catch (parseError) {
+            console.warn(`Invalid payload for sync item ${item.id}`);
+            payloadValid = false;
+          }
+
+          // For Create/Update operations, we need valid payload data - skip if invalid
+          if (!payloadValid && (item.operation === SyncOperation.Create || item.operation === SyncOperation.Update)) {
+            console.warn(`Removing sync item ${item.id} - invalid payload for ${item.operation} operation`);
+            await removeSyncQueueItem(item.id);
+            await this.updatePendingCount();
+            continue;
+          }
 
           switch (item.operation) {
             case SyncOperation.Create:
@@ -208,8 +224,18 @@ export class SyncManager {
           await removeSyncQueueItem(item.id);
           await this.updatePendingCount();
         } catch (error) {
+          const errorMessage = (error as Error).message;
           console.error(`Failed to sync item ${item.id}:`, error);
-          await updateSyncQueueItemError(item.id, (error as Error).message);
+
+          // Immediately remove items that reference non-existent resources
+          if (errorMessage.includes('not found') || errorMessage.includes('Not found')) {
+            console.warn(`Removing sync item ${item.id} - resource no longer exists`);
+            await removeSyncQueueItem(item.id);
+            await this.updatePendingCount();
+            continue;
+          }
+
+          await updateSyncQueueItemError(item.id, errorMessage);
 
           if (item.retryCount >= 3) {
             console.warn(`Giving up on sync item ${item.id} after 3 retries`);
@@ -334,6 +360,58 @@ export class SyncManager {
       });
       await this.updatePendingCount();
     }
+    return updatedNote;
+  }
+
+  async moveNoteToCategory(id: string, categoryId: string | undefined): Promise<Note> {
+    const existingNote = await getLocalNote(id);
+    if (!existingNote) {
+      throw new Error('Note not found locally');
+    }
+
+    // Update local note
+    const updatedNote: Note = {
+      ...existingNote,
+      categoryId: categoryId,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await saveLocalNote(updatedNote, id.startsWith('local_'));
+
+    // If it's a local note that hasn't synced yet, just update locally
+    if (id.startsWith('local_')) {
+      return updatedNote;
+    }
+
+    // Try to sync with server
+    if (this.isOnline) {
+      try {
+        const serverNote = await this.api.moveNote(id, { categoryId });
+        await saveLocalNote(serverNote, false);
+        return serverNote;
+      } catch (error) {
+        console.error('Failed to move note on server, queuing:', error);
+        await addToSyncQueue({
+          entityType: 'note',
+          entityId: id,
+          operation: SyncOperation.Move,
+          payload: JSON.stringify({ categoryId }),
+          baseVersion: null,
+        });
+        await this.updatePendingCount();
+        return updatedNote;
+      }
+    } else {
+      await addToSyncQueue({
+        entityType: 'note',
+        entityId: id,
+        operation: SyncOperation.Move,
+        payload: JSON.stringify({ categoryId }),
+        baseVersion: null,
+      });
+      await this.updatePendingCount();
+    }
+
     return updatedNote;
   }
 
@@ -622,5 +700,10 @@ export class SyncManager {
 
   async clearAllData(): Promise<void> {
     await clearLocalData();
+  }
+
+  async clearPendingSyncs(): Promise<void> {
+    await clearSyncQueue();
+    await this.updatePendingCount();
   }
 }

@@ -8,9 +8,11 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Modal,
+  FlatList,
+  Pressable,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
-import { useToast } from '../components/Toast';
 import { colors } from '../theme/colors';
 import { SyncManager } from '../services/syncManager';
 import { getLocalNote } from '../services/database';
@@ -28,7 +30,6 @@ interface NoteEditorScreenProps {
 
 function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
   const { api } = useAuth();
-  const toast = useToast();
   const [note, setNote] = useState<Note | null>(null);
   const [content, setContent] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
@@ -37,12 +38,25 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const textInputRef = useRef<TextInput>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const syncManagerRef = useRef<SyncManager | null>(null);
+  const isMountedRef = useRef(true);
 
   const noteId = route.params?.noteId;
   const isNew = route.params?.isNew || !noteId;
+
+  // Cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Initialize SyncManager
   useEffect(() => {
@@ -83,7 +97,6 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
       setSelectedCategoryId(fetchedNote.categoryId);
     } catch (error) {
       console.error('Failed to fetch note:', error);
-      toast.error('Failed to load note');
       navigation.goBack();
     } finally {
       setIsLoading(false);
@@ -127,53 +140,80 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
           categoryId: selectedCategoryId,
           deviceId: 'mobile',
         });
-        setNote(newNote);
-        setHasChanges(false);
-        navigation.setParams({ noteId: newNote.id, isNew: false });
+        // Only update state if still mounted
+        if (isMountedRef.current) {
+          setNote(newNote);
+          setHasChanges(false);
+          navigation.setParams({ noteId: newNote.id, isNew: false });
+        }
       } else if (noteId) {
         const updatedNote = await syncManagerRef.current.updateNote(noteId, {
           content: content.trim(),
           categoryId: selectedCategoryId,
           deviceId: 'mobile',
         });
-        setNote(updatedNote);
-        setHasChanges(false);
+        // Only update state if still mounted
+        if (isMountedRef.current) {
+          setNote(updatedNote);
+          setHasChanges(false);
+        }
       }
     } catch (error) {
       console.error('Failed to save note:', error);
-      toast.error('Failed to save note');
     } finally {
-      setIsSaving(false);
+      if (isMountedRef.current) {
+        setIsSaving(false);
+      }
     }
-  }, [content, selectedCategoryId, isNew, noteId, navigation, toast]);
+  }, [content, selectedCategoryId, isNew, noteId, navigation]);
 
   const debouncedSave = useCallback(() => {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
     saveTimeoutRef.current = setTimeout(() => {
-      if (hasChanges && !isNew) {
+      if (hasChanges) {
         saveNote();
       }
     }, 2000);
-  }, [hasChanges, isNew, saveNote]);
+  }, [hasChanges, saveNote]);
 
   const handleContentChange = (text: string) => {
     setContent(text);
     setHasChanges(true);
-    if (!isNew) {
+    // Auto-save for both new and existing notes
+    if (text.trim()) {
       debouncedSave();
     }
   };
+
+  const handleCategoryChange = async (categoryId: string | undefined) => {
+    setSelectedCategoryId(categoryId);
+    setShowCategoryPicker(false);
+
+    // Save immediately if editing existing note
+    if (!isNew && noteId && syncManagerRef.current) {
+      setIsSaving(true);
+      try {
+        const updatedNote = await syncManagerRef.current.moveNoteToCategory(noteId, categoryId);
+        setNote(updatedNote);
+      } catch (error) {
+        console.error('Failed to update category:', error);
+      } finally {
+        setIsSaving(false);
+      }
+    }
+  };
+
+  const selectedCategory = categories.find((c) => c.id === selectedCategoryId);
 
   const handleArchive = async () => {
     if (!noteId || !syncManagerRef.current) return;
     try {
       await syncManagerRef.current.archiveNote(noteId);
-      toast.success('Note archived');
       navigation.goBack();
     } catch (error) {
-      toast.error('Failed to archive note');
+      console.error('Failed to archive note:', error);
     }
   };
 
@@ -181,10 +221,9 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
     if (!noteId || !syncManagerRef.current) return;
     try {
       await syncManagerRef.current.restoreNote(noteId);
-      toast.success('Note restored');
       navigation.goBack();
     } catch (error) {
-      toast.error('Failed to restore note');
+      console.error('Failed to restore note:', error);
     }
   };
 
@@ -198,10 +237,9 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
         onPress: async () => {
           try {
             await syncManagerRef.current?.trashNote(noteId);
-            toast.success('Note moved to trash');
             navigation.goBack();
           } catch (error) {
-            toast.error('Failed to move note to trash');
+            console.error('Failed to move note to trash:', error);
           }
         },
       },
@@ -221,10 +259,9 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
           onPress: async () => {
             try {
               await syncManagerRef.current?.deleteNotePermanently(noteId);
-              toast.success('Note deleted permanently');
               navigation.goBack();
             } catch (error) {
-              toast.error('Failed to delete note');
+              console.error('Failed to delete note:', error);
             }
           },
         },
@@ -242,7 +279,19 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
             </View>
           )}
           {isSaving && <Text style={styles.savingText}>Saving...</Text>}
-          {!isNew && note && (
+          {isNew ? (
+            <TouchableOpacity
+              onPress={() => {
+                if (content.trim()) {
+                  saveNote();
+                }
+                navigation.goBack();
+              }}
+              style={styles.headerButton}
+            >
+              <Text style={styles.headerButtonText}>Done</Text>
+            </TouchableOpacity>
+          ) : note && (
             <>
               {note.status === 0 && (
                 <TouchableOpacity onPress={handleArchive} style={styles.headerButton}>
@@ -268,7 +317,7 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
         </View>
       ),
     });
-  }, [navigation, note, isNew, isSaving, isOffline]);
+  }, [navigation, note, isNew, isSaving, isOffline, content, saveNote]);
 
   if (isLoading) {
     return (
@@ -291,6 +340,26 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
           </Text>
         </View>
       )}
+
+      {/* Category Picker Row */}
+      <TouchableOpacity
+        style={styles.categoryRow}
+        onPress={() => setShowCategoryPicker(true)}
+      >
+        {selectedCategory && (
+          <View
+            style={[
+              styles.categoryDot,
+              { backgroundColor: selectedCategory.color },
+            ]}
+          />
+        )}
+        <Text style={selectedCategory ? styles.categoryName : styles.categoryNameMuted}>
+          {selectedCategory ? selectedCategory.name : 'Inbox'}
+        </Text>
+        <Text style={styles.categoryArrow}>›</Text>
+      </TouchableOpacity>
+
       <TextInput
         ref={textInputRef}
         style={styles.editor}
@@ -302,19 +371,61 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
         textAlignVertical="top"
         autoFocus={isNew}
       />
-      {isNew && (
-        <View style={styles.newNoteActions}>
-          <TouchableOpacity
-            style={[styles.saveButton, !content.trim() && styles.saveButtonDisabled]}
-            onPress={saveNote}
-            disabled={!content.trim() || isSaving}
-          >
-            <Text style={styles.saveButtonText}>
-              {isSaving ? 'Saving...' : isOffline ? 'Save Offline' : 'Save Note'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
+
+      {/* Category Picker Modal */}
+      <Modal
+        visible={showCategoryPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCategoryPicker(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowCategoryPicker(false)}
+        >
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Category</Text>
+              <TouchableOpacity onPress={() => setShowCategoryPicker(false)}>
+                <Text style={styles.modalClose}>Done</Text>
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={[{ id: undefined, name: 'Inbox', color: undefined }, ...categories]}
+              keyExtractor={(item) => item.id || 'none'}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.categoryOption,
+                    selectedCategoryId === item.id && styles.categoryOptionSelected,
+                  ]}
+                  onPress={() => handleCategoryChange(item.id)}
+                >
+                  {item.color ? (
+                    <View
+                      style={[styles.categoryOptionDot, { backgroundColor: item.color }]}
+                    />
+                  ) : (
+                    <View style={[styles.categoryOptionDot, styles.categoryOptionDotEmpty]} />
+                  )}
+                  <Text
+                    style={[
+                      styles.categoryOptionText,
+                      selectedCategoryId === item.id && styles.categoryOptionTextSelected,
+                    ]}
+                  >
+                    {item.name}
+                  </Text>
+                  {selectedCategoryId === item.id && (
+                    <Text style={styles.categoryOptionCheck}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -384,24 +495,101 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  newNoteActions: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  saveButton: {
-    backgroundColor: colors.accent,
-    paddingVertical: 14,
-    borderRadius: 8,
+  // Category picker row
+  categoryRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  saveButtonDisabled: {
+  categoryDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 8,
+  },
+  categoryName: {
+    fontSize: 14,
+    color: colors.text,
+    fontWeight: '500',
+  },
+  categoryNameMuted: {
+    fontSize: 14,
+    color: colors.textMuted,
+  },
+  categoryArrow: {
+    fontSize: 18,
+    color: colors.textMuted,
+    marginLeft: 8,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    width: '100%',
+    maxHeight: '70%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  modalClose: {
+    fontSize: 16,
+    color: colors.accent,
+    fontWeight: '500',
+  },
+  categoryOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  categoryOptionSelected: {
     backgroundColor: colors.surfaceActive,
   },
-  saveButtonText: {
-    color: '#fff',
+  categoryOptionDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 12,
+  },
+  categoryOptionDotEmpty: {
+    backgroundColor: colors.border,
+  },
+  categoryOptionText: {
     fontSize: 16,
+    color: colors.text,
+    flex: 1,
+  },
+  categoryOptionTextSelected: {
+    fontWeight: '600',
+    color: colors.accent,
+  },
+  categoryOptionCheck: {
+    fontSize: 16,
+    color: colors.accent,
     fontWeight: '600',
   },
 });

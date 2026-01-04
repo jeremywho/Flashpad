@@ -300,6 +300,14 @@ export async function clearLocalData(): Promise<void> {
   }
 }
 
+export async function clearSyncQueue(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEYS.SYNC_QUEUE);
+  } catch (error) {
+    console.error('Failed to clear sync queue:', error);
+  }
+}
+
 // Helper functions
 export async function getInboxCount(): Promise<number> {
   try {
