@@ -10,9 +10,12 @@ import {
   Platform,
   ScrollView,
   Alert,
+  Switch,
 } from 'react-native';
+import RNRestart from 'react-native-restart';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { isUsingProduction, setUseProduction, getApiUrl } from '../config';
 
 function AccountScreen() {
   const { user, api, logout } = useAuth();
@@ -23,6 +26,20 @@ function AccountScreen() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [useProduction, setUseProductionState] = useState(isUsingProduction());
+
+  const handleApiToggle = async (value: boolean) => {
+    setUseProductionState(value);
+    await setUseProduction(value);
+    Alert.alert(
+      'Restart Required',
+      `API changed to ${value ? 'Production' : 'Local Dev'}. The app needs to restart for changes to take effect.`,
+      [
+        { text: 'Later', style: 'cancel' },
+        { text: 'Restart Now', onPress: () => RNRestart.restart() },
+      ]
+    );
+  };
 
   useEffect(() => {
     if (user) {
@@ -179,6 +196,22 @@ function AccountScreen() {
       fontSize: 16,
       fontWeight: '600',
     },
+    developerRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    developerLabel: {
+      fontSize: 16,
+      color: theme.text,
+      fontWeight: '500',
+    },
+    developerHint: {
+      fontSize: 12,
+      color: theme.textMuted,
+      marginTop: 4,
+    },
   });
 
   return (
@@ -276,6 +309,22 @@ function AccountScreen() {
               </TouchableOpacity>
             ))}
           </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Developer</Text>
+          <View style={styles.developerRow}>
+            <Text style={styles.developerLabel}>Use Production API</Text>
+            <Switch
+              value={useProduction}
+              onValueChange={handleApiToggle}
+              trackColor={{ false: theme.border, true: theme.accent }}
+              thumbColor={useProduction ? '#fff' : '#f4f3f4'}
+            />
+          </View>
+          <Text style={styles.developerHint}>
+            Current: {getApiUrl()}
+          </Text>
         </View>
 
         <View style={styles.section}>

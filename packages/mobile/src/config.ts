@@ -1,10 +1,8 @@
 import { Platform } from 'react-native';
-
-// Environment configuration
-// Change USE_PRODUCTION to true to point to production API
-const USE_PRODUCTION = false;
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PRODUCTION_API_URL = 'https://api.flashpad.cc';
+const CONFIG_KEY = '@flashpad_use_production';
 
 // Local development URLs vary by platform
 const getLocalApiUrl = () => {
@@ -12,13 +10,49 @@ const getLocalApiUrl = () => {
     // Android emulator uses 10.0.2.2 to reach host machine's localhost
     return 'http://10.0.2.2:5000';
   }
-  // iOS simulator and physical devices on same network can use localhost
+  // iOS simulator uses localhost, physical device needs your machine's IP
   return 'http://localhost:5000';
 };
 
-export const API_URL = USE_PRODUCTION ? PRODUCTION_API_URL : getLocalApiUrl();
+// Runtime configuration state
+let _useProduction = false;
+let _initialized = false;
+
+export const initConfig = async (): Promise<void> => {
+  try {
+    const stored = await AsyncStorage.getItem(CONFIG_KEY);
+    _useProduction = stored === 'true';
+    _initialized = true;
+  } catch {
+    _useProduction = false;
+    _initialized = true;
+  }
+};
+
+export const getApiUrl = (): string => {
+  if (!_initialized) {
+    console.warn('Config not initialized, using default (local dev)');
+  }
+  return _useProduction ? PRODUCTION_API_URL : getLocalApiUrl();
+};
+
+export const isUsingProduction = (): boolean => {
+  return _useProduction;
+};
+
+export const setUseProduction = async (value: boolean): Promise<void> => {
+  _useProduction = value;
+  await AsyncStorage.setItem(CONFIG_KEY, value.toString());
+};
+
+// For backwards compatibility
+export const API_URL = PRODUCTION_API_URL; // Will be overridden after init
 
 export const config = {
-  apiUrl: API_URL,
-  isProduction: USE_PRODUCTION,
+  get apiUrl() {
+    return getApiUrl();
+  },
+  get isProduction() {
+    return _useProduction;
+  },
 };

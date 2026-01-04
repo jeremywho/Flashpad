@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ApiClient } from '@flashpad/shared';
 import type { User } from '@flashpad/shared';
-import { API_URL } from '../config';
+import { getApiUrl } from '../config';
 
 interface AuthContextType {
   user: User | null;
@@ -14,11 +14,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const api = new ApiClient(API_URL);
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Create API client with current config URL
+  const api = useMemo(() => new ApiClient(getApiUrl()), []);
 
   useEffect(() => {
     loadUser();

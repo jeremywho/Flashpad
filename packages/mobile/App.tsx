@@ -1,13 +1,14 @@
-import React from 'react';
-import { StatusBar } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { StatusBar, View, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import { ToastProvider } from './src/components/Toast';
 import AppNavigator from './src/navigation/AppNavigator';
+import { initConfig } from './src/config';
 
 function AppContent() {
-  const { isDark } = useTheme();
+  const { isDark, colors } = useTheme();
 
   return (
     <>
@@ -22,6 +23,20 @@ function AppContent() {
 }
 
 function App() {
+  const [configReady, setConfigReady] = useState(false);
+
+  useEffect(() => {
+    initConfig().then(() => setConfigReady(true));
+  }, []);
+
+  if (!configReady) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a2e' }}>
+        <ActivityIndicator size="large" color="#6366f1" />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaProvider>
       <ThemeProvider>
