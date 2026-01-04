@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Getting Started
+
+When starting work on this project, read the following documentation files:
+- `FLASHPAD-PLAN.md` - Detailed implementation plan and phase checklist
+- `DEPLOY.md` - Deployment and release procedures
+- `README.md` - User-facing documentation
+
 ## Project Overview
 
 Flashpad is a cross-platform quick note capture application with:
@@ -148,7 +155,7 @@ Events broadcast to user's group:
 ### Environment Files
 - `packages/web/.env.development` / `.env.production`
 - `packages/electron/.env.development` / `.env.production`
-- `packages/mobile/src/config.ts` → `USE_PRODUCTION` flag
+- `packages/mobile/src/config.ts` → Runtime toggle in Account Settings (persisted to AsyncStorage)
 - `packages/backend/appsettings.json` / `appsettings.Production.json`
 
 ### Running Against Production API
@@ -241,3 +248,24 @@ scp -r dist/* jeremy@flashpad.cc:/var/www/flashpad/web/
 - **JWT secret** in `appsettings.Production.json` (gitignored, only on server)
 - **CORS** configured in `appsettings.json` (dev) and `appsettings.Production.json` (prod)
 - **Full deployment docs** in `DEPLOY.md`
+
+## Future Roadmap
+
+### Phase 2: Conflict Resolution
+- Version-aware writes with conflict detection
+- Conflict resolution UI on all platforms
+- No automatic overwrites on stale versions
+
+### Phase 3: Push Notifications
+- FCM/APNS integration
+- Background sync triggers
+
+### Phase 4: Rich Text
+- Markdown editor
+- Image attachments
+
+## Design Decisions
+
+- **Trash retention**: Never auto-delete (user manually empties)
+- **History retention**: Last 10 versions per note
+- **Theme**: Dark mode default, indigo accent (`#6366f1`)
