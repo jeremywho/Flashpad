@@ -155,7 +155,7 @@ Events broadcast to user's group:
 ### Environment Files
 - `packages/web/.env.development` / `.env.production`
 - `packages/electron/.env.development` / `.env.production`
-- `packages/mobile/src/config.ts` → Runtime toggle in Account Settings (persisted to AsyncStorage)
+- `packages/mobile/src/config.ts` → Defaults to production for Release builds, local for Debug. Can be overridden in Account Settings (persisted to AsyncStorage)
 - `packages/backend/appsettings.json` / `appsettings.Production.json`
 
 ### Running Against Production API
@@ -248,6 +248,16 @@ scp -r dist/* jeremy@flashpad.cc:/var/www/flashpad/web/
 - **JWT secret** in `appsettings.Production.json` (gitignored, only on server)
 - **CORS** configured in `appsettings.json` (dev) and `appsettings.Production.json` (prod)
 - **Full deployment docs** in `DEPLOY.md`
+
+### iOS Bundle Identifiers
+- Main app: `cc.flashpad.mobile`
+- Widget: `cc.flashpad.mobile.widget`
+
+### Building iOS for Physical Device
+1. Update `.xcode.env.local` to point to Node 20+ (nvm path may differ per machine)
+2. Open `mobile.xcworkspace` in Xcode
+3. Select `mobile-release` scheme for Release builds
+4. Select your device and build
 
 ## Future Roadmap
 

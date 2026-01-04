@@ -15,16 +15,20 @@ const getLocalApiUrl = () => {
 };
 
 // Runtime configuration state
-let _useProduction = false;
+// Default to production for Release builds, local for Debug
+let _useProduction = !__DEV__;
 let _initialized = false;
 
 export const initConfig = async (): Promise<void> => {
   try {
     const stored = await AsyncStorage.getItem(CONFIG_KEY);
-    _useProduction = stored === 'true';
+    // Only override if explicitly set, otherwise use default based on build type
+    if (stored !== null) {
+      _useProduction = stored === 'true';
+    }
     _initialized = true;
   } catch {
-    _useProduction = false;
+    // Keep default based on __DEV__
     _initialized = true;
   }
 };

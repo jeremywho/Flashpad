@@ -28,7 +28,7 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>com.flashpad.mobile</string>
+			<string>cc.flashpad.mobile</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>flashpad</string>
