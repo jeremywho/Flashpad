@@ -264,6 +264,20 @@ scp -r dist/* jeremy@flashpad.cc:/var/www/flashpad/web/
 - Markdown editor
 - Image attachments
 
+### Phase 5: Encryption at Rest
+- Field-level encryption for `Note.Content` using AES-256-GCM
+- Encryption key stored in environment variable (not config files)
+- Encrypt before saving to DB, decrypt when reading
+- Protects against: database file leaks, SQL injection returning raw data, backup exposure
+- Does NOT protect against: full server compromise (for that, need E2EE - see below)
+- Consider: migration path for existing unencrypted notes
+
+#### Future E2EE Option (if needed)
+- Client-side encryption with user passphrase
+- Master key encrypted with passphrase-derived key, stored on server
+- Recovery key for passphrase reset scenarios
+- Trade-off: server cannot recover data if passphrase forgotten
+
 ## Design Decisions
 
 - **Trash retention**: Never auto-delete (user manually empties)
