@@ -20,7 +20,8 @@
     "react-native": "0.83.1",
     "react-native-restart": "^0.0.27",
     "react-native-safe-area-context": "^5.5.2",
-    "react-native-screens": "^4.19.0"
+    "react-native-screens": "^4.19.0",
+    "react-native-url-polyfill": "^3.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.27.4",

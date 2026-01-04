@@ -7,13 +7,15 @@ import {
   StyleSheet,
   RefreshControl,
   TextInput,
+  AppState,
+  AppStateStatus,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/colors';
 import { SyncManager, SyncStatus } from '../services/syncManager';
 import type { Note, Category, NoteStatus } from '@flashpad/shared';
 import { SignalRClient, ConnectionState } from '@flashpad/shared';
-import { API_URL } from '../config';
+import { getApiUrl } from '../config';
 
 interface HomeScreenProps {
   navigation: any;
@@ -179,8 +181,11 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     const token = api.getToken();
     if (!token) return;
 
+    const signalRUrl = getApiUrl();
+    console.log('SignalR connecting to:', signalRUrl);
+
     const client = new SignalRClient({
-      baseUrl: API_URL,
+      baseUrl: signalRUrl,
       getToken: () => api.getToken(),
       onConnectionStateChange: setConnectionState,
       onNoteCreated: (note) => {
@@ -219,7 +224,18 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     signalRRef.current = client;
     client.start().catch(console.error);
 
+    // Reconnect SignalR when app comes to foreground
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active' && signalRRef.current && !signalRRef.current.isConnected()) {
+        console.log('App foregrounded, reconnecting SignalR...');
+        signalRRef.current.start().catch(console.error);
+      }
+    };
+
+    const appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
+
     return () => {
+      appStateSubscription.remove();
       client.stop();
       signalRRef.current = null;
     };

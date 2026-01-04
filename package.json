@@ -7,6 +7,7 @@
     "packages/*"
   ],
   "scripts": {
+    "postinstall": "rm -rf packages/mobile/node_modules/react packages/mobile/node_modules/react-native packages/electron/node_modules/react packages/web/node_modules/react 2>/dev/null || true",
     "backend": "cd packages/backend && dotnet run",
     "electron": "cd packages/electron && npm run electron:dev",
     "electron:prod": "cd packages/electron && npm run electron:prod",
@@ -19,7 +20,9 @@
     "build:web": "cd packages/web && npm run build",
     "build:mobile:android": "cd packages/mobile && npm run build:android",
     "build:mobile:ios": "cd packages/mobile && npm run build:ios",
-    "install:all": "npm install && cd packages/backend && dotnet restore"
+    "install:all": "npm install && cd packages/backend && dotnet restore",
+    "pods": "cd packages/mobile/ios && pod install",
+    "pods:clean": "cd packages/mobile/ios && rm -rf Pods Podfile.lock && pod install"
   },
   "keywords": [
     "flashpad",

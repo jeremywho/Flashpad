@@ -386,6 +386,67 @@ Support formatted text input.
 
 ---
 
+## Phase 6: Mobile App Distribution (Future)
+
+### Goal
+Distribute mobile apps through official app stores for beta testing and public release.
+
+### 6.1 Apple Developer Setup
+- [ ] Enroll in Apple Developer Program ($99/year)
+- [ ] Create App ID and provisioning profiles
+- [ ] Configure code signing certificates (development + distribution)
+- [ ] Add app icons (all required sizes for iOS)
+
+### 6.2 TestFlight Beta Distribution
+- [ ] Create app record in App Store Connect
+- [ ] Configure app metadata:
+  - App name, bundle ID, SKU
+  - Privacy policy URL
+  - Age rating questionnaire
+  - App category (Productivity)
+- [ ] Archive and upload build from Xcode
+- [ ] Submit for TestFlight review (24-48 hours typically)
+- [ ] Internal testing (up to 100 team members, no review)
+- [ ] External testing (up to 10,000 testers via email/public link)
+
+### 6.3 App Store Release (iOS)
+- [ ] Complete App Store listing:
+  - Screenshots for all device sizes
+  - App description and keywords
+  - Support URL
+  - Marketing URL (optional)
+- [ ] Submit for App Store review
+- [ ] Address any review feedback
+- [ ] Release to App Store
+
+### 6.4 Google Play Distribution (Android)
+- [ ] Enroll in Google Play Developer Program ($25 one-time)
+- [ ] Create app listing in Google Play Console
+- [ ] Generate signed release APK/AAB
+- [ ] Configure app metadata and screenshots
+- [ ] Internal testing track
+- [ ] Closed beta testing
+- [ ] Open beta / Production release
+
+### 6.5 App Store Requirements Checklist
+
+**iOS Requirements:**
+- [ ] Valid provisioning profile (distribution)
+- [ ] App icons (all required sizes)
+- [ ] Launch screen / splash screen
+- [ ] Privacy policy URL
+- [ ] No crashes on launch
+- [ ] Widget properly bundled in app extension
+
+**Android Requirements:**
+- [ ] Signed release build (APK or AAB)
+- [ ] App icons (adaptive icons for Android 8+)
+- [ ] Privacy policy URL
+- [ ] Target SDK compliance (current: API 34)
+- [ ] Quick Settings Tile permissions properly declared
+
+---
+
 ## Technical Decisions
 
 ### Database Strategy
