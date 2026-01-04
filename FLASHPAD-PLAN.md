@@ -279,6 +279,99 @@ Basic note capture and sync across all platforms with offline support.
 - [ ] Accessibility review
 - [x] Error handling and user feedback (Toast notifications, error boundaries)
 
+### 1.13 Branding & Icons
+- [ ] Design app icon using AI tool (Recraft.ai recommended for vector output)
+- [ ] Generate icon set for all platforms:
+  - iOS: 1024x1024 + all required sizes (20, 29, 40, 60, 76, 83.5 @1x/2x/3x)
+  - Android: Adaptive icon (foreground + background layers), 512x512 for Play Store
+  - Electron: 256x256, 512x512, .ico for Windows, .icns for macOS
+  - Web: favicon.ico, apple-touch-icon, PWA icons
+- [ ] Update mobile splash screen with new branding
+- [ ] Update Electron app icon and Windows installer branding
+
+### 1.14 Login Screen Polish
+- [ ] Investigate and fix login screen responsiveness/performance
+  - Profile initial load time
+  - Check for unnecessary re-renders
+  - Ensure lightweight initial bundle
+- [ ] Add hidden developer environment selector:
+  - Triple-tap on logo or version number to reveal
+  - Options: Production / Beta / Localhost
+  - Only visible after secret gesture, not to normal users
+  - Persist selection to AsyncStorage/localStorage
+- [ ] Improve login UX:
+  - Auto-focus email field
+  - Clear loading states
+  - Smooth transitions
+
+---
+
+## Phase 1.5: Beta Environment
+
+### Goal
+Set up a beta environment for testing changes before production deployment.
+
+### 1.5.1 Infrastructure Setup
+- [ ] Configure DNS:
+  - `beta.flashpad.cc` → server IP
+  - `api.beta.flashpad.cc` → server IP
+- [ ] Create beta directory structure on server:
+  ```
+  /var/www/flashpad-beta/
+  ├── api/
+  │   ├── Flashpad.dll
+  │   ├── appsettings.Production.json (beta-specific)
+  │   └── flashpad-beta.db
+  └── web/
+  ```
+- [ ] Create separate systemd service (`flashpad-api-beta`) on different port (5001)
+- [ ] Update Caddy config for beta domains
+- [ ] Create separate JWT secret for beta environment
+
+### 1.5.2 Caddy Configuration
+```caddyfile
+# Beta API
+api.beta.flashpad.cc {
+    reverse_proxy localhost:5001
+}
+
+# Beta Web
+beta.flashpad.cc {
+    root * /var/www/flashpad-beta/web
+    file_server
+    try_files {path} /index.html
+}
+```
+
+### 1.5.3 Deployment Scripts
+- [ ] Create `deploy-beta.sh` script for backend
+- [ ] Create `deploy-beta-web.sh` script for web app
+- [ ] Add npm scripts to root package.json:
+  - `npm run deploy:beta` - Deploy backend to beta
+  - `npm run deploy:beta:web` - Deploy web to beta
+  - `npm run deploy:prod` - Deploy backend to production
+  - `npm run deploy:prod:web` - Deploy web to production
+
+### 1.5.4 Environment Configuration
+- [ ] Add beta environment to mobile config.ts:
+  ```typescript
+  const ENVIRONMENTS = {
+    production: 'https://api.flashpad.cc',
+    beta: 'https://api.beta.flashpad.cc',
+    local: Platform.OS === 'android' ? 'http://10.0.2.2:5000' : 'http://localhost:5000'
+  };
+  ```
+- [ ] Add beta .env files for web/electron:
+  - `.env.beta` with `VITE_API_URL=https://api.beta.flashpad.cc`
+- [ ] Add npm scripts for running against beta:
+  - `npm run electron:beta`
+  - `npm run web:beta`
+
+### 1.5.5 Database Strategy
+- [ ] Beta uses separate database (`flashpad-beta.db`)
+- [ ] Option to seed beta with anonymized production data (future)
+- [ ] Beta database is ephemeral - can be reset as needed
+
 ---
 
 ## Phase 2: Conflict Resolution & Enhanced Sync
