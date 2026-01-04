@@ -52,7 +52,10 @@ Flashpad/
 │   │   └── src/         # Screens, navigation
 │   └── shared/          # Shared TypeScript code
 │       └── src/         # types.ts, api-client.ts, signalr-client.ts
+├── .github/workflows/   # GitHub Actions (release.yml)
+├── deploy/              # Server setup scripts
 ├── FLASHPAD-PLAN.md     # Detailed implementation plan
+├── DEPLOY.md            # Deployment & release documentation
 └── README.md            # User documentation
 ```
 
@@ -128,13 +131,31 @@ Events broadcast to user's group:
 
 ## Network Configuration
 
+### Development
 | App | API URL |
 |-----|---------|
 | Electron | `http://localhost:5000` |
-| Web (dev) | `http://localhost:5000` (proxied from 5174) |
-| Web (prod) | Same origin (served from backend) |
+| Web (dev) | `http://localhost:5000` |
 | Android Emulator | `http://10.0.2.2:5000` |
 | iOS Simulator | `http://localhost:5000` |
+
+### Production
+| Service | URL |
+|---------|-----|
+| API | `https://api.flashpad.cc` |
+| Web App | `https://flashpad.cc` |
+
+### Environment Files
+- `packages/web/.env.development` / `.env.production`
+- `packages/electron/.env.development` / `.env.production`
+- `packages/mobile/src/config.ts` → `USE_PRODUCTION` flag
+- `packages/backend/appsettings.json` / `appsettings.Production.json`
+
+### Running Against Production API
+```bash
+npm run electron:prod   # Electron app → production API
+npm run web:prod        # Web app → production API
+```
 
 ## Desktop Features
 
@@ -178,10 +199,45 @@ CSS variables in `:root` and `[data-theme="light"]`:
 Notes with `status=Inbox` and `categoryId=null` appear in Inbox.
 Notes with a category appear under that category, not Inbox.
 
+## Releases
+
+Electron releases are triggered **only** by pushing a version tag (not regular commits):
+
+```bash
+# Create a release
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+This triggers GitHub Actions to build for Windows, macOS, and Linux, then publishes to GitHub Releases. Auto-updates are enabled.
+
+See `DEPLOY.md` for full deployment documentation.
+
+## Server Deployment
+
+The production server runs on Ubuntu 24.04 with:
+- .NET 9 ASP.NET Runtime
+- Caddy as reverse proxy
+- systemd for the API service (`flashpad-api`)
+- Daily SQLite backups at 2 AM (7-day retention)
+
+### Quick Deploy Commands
+```bash
+# Deploy backend
+cd packages/backend && dotnet publish -c Release -o publish
+scp -r publish/* jeremy@flashpad.cc:/var/www/flashpad/api/
+ssh jeremy@flashpad.cc "sudo systemctl restart flashpad-api"
+
+# Deploy web
+cd packages/web && npm run build
+scp -r dist/* jeremy@flashpad.cc:/var/www/flashpad/web/
+```
+
 ## Important Notes
 
 - **Node.js 20+** required
 - **Shared package** must be built before running frontends
 - **Database** (`flashpad.db`) auto-created on first backend run
-- **JWT secret** in `appsettings.json` (change for production!)
-- **CORS** configured for localhost dev ports
+- **JWT secret** in `appsettings.Production.json` (gitignored, only on server)
+- **CORS** configured in `appsettings.json` (dev) and `appsettings.Production.json` (prod)
+- **Full deployment docs** in `DEPLOY.md`
