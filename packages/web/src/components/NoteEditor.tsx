@@ -12,6 +12,7 @@ interface NoteEditorProps {
   isNew: boolean;
   isSaving: boolean;
   onCategoryChanged?: (categoryName: string) => void;
+  initialCategoryId?: string;
 }
 
 export default function NoteEditor({
@@ -25,10 +26,11 @@ export default function NoteEditor({
   isNew,
   isSaving,
   onCategoryChanged,
+  initialCategoryId,
 }: NoteEditorProps) {
   const [content, setContent] = useState(note?.content || '');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(
-    note?.categoryId
+    note?.categoryId ?? initialCategoryId
   );
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -36,8 +38,8 @@ export default function NoteEditor({
 
   useEffect(() => {
     setContent(note?.content || '');
-    setSelectedCategoryId(note?.categoryId);
-  }, [note?.id, note?.content, note?.categoryId]);
+    setSelectedCategoryId(note?.categoryId ?? initialCategoryId);
+  }, [note?.id, note?.content, note?.categoryId, initialCategoryId]);
 
   useEffect(() => {
     if (isNew && textareaRef.current) {

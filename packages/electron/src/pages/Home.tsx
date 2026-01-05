@@ -39,6 +39,7 @@ function Home() {
     return saved ? parseInt(saved, 10) : 300;
   });
   const [isResizing, setIsResizing] = useState<'sidebar' | 'noteslist' | null>(null);
+  const [newNoteInitialCategoryId, setNewNoteInitialCategoryId] = useState<string | undefined>();
 
   const signalRRef = useRef<SignalRClient | null>(null);
   const syncManagerRef = useRef<SyncManager | null>(null);
@@ -320,6 +321,15 @@ function Home() {
   const handleNewNote = () => {
     setSelectedNote(null);
     setIsNewNote(true);
+    setNewNoteInitialCategoryId(undefined);
+  };
+
+  const handleNewNoteInCategory = (categoryId: string) => {
+    setSelectedNote(null);
+    setIsNewNote(true);
+    setNewNoteInitialCategoryId(categoryId);
+    // Switch to the category view
+    setSelectedView(categoryId);
   };
 
   const handleSave = async (content: string, categoryId?: string) => {
@@ -476,6 +486,7 @@ function Home() {
         selectedView={selectedView}
         onViewChange={handleViewChange}
         onManageCategories={() => setShowCategoryManager(true)}
+        onNewNoteInCategory={handleNewNoteInCategory}
         inboxCount={inboxCount}
         archiveCount={0}
         trashCount={0}
@@ -511,6 +522,7 @@ function Home() {
         isNew={isNewNote}
         isSaving={isSaving}
         onCategoryChanged={handleCategoryChanged}
+        initialCategoryId={newNoteInitialCategoryId}
       />
       {showCategoryManager && (
         <CategoryManager
