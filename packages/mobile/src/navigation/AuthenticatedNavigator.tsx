@@ -1,5 +1,6 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { colors } from '../theme/colors';
 
 import HomeScreen from '../screens/HomeScreen';
@@ -20,21 +21,22 @@ const Stack = createNativeStackNavigator<AuthenticatedStackParamList>();
 
 function AuthenticatedNavigator() {
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: colors.surface,
-        },
-        headerTintColor: colors.text,
-        headerTitleStyle: {
-          fontWeight: '600',
-        },
-        headerShadowVisible: false,
-        contentStyle: {
-          backgroundColor: colors.background,
-        },
-      }}
-    >
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <Stack.Navigator
+        screenOptions={{
+          headerStyle: {
+            backgroundColor: colors.surface,
+          },
+          headerTintColor: colors.text,
+          headerTitleStyle: {
+            fontWeight: '600',
+          },
+          headerShadowVisible: false,
+          contentStyle: {
+            backgroundColor: colors.background,
+          },
+        }}
+      >
       <Stack.Screen
         name="Home"
         component={HomeScreen}
@@ -67,7 +69,8 @@ function AuthenticatedNavigator() {
         component={CategoryManagerScreen}
         options={{ title: 'Manage Categories' }}
       />
-    </Stack.Navigator>
+      </Stack.Navigator>
+    </GestureHandlerRootView>
   );
 }
 
