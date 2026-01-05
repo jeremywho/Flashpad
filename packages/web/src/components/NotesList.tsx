@@ -9,6 +9,7 @@ interface NotesListProps {
   viewTitle: string;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  showCategory?: boolean;
   style?: React.CSSProperties;
 }
 
@@ -49,6 +50,7 @@ export default function NotesList({
   viewTitle,
   searchQuery,
   onSearchChange,
+  showCategory = true,
   style,
 }: NotesListProps) {
   return (
@@ -106,7 +108,7 @@ export default function NotesList({
                 <span className="notes-list-item-date">{formatDate(note.updatedAt)}</span>
               </div>
               <div className="notes-list-item-preview">{getPreview(note.content)}</div>
-              {note.categoryName && (
+              {showCategory && note.categoryName && (
                 <div className="notes-list-item-category">
                   <span
                     className="notes-list-item-category-dot"

@@ -506,6 +506,7 @@ function Home() {
         style={{ width: notesListWidth }}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        showCategory={selectedView === 'inbox' || selectedView === 'archive' || selectedView === 'trash'}
       />
       <div
         className="resize-handle"
