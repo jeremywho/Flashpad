@@ -190,7 +190,14 @@ function Home() {
         fetchCategories();
       },
       onNoteUpdated: (note) => {
-        setNotes((prev) => prev.map((n) => (n.id === note.id ? note : n)));
+        // Move updated note to top if it belongs in current view, remove if not
+        setNotes((prev) => {
+          const filtered = prev.filter((n) => n.id !== note.id);
+          if (shouldShowNoteInCurrentView(note)) {
+            return [note, ...filtered];
+          }
+          return filtered;
+        });
         setSelectedNote((prev) => (prev?.id === note.id ? note : prev));
         fetchCategories();
       },
@@ -295,10 +302,20 @@ function Home() {
           categoryId,
           deviceId: 'electron-desktop',
         });
-        setNotes((prev) =>
-          prev.map((n) => (n.id === updatedNote.id ? updatedNote : n))
-        );
-        setSelectedNote(updatedNote);
+        // Move to top if still in current view, remove if not (e.g., assigned category while in inbox)
+        setNotes((prev) => {
+          const filtered = prev.filter((n) => n.id !== updatedNote.id);
+          if (shouldShowNoteInCurrentView(updatedNote)) {
+            return [updatedNote, ...filtered];
+          }
+          return filtered;
+        });
+        // Clear selection if note moved out of current view
+        if (!shouldShowNoteInCurrentView(updatedNote)) {
+          setSelectedNote(null);
+        } else {
+          setSelectedNote(updatedNote);
+        }
         fetchInboxCount();
         fetchCategories();
       }
