@@ -80,6 +80,8 @@ This creates:
 
 ### Deploying Updates
 
+Deployment uses passwordless sudo for specific commands (configured in `/etc/sudoers.d/flashpad-deploy`).
+
 #### Backend
 
 ```bash
@@ -87,11 +89,16 @@ This creates:
 cd packages/backend
 dotnet publish -c Release -o publish
 
-# Deploy
-scp -r publish/* jeremy@flashpad.cc:/var/www/flashpad/api/
+# Copy to temp directory
+ssh jeremy@flashpad.cc "mkdir -p /tmp/flashpad-deploy"
+scp -r publish/* jeremy@flashpad.cc:/tmp/flashpad-deploy/
 
-# Restart service
-ssh jeremy@flashpad.cc "sudo systemctl restart flashpad-api"
+# Deploy and restart
+ssh jeremy@flashpad.cc "sudo /bin/systemctl stop flashpad-api && \
+  sudo /bin/cp -r /tmp/flashpad-deploy/* /var/www/flashpad/api/ && \
+  sudo /bin/chown -R www-data:www-data /var/www/flashpad/ && \
+  sudo /bin/systemctl start flashpad-api && \
+  rm -rf /tmp/flashpad-deploy"
 ```
 
 #### Web App
@@ -101,8 +108,27 @@ ssh jeremy@flashpad.cc "sudo systemctl restart flashpad-api"
 cd packages/web
 npm run build
 
+# Copy to temp directory
+ssh jeremy@flashpad.cc "mkdir -p /tmp/flashpad-deploy-web"
+scp -r dist/* jeremy@flashpad.cc:/tmp/flashpad-deploy-web/
+
 # Deploy
-scp -r dist/* jeremy@flashpad.cc:/var/www/flashpad/web/
+ssh jeremy@flashpad.cc "sudo /bin/cp -r /tmp/flashpad-deploy-web/* /var/www/flashpad/web/ && \
+  sudo /bin/chown -R www-data:www-data /var/www/flashpad/web/ && \
+  rm -rf /tmp/flashpad-deploy-web"
+```
+
+#### Passwordless Sudo Setup
+
+The following commands are configured for passwordless sudo in `/etc/sudoers.d/flashpad-deploy`:
+
+```
+jeremy ALL=(ALL) NOPASSWD: /bin/systemctl stop flashpad-api
+jeremy ALL=(ALL) NOPASSWD: /bin/systemctl start flashpad-api
+jeremy ALL=(ALL) NOPASSWD: /bin/systemctl restart flashpad-api
+jeremy ALL=(ALL) NOPASSWD: /bin/cp -r /tmp/flashpad-deploy/* /var/www/flashpad/api/
+jeremy ALL=(ALL) NOPASSWD: /bin/cp -r /tmp/flashpad-deploy-web/* /var/www/flashpad/web/
+jeremy ALL=(ALL) NOPASSWD: /bin/chown -R www-data\:www-data /var/www/flashpad/*
 ```
 
 ### Server Management
