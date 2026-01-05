@@ -279,7 +279,12 @@ Basic note capture and sync across all platforms with offline support.
 - [ ] Accessibility review
 - [x] Error handling and user feedback (Toast notifications, error boundaries)
 
-### 1.13 Branding & Icons
+### 1.13 Known Bugs
+- [ ] **iOS: Swipe to delete not working** - Swipe gesture not triggering delete action
+- [ ] **Backend: Username should be case insensitive** - Login/lookup should ignore case
+- [ ] **iOS: Login button dismisses keyboard instead of logging in** - First tap dismisses keyboard, requires second tap to submit
+
+### 1.15 Branding & Icons
 - [ ] Design app icon using AI tool (Recraft.ai recommended for vector output)
 - [ ] Generate icon set for all platforms:
   - iOS: 1024x1024 + all required sizes (20, 29, 40, 60, 76, 83.5 @1x/2x/3x)
@@ -289,7 +294,7 @@ Basic note capture and sync across all platforms with offline support.
 - [ ] Update mobile splash screen with new branding
 - [ ] Update Electron app icon and Windows installer branding
 
-### 1.14 Login Screen Polish
+### 1.16 Login Screen Polish
 - [ ] Investigate and fix login screen responsiveness/performance
   - Profile initial load time
   - Check for unnecessary re-renders
