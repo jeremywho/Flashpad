@@ -289,14 +289,14 @@ Basic note capture and sync across all platforms with offline support.
 - [x] **Mobile: Trash improvements needed** - Add "Empty Trash" button and swipe-to-permanently-delete functionality (fixed: added Empty Trash header button with confirmation, swipe-to-permanently-delete on trash items)
 
 ### 1.15 Branding & Icons
-- [ ] Design app icon using AI tool (Recraft.ai recommended for vector output)
-- [ ] Generate icon set for all platforms:
-  - iOS: 1024x1024 + all required sizes (20, 29, 40, 60, 76, 83.5 @1x/2x/3x)
-  - Android: Adaptive icon (foreground + background layers), 512x512 for Play Store
-  - Electron: 256x256, 512x512, .ico for Windows, .icns for macOS
-  - Web: favicon.ico, apple-touch-icon, PWA icons
+- [x] Design app icon using AI tool (Recraft.ai recommended for vector output)
+- [x] Generate icon set for all platforms:
+  - iOS: 1024x1024 + all required sizes (40, 58, 60, 80, 87, 120, 180)
+  - Android: mipmap icons for all densities (mdpi, hdpi, xhdpi, xxhdpi, xxxhdpi)
+  - Electron: icon.png, icon.ico (Windows), icon.icns (macOS)
+  - Web: favicon.ico, favicon-16x16.png, favicon-32x32.png, apple-touch-icon.png, icon.svg, PWA icons (192, 512)
 - [ ] Update mobile splash screen with new branding
-- [ ] Update Electron app icon and Windows installer branding
+- [x] Update Electron app icon and Windows installer branding
 
 ### 1.16 Login Screen Polish
 - [ ] Investigate and fix login screen responsiveness/performance

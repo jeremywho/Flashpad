@@ -39,6 +39,7 @@
     "concurrently": "^9.1.2",
     "electron": "39.2.7",
     "electron-builder": "^26.0.12",
+    "png-to-ico": "^3.0.1",
     "typescript": "^5.8.3",
     "vite": "^7.3.0",
     "vite-plugin-electron": "^0.29.0",
@@ -53,22 +54,26 @@
       "dist-electron/**/*"
     ],
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "mac": {
       "category": "public.app-category.productivity",
+      "icon": "build/icon.icns",
       "target": [
         "dmg",
         "zip"
       ]
     },
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         "nsis",
         "portable"
       ]
     },
     "linux": {
+      "icon": "build/icon.png",
       "target": [
         "AppImage",
         "deb"
