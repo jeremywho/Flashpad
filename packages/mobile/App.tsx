@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StatusBar, View, ActivityIndicator } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import BootSplash from 'react-native-bootsplash';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import { ToastProvider } from './src/components/Toast';
@@ -27,7 +28,11 @@ function App() {
   const [configReady, setConfigReady] = useState(false);
 
   useEffect(() => {
-    initConfig().then(() => setConfigReady(true));
+    initConfig().then(() => {
+      setConfigReady(true);
+      // Hide splash screen after config is loaded
+      BootSplash.hide({ fade: true });
+    });
   }, []);
 
   // GestureHandlerRootView must wrap the entire app, including loading state

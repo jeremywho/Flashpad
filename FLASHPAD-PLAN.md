@@ -295,7 +295,7 @@ Basic note capture and sync across all platforms with offline support.
   - Android: mipmap icons for all densities (mdpi, hdpi, xhdpi, xxhdpi, xxxhdpi)
   - Electron: icon.png, icon.ico (Windows), icon.icns (macOS)
   - Web: favicon.ico, favicon-16x16.png, favicon-32x32.png, apple-touch-icon.png, icon.svg, PWA icons (192, 512)
-- [ ] Update mobile splash screen with new branding
+- [x] Update mobile splash screen with new branding (using react-native-bootsplash)
 - [x] Update Electron app icon and Windows installer branding
 
 ### 1.16 Login Screen Polish
