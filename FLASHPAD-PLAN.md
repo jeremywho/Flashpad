@@ -284,6 +284,9 @@ Basic note capture and sync across all platforms with offline support.
 - [x] **Backend: Username should be case insensitive** - Login/lookup should ignore case
 - [x] **iOS: Login button dismisses keyboard instead of logging in** - First tap dismisses keyboard, requires second tap to submit (fixed: added keyboardShouldPersistTaps="handled" to ScrollViews)
 - [x] **Web: Duplicate note appears after save** - Creating a new note shows two identical notes in list until category switch (fixed: added deduplication check)
+- [ ] **iOS: Swipe delete button flashes on swipe start** - Delete button is fully visible initially, then gets covered and reveals as expected during swipe
+- [ ] **Mobile: Trash folder doesn't show newly deleted items** - Items moved to trash don't appear until pull-to-refresh
+- [ ] **Mobile: Trash improvements needed** - Add "Empty Trash" button and swipe-to-permanently-delete functionality
 
 ### 1.15 Branding & Icons
 - [ ] Design app icon using AI tool (Recraft.ai recommended for vector output)
