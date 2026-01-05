@@ -11,6 +11,7 @@ import {
   AppStateStatus,
   Modal,
   Pressable,
+  Alert,
 } from 'react-native';
 import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 import Reanimated, {
@@ -66,14 +67,17 @@ interface SwipeableNoteItemProps {
   children: React.ReactNode;
   onSwipeLeft: () => void;
   enabled: boolean;
+  actionText?: string;
 }
 
 function RightAction({
   drag,
   onPress,
+  actionText = 'Trash',
 }: {
   drag: SharedValue<number>;
   onPress: () => void;
+  actionText?: string;
 }) {
   const animatedStyle = useAnimatedStyle(() => {
     // drag.value is negative when swiping left
@@ -93,13 +97,13 @@ function RightAction({
         activeOpacity={0.8}
         style={styles.swipeActionTouchable}
       >
-        <Text style={styles.swipeActionText}>Trash</Text>
+        <Text style={styles.swipeActionText}>{actionText}</Text>
       </TouchableOpacity>
     </Reanimated.View>
   );
 }
 
-function SwipeableNoteItem({ children, onSwipeLeft, enabled }: SwipeableNoteItemProps) {
+function SwipeableNoteItem({ children, onSwipeLeft, enabled, actionText }: SwipeableNoteItemProps) {
   const swipeableRef = useRef<ReanimatedSwipeable>(null);
 
   const renderRightActions = (
@@ -113,6 +117,7 @@ function SwipeableNoteItem({ children, onSwipeLeft, enabled }: SwipeableNoteItem
           swipeableRef.current?.close();
           onSwipeLeft();
         }}
+        actionText={actionText}
       />
     );
   };
@@ -190,20 +195,27 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     };
   }, [api]);
 
-  const fetchNotes = useCallback(async () => {
+  const fetchNotes = useCallback(async (
+    overrideTab?: TabType,
+    overrideCategoryId?: string | null
+  ) => {
     if (!syncManagerRef.current) return;
+
+    // Use override values if provided, otherwise use state
+    const tab = overrideTab ?? selectedTab;
+    const categoryId = overrideCategoryId !== undefined ? overrideCategoryId : selectedCategoryId;
 
     try {
       const localNotes = await syncManagerRef.current.getNotes({
-        status: getStatusForTab(selectedTab),
-        categoryId: selectedCategoryId || undefined,
+        status: getStatusForTab(tab),
+        categoryId: categoryId || undefined,
       });
 
       // Filter notes based on view
       let filteredNotes = localNotes;
 
       // In Inbox view (no category selected), only show uncategorized notes
-      if (selectedTab === 'inbox' && !selectedCategoryId) {
+      if (tab === 'inbox' && !categoryId) {
         filteredNotes = filteredNotes.filter((n) => !n.categoryId);
       }
 
@@ -365,8 +377,10 @@ function HomeScreen({ navigation }: HomeScreenProps) {
 
   const renderNote = ({ item }: { item: Note }) => {
     const isSelected = selectedNoteIds.has(item.id);
-    // Enable swipe for inbox/archive notes, not for trash or during selection mode
-    const swipeEnabled = selectedTab !== 'trash' && !isSelectionMode;
+    // Enable swipe for all notes except during selection mode
+    const swipeEnabled = !isSelectionMode;
+    // Use different handler and text for trash items
+    const isTrashView = selectedTab === 'trash';
 
     const noteContent = (
       <TouchableOpacity
@@ -422,8 +436,13 @@ function HomeScreen({ navigation }: HomeScreenProps) {
 
     return (
       <SwipeableNoteItem
-        onSwipeLeft={() => handleSwipeToTrash(item.id)}
+        onSwipeLeft={() =>
+          isTrashView
+            ? handleSwipeToPermanentDelete(item.id)
+            : handleSwipeToTrash(item.id)
+        }
         enabled={swipeEnabled}
+        actionText={isTrashView ? 'Delete' : 'Trash'}
       >
         {noteContent}
       </SwipeableNoteItem>
@@ -452,6 +471,9 @@ function HomeScreen({ navigation }: HomeScreenProps) {
   const handleCategoryFilterSelect = (categoryId: string | null) => {
     setSelectedCategoryId(categoryId);
     setShowCategoryFilter(false);
+    // Explicitly fetch with the new category to avoid stale closure issues
+    setIsLoading(true);
+    fetchNotes(selectedTab, categoryId);
   };
 
   const handleTabChange = (tab: TabType) => {
@@ -459,6 +481,9 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     setSelectedCategoryId(null); // Clear category filter when switching tabs
     exitSelectionMode(); // Exit selection mode when switching tabs
     setShowCategoryFilter(false);
+    // Explicitly fetch with the new tab value to avoid stale closure issues
+    setIsLoading(true);
+    fetchNotes(tab, null);
   };
 
   const handleStatusSelect = (tab: TabType) => {
@@ -524,6 +549,44 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     } catch (error) {
       console.error('Failed to trash note:', error);
     }
+  };
+
+  const handleSwipeToPermanentDelete = async (noteId: string) => {
+    if (!syncManagerRef.current) return;
+    try {
+      await syncManagerRef.current.deleteNotePermanently(noteId);
+      setNotes((prev) => prev.filter((n) => n.id !== noteId));
+    } catch (error) {
+      console.error('Failed to permanently delete note:', error);
+    }
+  };
+
+  const handleEmptyTrash = () => {
+    if (notes.length === 0) return;
+
+    Alert.alert(
+      'Empty Trash',
+      `Are you sure you want to permanently delete ${notes.length} note${notes.length !== 1 ? 's' : ''}? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete All',
+          style: 'destructive',
+          onPress: async () => {
+            if (!syncManagerRef.current) return;
+            try {
+              const promises = notes.map((note) =>
+                syncManagerRef.current!.deleteNotePermanently(note.id)
+              );
+              await Promise.all(promises);
+              setNotes([]);
+            } catch (error) {
+              console.error('Failed to empty trash:', error);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const renderSyncStatus = () => {
@@ -592,6 +655,14 @@ function HomeScreen({ navigation }: HomeScreenProps) {
           {renderSyncStatus()}
         </View>
         <View style={styles.headerActions}>
+          {selectedTab === 'trash' && notes.length > 0 && (
+            <TouchableOpacity
+              style={styles.emptyTrashButton}
+              onPress={handleEmptyTrash}
+            >
+              <Text style={styles.emptyTrashButtonText}>Empty</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={styles.headerIconButton}
             onPress={() => navigation.navigate('CategoryManager')}
@@ -902,6 +973,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  emptyTrashButton: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginRight: 4,
+  },
+  emptyTrashButtonText: {
+    color: colors.danger,
+    fontSize: 14,
+    fontWeight: '600',
   },
   headerIconButton: {
     width: 40,
