@@ -380,6 +380,79 @@ beta.flashpad.cc {
 
 ---
 
+## Phase 1.6: Server Administration & Infrastructure
+
+### Goal
+Improve server monitoring, security, and administration capabilities.
+
+### 1.6.1 Database Web Viewer
+- [ ] Research SQLite web admin tools:
+  - **Adminer** (PHP-based, single file, supports SQLite) - lightweight
+  - **sqlite-web** (Python-based) - simple SQLite browser
+  - **Cloudbeaver** (Java-based) - more full-featured but heavier
+  - **phpLiteAdmin** (PHP, single file) - very lightweight
+- [ ] Set up chosen tool at `db.flashpad.cc`
+- [ ] Configure Caddy with HTTP Basic Auth (like monitor.flashpad.cc)
+- [ ] Ensure read-only or carefully secured access
+
+### 1.6.2 Bot Protection & SEO
+- [ ] **Registration Protection:**
+  - Add rate limiting on `/api/auth/register` endpoint
+  - Consider CAPTCHA (hCaptcha, Cloudflare Turnstile, or simple honeypot)
+  - Add email verification requirement
+- [ ] **SEO Meta Tags:**
+  - Add proper `<meta>` tags (description, keywords, Open Graph)
+  - Add `robots.txt` with allowed/disallowed paths
+  - Add `sitemap.xml` for helpful crawlers
+- [ ] **Bot Blocking:**
+  - Configure `robots.txt` to block sensitive paths (`/api/*`, `/login`, `/register`)
+  - Consider Cloudflare or Caddy-based bot detection
+  - Add user-agent filtering for known bad bots
+
+### 1.6.3 Traffic Monitoring & Bot Detection
+- [ ] **Netdata Capabilities:**
+  - Netdata can show web server request rates via Caddy/nginx metrics
+  - Can alert on unusual traffic spikes
+  - Limited bot-specific detection out of the box
+- [ ] **Enhanced Monitoring Options:**
+  - **GoAccess** - Real-time log analyzer, shows bots/crawlers, generates reports
+  - **Caddy access logs** - Enable and analyze with GoAccess or similar
+  - **Fail2ban** - Auto-ban IPs with too many failed requests
+  - **Crowdsec** - Modern alternative to Fail2ban with crowd-sourced threat intel
+- [ ] Set up access log analysis dashboard
+
+### 1.6.4 Self-Hosted Email
+- [ ] **Email Server Options (self-hosted):**
+  - **Mailcow** - Docker-based, includes webmail (SOGo), admin UI, mobile sync
+  - **Mail-in-a-Box** - All-in-one, easy setup, includes webmail (Roundcube)
+  - **iRedMail** - Comprehensive, supports multiple webmail options
+  - **Maddy** - Lightweight Go-based, simpler but fewer features
+  - **Docker Mailserver** - Docker-based, flexible, use with Roundcube/Rainloop
+- [ ] **Considerations:**
+  - Requires proper DNS (MX, SPF, DKIM, DMARC records)
+  - Email deliverability can be challenging with new IPs
+  - May need separate IP or VPS for email
+  - Ongoing maintenance (security updates, spam filtering)
+- [ ] **Mobile App Options:**
+  - Standard IMAP/SMTP works with any email client (iOS Mail, Gmail app, Outlook)
+  - SOGo (in Mailcow) has its own mobile apps
+  - Consider if dedicated app is really needed vs standard clients
+- [ ] **Alternative: Transactional Email Only:**
+  - Use self-hosted for sending only (registration confirmations, notifications)
+  - Skip full mailbox hosting complexity
+  - Tools: Postal, Haraka, or just Postfix
+
+### 1.6.5 Registration Notifications
+- [ ] Add webhook/notification on new user registration
+- [ ] Options:
+  - Email notification to admin
+  - Discord/Slack webhook
+  - Push notification to mobile
+  - Simple log entry that Netdata can alert on
+- [ ] Implementation: Add to `AuthController.Register` method
+
+---
+
 ## Phase 2: Conflict Resolution & Enhanced Sync
 
 ### Goal
