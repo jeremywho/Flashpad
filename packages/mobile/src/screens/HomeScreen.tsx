@@ -76,22 +76,26 @@ function RightAction({
   onPress: () => void;
 }) {
   const animatedStyle = useAnimatedStyle(() => {
+    // drag.value is negative when swiping left
+    // Only show when actually swiping (drag < -5 to avoid flash)
+    const opacity = Math.min(1, Math.max(0, (-drag.value - 5) / 30));
     const scale = Math.min(1, Math.max(0.5, -drag.value / 100));
     return {
+      opacity,
       transform: [{ scale }],
     };
   });
 
   return (
-    <TouchableOpacity
-      style={styles.swipeAction}
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
-      <Reanimated.Text style={[styles.swipeActionText, animatedStyle]}>
-        Trash
-      </Reanimated.Text>
-    </TouchableOpacity>
+    <Reanimated.View style={[styles.swipeAction, animatedStyle]}>
+      <TouchableOpacity
+        onPress={onPress}
+        activeOpacity={0.8}
+        style={styles.swipeActionTouchable}
+      >
+        <Text style={styles.swipeActionText}>Trash</Text>
+      </TouchableOpacity>
+    </Reanimated.View>
   );
 }
 
@@ -1017,6 +1021,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     width: 80,
+  },
+  swipeActionTouchable: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
   },
   swipeActionText: {
     color: '#fff',
