@@ -30,7 +30,6 @@ function App() {
   useEffect(() => {
     initConfig().then(() => {
       setConfigReady(true);
-      // Hide splash screen after config is loaded
       BootSplash.hide({ fade: true });
     });
   }, []);
