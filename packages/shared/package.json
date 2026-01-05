@@ -15,7 +15,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@microsoft/signalr": "^8.0.7"
+    "@microsoft/signalr": "^10.0.0"
   },
   "devDependencies": {
     "@types/node": "^25.0.3",
