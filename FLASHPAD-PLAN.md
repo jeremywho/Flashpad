@@ -281,7 +281,7 @@ Basic note capture and sync across all platforms with offline support.
 
 ### 1.13 Known Bugs
 - [ ] **iOS: Swipe to delete not working** - Swipe gesture not triggering delete action
-- [ ] **Backend: Username should be case insensitive** - Login/lookup should ignore case
+- [x] **Backend: Username should be case insensitive** - Login/lookup should ignore case
 - [ ] **iOS: Login button dismisses keyboard instead of logging in** - First tap dismisses keyboard, requires second tap to submit
 
 ### 1.15 Branding & Icons

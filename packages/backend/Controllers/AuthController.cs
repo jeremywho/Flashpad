@@ -24,19 +24,21 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<ActionResult<AuthResponseDto>> Register(RegisterDto dto)
     {
-        if (await _context.Users.AnyAsync(u => u.Username == dto.Username))
+        var usernameNormalized = dto.Username.ToLowerInvariant();
+
+        if (await _context.Users.AnyAsync(u => u.Username == usernameNormalized))
         {
             return BadRequest(new { message = "Username already exists" });
         }
 
-        if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
+        if (await _context.Users.AnyAsync(u => u.Email.ToLower() == dto.Email.ToLower()))
         {
             return BadRequest(new { message = "Email already exists" });
         }
 
         var user = new User
         {
-            Username = dto.Username,
+            Username = usernameNormalized,
             Email = dto.Email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
             FullName = dto.FullName,
@@ -67,7 +69,8 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<ActionResult<AuthResponseDto>> Login(LoginDto dto)
     {
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == dto.Username);
+        var usernameNormalized = dto.Username.ToLowerInvariant();
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == usernameNormalized);
 
         if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
         {
