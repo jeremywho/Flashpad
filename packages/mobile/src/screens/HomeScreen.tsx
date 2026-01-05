@@ -11,10 +11,12 @@ import {
   AppStateStatus,
   Modal,
   Pressable,
-  Animated,
-  PanResponder,
-  Dimensions,
 } from 'react-native';
+import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
+import Reanimated, {
+  SharedValue,
+  useAnimatedStyle,
+} from 'react-native-reanimated';
 import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/colors';
 import { SyncManager, SyncStatus } from '../services/syncManager';
@@ -60,58 +62,71 @@ function getTitle(content: string): string {
 
 type TabType = 'inbox' | 'archive' | 'trash';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
-
 interface SwipeableNoteItemProps {
   children: React.ReactNode;
   onSwipeLeft: () => void;
   enabled: boolean;
 }
 
-function SwipeableNoteItem({ children, onSwipeLeft, enabled }: SwipeableNoteItemProps) {
-  const translateX = useRef(new Animated.Value(0)).current;
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return enabled && Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dy) < 10;
-      },
-      onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dx < 0) {
-          translateX.setValue(gestureState.dx);
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx < -SWIPE_THRESHOLD) {
-          Animated.timing(translateX, {
-            toValue: -SCREEN_WIDTH,
-            duration: 200,
-            useNativeDriver: true,
-          }).start(() => onSwipeLeft());
-        } else {
-          Animated.spring(translateX, {
-            toValue: 0,
-            useNativeDriver: true,
-          }).start();
-        }
-      },
-    })
-  ).current;
+function RightAction({
+  drag,
+  onPress,
+}: {
+  drag: SharedValue<number>;
+  onPress: () => void;
+}) {
+  const animatedStyle = useAnimatedStyle(() => {
+    const scale = Math.min(1, Math.max(0.5, -drag.value / 100));
+    return {
+      transform: [{ scale }],
+    };
+  });
 
   return (
-    <View style={styles.swipeContainer}>
-      <View style={styles.swipeBackground}>
-        <Text style={styles.swipeBackgroundText}>Trash</Text>
-      </View>
-      <Animated.View
-        style={{ transform: [{ translateX }] }}
-        {...panResponder.panHandlers}
-      >
-        {children}
-      </Animated.View>
-    </View>
+    <TouchableOpacity
+      style={styles.swipeAction}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
+      <Reanimated.Text style={[styles.swipeActionText, animatedStyle]}>
+        Trash
+      </Reanimated.Text>
+    </TouchableOpacity>
+  );
+}
+
+function SwipeableNoteItem({ children, onSwipeLeft, enabled }: SwipeableNoteItemProps) {
+  const swipeableRef = useRef<ReanimatedSwipeable>(null);
+
+  const renderRightActions = (
+    _progress: SharedValue<number>,
+    drag: SharedValue<number>
+  ) => {
+    return (
+      <RightAction
+        drag={drag}
+        onPress={() => {
+          swipeableRef.current?.close();
+          onSwipeLeft();
+        }}
+      />
+    );
+  };
+
+  if (!enabled) {
+    return <>{children}</>;
+  }
+
+  return (
+    <ReanimatedSwipeable
+      ref={swipeableRef}
+      renderRightActions={renderRightActions}
+      rightThreshold={40}
+      friction={2}
+      overshootRight={false}
+    >
+      {children}
+    </ReanimatedSwipeable>
   );
 }
 
@@ -997,24 +1012,15 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 16,
   },
-  swipeContainer: {
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  swipeBackground: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    width: '100%',
+  swipeAction: {
     backgroundColor: colors.danger,
     justifyContent: 'center',
-    alignItems: 'flex-end',
-    paddingRight: 30,
+    alignItems: 'center',
+    width: 80,
   },
-  swipeBackgroundText: {
+  swipeActionText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
   noteItem: {

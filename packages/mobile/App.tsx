@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { StatusBar, View, ActivityIndicator } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
@@ -8,7 +9,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { initConfig } from './src/config';
 
 function AppContent() {
-  const { isDark, colors } = useTheme();
+  const { isDark } = useTheme();
 
   return (
     <>
@@ -29,20 +30,21 @@ function App() {
     initConfig().then(() => setConfigReady(true));
   }, []);
 
-  if (!configReady) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a2e' }}>
-        <ActivityIndicator size="large" color="#6366f1" />
-      </View>
-    );
-  }
-
+  // GestureHandlerRootView must wrap the entire app, including loading state
   return (
-    <SafeAreaProvider>
-      <ThemeProvider>
-        <AppContent />
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      {!configReady ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a2e' }}>
+          <ActivityIndicator size="large" color="#6366f1" />
+        </View>
+      ) : (
+        <SafeAreaProvider>
+          <ThemeProvider>
+            <AppContent />
+          </ThemeProvider>
+        </SafeAreaProvider>
+      )}
+    </GestureHandlerRootView>
   );
 }
 
