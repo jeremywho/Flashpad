@@ -11,6 +11,7 @@ interface NoteEditorProps {
   onDelete: () => void;
   isNew: boolean;
   isSaving: boolean;
+  onCategoryChanged?: (categoryName: string) => void;
 }
 
 export default function NoteEditor({
@@ -23,6 +24,7 @@ export default function NoteEditor({
   onDelete,
   isNew,
   isSaving,
+  onCategoryChanged,
 }: NoteEditorProps) {
   const [content, setContent] = useState(note?.content || '');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(
@@ -75,10 +77,18 @@ export default function NoteEditor({
   };
 
   const handleCategoryChange = (categoryId: string | undefined) => {
+    const previousCategoryId = selectedCategoryId;
     setSelectedCategoryId(categoryId);
     setShowCategoryDropdown(false);
     if (!isNew && content.trim()) {
       onSave(content, categoryId);
+      // Notify parent if category actually changed
+      if (previousCategoryId !== categoryId && onCategoryChanged) {
+        const newCategoryName = categoryId
+          ? categories.find(c => c.id === categoryId)?.name || 'category'
+          : 'Inbox';
+        onCategoryChanged(newCategoryName);
+      }
     }
   };
 
@@ -107,6 +117,7 @@ export default function NoteEditor({
       <div className="note-editor-toolbar">
         <div className="note-editor-toolbar-left">
           <div className="note-editor-category-selector">
+            <span className="note-editor-category-label">Move to:</span>
             <button
               className="note-editor-category-btn"
               onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
@@ -120,22 +131,22 @@ export default function NoteEditor({
                   {selectedCategory.name}
                 </>
               ) : (
-                'No Category'
+                'Inbox'
               )}
               <span className="note-editor-category-arrow">&#9662;</span>
             </button>
             {showCategoryDropdown && (
               <div className="note-editor-category-dropdown">
                 <button
-                  className="note-editor-category-option"
+                  className={`note-editor-category-option ${!selectedCategoryId ? 'selected' : ''}`}
                   onClick={() => handleCategoryChange(undefined)}
                 >
-                  No Category
+                  Inbox
                 </button>
                 {categories.map((category) => (
                   <button
                     key={category.id}
-                    className="note-editor-category-option"
+                    className={`note-editor-category-option ${selectedCategoryId === category.id ? 'selected' : ''}`}
                     onClick={() => handleCategoryChange(category.id)}
                   >
                     <span

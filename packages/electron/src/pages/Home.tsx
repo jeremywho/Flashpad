@@ -34,6 +34,10 @@ function Home() {
   const signalRRef = useRef<SignalRClient | null>(null);
   const syncManagerRef = useRef<SyncManager | null>(null);
 
+  const handleCategoryChanged = useCallback((categoryName: string) => {
+    toast.success(`Moved to ${categoryName}`);
+  }, [toast]);
+
   // Initialize SyncManager
   useEffect(() => {
     const syncManager = new SyncManager({
@@ -454,6 +458,7 @@ function Home() {
         onDelete={handleDelete}
         isNew={isNewNote}
         isSaving={isSaving}
+        onCategoryChanged={handleCategoryChanged}
       />
       {showCategoryManager && (
         <CategoryManager

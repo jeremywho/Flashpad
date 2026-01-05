@@ -24,7 +24,23 @@ function Home() {
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [inboxCount, setInboxCount] = useState(0);
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const signalRRef = useRef<SignalRClient | null>(null);
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((message: string) => {
+    setToastMessage(message);
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    toastTimeoutRef.current = setTimeout(() => {
+      setToastMessage(null);
+    }, 3000);
+  }, []);
+
+  const handleCategoryChanged = useCallback((categoryName: string) => {
+    showToast(`Moved to ${categoryName}`);
+  }, [showToast]);
 
   const fetchNotes = useCallback(async () => {
     try {
@@ -329,6 +345,7 @@ function Home() {
         onDelete={handleDelete}
         isNew={isNewNote}
         isSaving={isSaving}
+        onCategoryChanged={handleCategoryChanged}
       />
       {showCategoryManager && (
         <CategoryManager
@@ -340,6 +357,11 @@ function Home() {
         />
       )}
       <ConnectionStatus state={connectionState} />
+      {toastMessage && (
+        <div className="toast-container">
+          <div className="toast">{toastMessage}</div>
+        </div>
+      )}
     </div>
   );
 }
