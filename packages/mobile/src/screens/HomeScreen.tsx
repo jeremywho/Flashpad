@@ -157,6 +157,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
   const [showBatchCategoryPicker, setShowBatchCategoryPicker] = useState(false);
   const syncManagerRef = useRef<SyncManager | null>(null);
   const signalRRef = useRef<SignalRClient | null>(null);
+  const fetchNotesRef = useRef<((tab?: TabType, categoryId?: string | null) => Promise<void>) | undefined>(undefined);
 
   const getStatusForTab = (tab: TabType): NoteStatus => {
     switch (tab) {
@@ -169,31 +170,6 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     }
   };
 
-  // Initialize SyncManager
-  useEffect(() => {
-    const syncManager = new SyncManager({
-      api,
-      onSyncStatusChange: setSyncStatus,
-      onPendingCountChange: setPendingCount,
-      onDataRefresh: () => {
-        fetchNotes();
-        fetchCategories();
-      },
-    });
-
-    syncManagerRef.current = syncManager;
-
-    // Perform initial sync
-    syncManager.initialSync().then(() => {
-      fetchNotes();
-      fetchCategories();
-    });
-
-    return () => {
-      syncManager.destroy();
-      syncManagerRef.current = null;
-    };
-  }, [api]);
 
   const fetchNotes = useCallback(async (
     overrideTab?: TabType,
@@ -246,6 +222,38 @@ function HomeScreen({ navigation }: HomeScreenProps) {
       console.error('Failed to fetch categories:', error);
     }
   }, []);
+
+  // Keep fetchNotesRef updated with the latest fetchNotes function
+  useEffect(() => {
+    fetchNotesRef.current = fetchNotes;
+  }, [fetchNotes]);
+
+  // Initialize SyncManager
+  useEffect(() => {
+    const syncManager = new SyncManager({
+      api,
+      onSyncStatusChange: setSyncStatus,
+      onPendingCountChange: setPendingCount,
+      onDataRefresh: () => {
+        // Use ref to get the latest fetchNotes function to avoid stale closure
+        fetchNotesRef.current?.();
+        fetchCategories();
+      },
+    });
+
+    syncManagerRef.current = syncManager;
+
+    // Perform initial sync
+    syncManager.initialSync().then(() => {
+      fetchNotesRef.current?.();
+      fetchCategories();
+    });
+
+    return () => {
+      syncManager.destroy();
+      syncManagerRef.current = null;
+    };
+  }, [api, fetchCategories]);
 
   useEffect(() => {
     if (syncManagerRef.current) {
@@ -358,7 +366,8 @@ function HomeScreen({ navigation }: HomeScreenProps) {
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchNotes();
+    // Explicitly pass current tab and category to avoid stale closure issues
+    fetchNotes(selectedTab, selectedCategoryId);
     syncManagerRef.current?.processSyncQueue();
   };
 
