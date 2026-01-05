@@ -178,6 +178,19 @@ h1, h2, h3 {
   overflow: hidden;
 }
 
+/* Resize Handles */
+.resize-handle {
+  width: 4px;
+  background: transparent;
+  cursor: col-resize;
+  flex-shrink: 0;
+  transition: background-color 0.15s;
+}
+
+.resize-handle:hover {
+  background: var(--accent-color);
+}
+
 /* Sidebar */
 .sidebar {
   width: 220px;

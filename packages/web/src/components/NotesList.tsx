@@ -7,6 +7,9 @@ interface NotesListProps {
   onNewNote: () => void;
   isLoading: boolean;
   viewTitle: string;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+  style?: React.CSSProperties;
 }
 
 function formatDate(dateString: string): string {
@@ -44,24 +47,51 @@ export default function NotesList({
   onNewNote,
   isLoading,
   viewTitle,
+  searchQuery,
+  onSearchChange,
+  style,
 }: NotesListProps) {
   return (
-    <div className="notes-list">
+    <div className="notes-list" style={style}>
       <div className="notes-list-header">
         <h2 className="notes-list-title">{viewTitle}</h2>
         <button className="notes-list-new-btn" onClick={onNewNote} title="New Note">
           +
         </button>
       </div>
+      <div className="notes-list-search">
+        <input
+          type="text"
+          className="notes-list-search-input"
+          placeholder="Search notes..."
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+        />
+        {searchQuery && (
+          <button
+            className="notes-list-search-clear"
+            onClick={() => onSearchChange('')}
+            title="Clear search"
+          >
+            ×
+          </button>
+        )}
+      </div>
 
       {isLoading ? (
         <div className="notes-list-loading">Loading notes...</div>
       ) : notes.length === 0 ? (
         <div className="notes-list-empty">
-          <p>No notes yet</p>
-          <button className="notes-list-empty-btn" onClick={onNewNote}>
-            Create your first note
-          </button>
+          {searchQuery ? (
+            <p>No notes match "{searchQuery}"</p>
+          ) : (
+            <>
+              <p>No notes yet</p>
+              <button className="notes-list-empty-btn" onClick={onNewNote}>
+                Create your first note
+              </button>
+            </>
+          )}
         </div>
       ) : (
         <div className="notes-list-items">

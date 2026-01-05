@@ -9,6 +9,7 @@ interface SidebarProps {
   inboxCount: number;
   archiveCount: number;
   trashCount: number;
+  style?: React.CSSProperties;
 }
 
 export default function Sidebar({
@@ -19,11 +20,12 @@ export default function Sidebar({
   inboxCount,
   archiveCount,
   trashCount,
+  style,
 }: SidebarProps) {
   const navigate = useNavigate();
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" style={style}>
       <div className="sidebar-header">
         <h1 className="sidebar-logo">Flashpad</h1>
       </div>

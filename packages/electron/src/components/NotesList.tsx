@@ -9,6 +9,7 @@ interface NotesListProps {
   viewTitle: string;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  style?: React.CSSProperties;
 }
 
 function formatDate(dateString: string): string {
@@ -48,9 +49,10 @@ export default function NotesList({
   viewTitle,
   searchQuery,
   onSearchChange,
+  style,
 }: NotesListProps) {
   return (
-    <div className="notes-list">
+    <div className="notes-list" style={style}>
       <div className="notes-list-header">
         <h2 className="notes-list-title">{viewTitle}</h2>
         <button className="notes-list-new-btn" onClick={onNewNote} title="New Note">

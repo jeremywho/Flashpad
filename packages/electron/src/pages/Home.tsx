@@ -30,9 +30,51 @@ function Home() {
   const [pendingCount, setPendingCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [connectedDevices, setConnectedDevices] = useState<DevicePresence[]>([]);
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const saved = localStorage.getItem('flashpad-sidebar-width');
+    return saved ? parseInt(saved, 10) : 220;
+  });
+  const [notesListWidth, setNotesListWidth] = useState(() => {
+    const saved = localStorage.getItem('flashpad-noteslist-width');
+    return saved ? parseInt(saved, 10) : 300;
+  });
+  const [isResizing, setIsResizing] = useState<'sidebar' | 'noteslist' | null>(null);
 
   const signalRRef = useRef<SignalRClient | null>(null);
   const syncManagerRef = useRef<SyncManager | null>(null);
+
+  // Handle resize drag
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isResizing === 'sidebar') {
+        const newWidth = Math.max(150, Math.min(400, e.clientX));
+        setSidebarWidth(newWidth);
+        localStorage.setItem('flashpad-sidebar-width', String(newWidth));
+      } else if (isResizing === 'noteslist') {
+        const newWidth = Math.max(200, Math.min(500, e.clientX - sidebarWidth - 4));
+        setNotesListWidth(newWidth);
+        localStorage.setItem('flashpad-noteslist-width', String(newWidth));
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(null);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing, sidebarWidth]);
 
   const handleCategoryChanged = useCallback((categoryName: string) => {
     toast.success(`Moved to ${categoryName}`);
@@ -437,6 +479,11 @@ function Home() {
         inboxCount={inboxCount}
         archiveCount={0}
         trashCount={0}
+        style={{ width: sidebarWidth }}
+      />
+      <div
+        className="resize-handle"
+        onMouseDown={() => setIsResizing('sidebar')}
       />
       <NotesList
         notes={notes}
@@ -445,8 +492,13 @@ function Home() {
         onNewNote={handleNewNote}
         isLoading={isLoading}
         viewTitle={getViewTitle()}
+        style={{ width: notesListWidth }}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+      />
+      <div
+        className="resize-handle"
+        onMouseDown={() => setIsResizing('noteslist')}
       />
       <NoteEditor
         note={selectedNote}
