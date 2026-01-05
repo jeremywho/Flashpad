@@ -104,7 +104,7 @@ function RightAction({
 }
 
 function SwipeableNoteItem({ children, onSwipeLeft, enabled, actionText }: SwipeableNoteItemProps) {
-  const swipeableRef = useRef<ReanimatedSwipeable>(null);
+  const swipeableRef = useRef<React.ElementRef<typeof ReanimatedSwipeable>>(null);
 
   const renderRightActions = (
     _progress: SharedValue<number>,
