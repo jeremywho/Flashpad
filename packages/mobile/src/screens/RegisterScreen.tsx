@@ -49,7 +49,7 @@ function RegisterScreen({ navigation }: any) {
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
         <View style={styles.formContainer}>
           <Text style={styles.title}>Register</Text>
 

@@ -280,9 +280,9 @@ Basic note capture and sync across all platforms with offline support.
 - [x] Error handling and user feedback (Toast notifications, error boundaries)
 
 ### 1.13 Known Bugs
-- [ ] **iOS: Swipe to delete not working** - Swipe gesture not triggering delete action
+- [x] **iOS: Swipe to delete not working** - Swipe gesture not triggering delete action (fixed: using ReanimatedSwipeable from react-native-gesture-handler)
 - [x] **Backend: Username should be case insensitive** - Login/lookup should ignore case
-- [ ] **iOS: Login button dismisses keyboard instead of logging in** - First tap dismisses keyboard, requires second tap to submit
+- [x] **iOS: Login button dismisses keyboard instead of logging in** - First tap dismisses keyboard, requires second tap to submit (fixed: added keyboardShouldPersistTaps="handled" to ScrollViews)
 - [x] **Web: Duplicate note appears after save** - Creating a new note shows two identical notes in list until category switch (fixed: added deduplication check)
 
 ### 1.15 Branding & Icons
