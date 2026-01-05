@@ -54,6 +54,10 @@ function LoginScreen({ navigation }: any) {
               onChangeText={setUsername}
               autoCapitalize="none"
               autoCorrect={false}
+              autoComplete="off"
+              spellCheck={false}
+              textContentType="username"
+              importantForAutofill="no"
             />
           </View>
 
@@ -65,6 +69,11 @@ function LoginScreen({ navigation }: any) {
               onChangeText={setPassword}
               secureTextEntry
               autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="off"
+              spellCheck={false}
+              textContentType="password"
+              importantForAutofill="no"
             />
           </View>
 
