@@ -280,7 +280,11 @@ function Home() {
           categoryId,
           deviceId: 'electron-desktop',
         });
-        setNotes((prev) => [newNote, ...prev]);
+        // Use deduplication to avoid race condition with SignalR broadcast
+        setNotes((prev) => {
+          if (prev.some((n) => n.id === newNote.id)) return prev;
+          return [newNote, ...prev];
+        });
         setSelectedNote(newNote);
         setIsNewNote(false);
         fetchInboxCount();

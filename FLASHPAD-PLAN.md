@@ -283,7 +283,7 @@ Basic note capture and sync across all platforms with offline support.
 - [ ] **iOS: Swipe to delete not working** - Swipe gesture not triggering delete action
 - [x] **Backend: Username should be case insensitive** - Login/lookup should ignore case
 - [ ] **iOS: Login button dismisses keyboard instead of logging in** - First tap dismisses keyboard, requires second tap to submit
-- [ ] **Web: Duplicate note appears after save** - Creating a new note shows two identical notes in list until category switch (likely optimistic update + server response both adding to state)
+- [x] **Web: Duplicate note appears after save** - Creating a new note shows two identical notes in list until category switch (fixed: added deduplication check)
 
 ### 1.15 Branding & Icons
 - [ ] Design app icon using AI tool (Recraft.ai recommended for vector output)
