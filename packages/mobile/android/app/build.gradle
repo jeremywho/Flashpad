@@ -105,7 +105,8 @@ android {
             shrinkResources enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
             
-            // Enable additional optimizations
+            // Enable NDK debug symbols for release builds only
+            // This helps with crash reporting without bloating debug builds
             ndk {
                 debugSymbolLevel 'SYMBOL_TABLE'
             }

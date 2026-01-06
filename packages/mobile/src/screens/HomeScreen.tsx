@@ -63,6 +63,11 @@ function getTitle(content: string): string {
 
 type TabType = 'inbox' | 'archive' | 'trash';
 
+// Approximate item height for FlatList optimization
+// This is an estimate based on the note item design (title + preview + meta)
+// Adjust if the actual rendered height differs significantly
+const ESTIMATED_ITEM_HEIGHT = 100;
+
 interface SwipeableNoteItemProps {
   children: React.ReactNode;
   onSwipeLeft: () => void;
@@ -719,8 +724,8 @@ function HomeScreen({ navigation }: HomeScreenProps) {
           keyExtractor={(item) => item.id}
           renderItem={renderNote}
           getItemLayout={(data, index) => ({
-            length: 100,
-            offset: 100 * index,
+            length: ESTIMATED_ITEM_HEIGHT,
+            offset: ESTIMATED_ITEM_HEIGHT * index,
             index,
           })}
           removeClippedSubviews={true}
