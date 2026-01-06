@@ -194,7 +194,7 @@ jobs:
 
       - name: Launch and test app
         run: |
-          APP_PATH=$(find packages/electron/dist -name "*.app" -type d | head -1)
+          APP_PATH=$(find packages/electron/release -name "*.app" -type d | head -1)
           echo "Found app at: $APP_PATH"
 
           # Launch the app
@@ -239,7 +239,7 @@ jobs:
       - name: Launch and test app
         shell: pwsh
         run: |
-          $exePath = Get-ChildItem -Path "packages/electron/dist" -Filter "*.exe" -Recurse | Select-Object -First 1
+          $exePath = Get-ChildItem -Path "packages/electron/release" -Filter "*.exe" -Recurse | Select-Object -First 1
           Write-Host "Found exe at: $($exePath.FullName)"
 
           # Launch the app
@@ -289,9 +289,9 @@ jobs:
 
       - name: Launch and test app
         run: |
-          APP_PATH=$(find packages/electron/dist -name "flashpad" -type f -executable | head -1)
+          APP_PATH=$(find packages/electron/release -name "flashpad" -type f -executable | head -1)
           if [ -z "$APP_PATH" ]; then
-            APP_PATH=$(find packages/electron/dist -name "Flashpad" -type f -executable | head -1)
+            APP_PATH=$(find packages/electron/release -name "Flashpad" -type f -executable | head -1)
           fi
           echo "Found app at: $APP_PATH"
 
