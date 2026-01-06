@@ -46,10 +46,8 @@ const config = {
       },
     },
   },
-  serializer: {
-    // Enable inline requires for better bundle performance
-    getModulesRunBeforeMainModule: () => [],
-  },
+  // NOTE: Do not override getModulesRunBeforeMainModule - it removes essential
+  // polyfills (like performance.now()) that React Native needs at startup
 };
 
 module.exports = mergeConfig(getDefaultConfig(__dirname), config);
