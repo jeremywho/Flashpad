@@ -194,11 +194,11 @@ jobs:
 
       - name: Launch and test app
         run: |
-          APP_PATH=$(find packages/electron/release -name "*.app" -type d | head -1)
+          APP_PATH=$(find "$PWD/packages/electron/release" -name "*.app" -type d | head -1)
           echo "Found app at: $APP_PATH"
 
           # Launch the app
-          open -a "$APP_PATH" &
+          open "$APP_PATH" &
           sleep 10
 
           # Check if app is running
