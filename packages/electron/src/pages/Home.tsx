@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../AuthContext';
-import { Note, Category, NoteStatus, CreateCategoryDto, SignalRClient, ConnectionState, DevicePresence } from '@shared/index';
+import { Note, Category, NoteStatus, CreateCategoryDto, SignalRClient, SignalRManager, ConnectionState, DevicePresence } from '@shared/index';
 import Sidebar from '../components/Sidebar';
 import NotesList from '../components/NotesList';
 import NoteEditor from '../components/NoteEditor';
@@ -43,6 +43,12 @@ function Home() {
 
   const signalRRef = useRef<SignalRClient | null>(null);
   const syncManagerRef = useRef<SyncManager | null>(null);
+  const selectedViewRef = useRef(selectedView);
+
+  // Keep ref in sync with state for use in SignalR callbacks
+  useEffect(() => {
+    selectedViewRef.current = selectedView;
+  }, [selectedView]);
 
   // Handle resize drag
   useEffect(() => {
@@ -201,16 +207,37 @@ function Home() {
     };
   }, [fetchNotes, fetchCategories, fetchInboxCount]);
 
-  // SignalR real-time sync
+  // SignalR real-time sync - uses singleton to survive React re-renders
   useEffect(() => {
     const token = api.getToken();
     if (!token) return;
 
-    // Generate a unique device ID for this instance
-    const deviceId = `electron-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    // Helper to check if note should show in current view (uses ref for current selectedView)
+    const shouldShowInView = (note: Note): boolean => {
+      const view = selectedViewRef.current;
+      if (view === 'inbox') {
+        return note.status === NoteStatus.Inbox && !note.categoryId;
+      }
+      if (view === 'archive') {
+        return note.status === NoteStatus.Archived;
+      }
+      if (view === 'trash') {
+        return note.status === NoteStatus.Trash;
+      }
+      // Category view
+      return note.status === NoteStatus.Inbox && note.categoryId === view;
+    };
+
+    // Generate a stable device ID (persisted in localStorage)
+    let deviceId = localStorage.getItem('flashpad-device-id');
+    if (!deviceId) {
+      deviceId = `electron-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem('flashpad-device-id', deviceId);
+    }
     const deviceName = 'Desktop App';
 
-    const client = new SignalRClient({
+    // Get or create singleton client - callbacks are updated on each call
+    const client = SignalRManager.getInstance({
       baseUrl: API_URL,
       getToken: () => api.getToken(),
       deviceId,
@@ -227,7 +254,7 @@ function Home() {
       },
       onNoteCreated: (note) => {
         // Only add if it matches current view
-        if (shouldShowNoteInCurrentView(note)) {
+        if (shouldShowInView(note)) {
           setNotes((prev) => {
             if (prev.some((n) => n.id === note.id)) return prev;
             return [note, ...prev];
@@ -240,7 +267,7 @@ function Home() {
         // Move updated note to top if it belongs in current view, remove if not
         setNotes((prev) => {
           const filtered = prev.filter((n) => n.id !== note.id);
-          if (shouldShowNoteInCurrentView(note)) {
+          if (shouldShowInView(note)) {
             return [note, ...filtered];
           }
           return filtered;
@@ -268,20 +295,16 @@ function Home() {
       },
       onCategoryDeleted: (categoryId) => {
         setCategories((prev) => prev.filter((c) => c.id !== categoryId));
-        if (selectedView === categoryId) {
-          setSelectedView('inbox');
-        }
+        setSelectedView((currentView) => currentView === categoryId ? 'inbox' : currentView);
       },
     });
 
     signalRRef.current = client;
     client.start().catch(console.error);
 
-    return () => {
-      client.stop();
-      signalRRef.current = null;
-    };
-  }, [api, selectedView]);
+    // Don't stop on cleanup - singleton persists across re-renders
+    // Connection is only stopped via SignalRManager.removeInstance() on logout
+  }, [api, fetchCategories, fetchInboxCount]);
 
   // Helper to check if a note should show in current view
   const shouldShowNoteInCurrentView = (note: Note): boolean => {

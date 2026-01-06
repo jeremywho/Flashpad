@@ -113,6 +113,13 @@ function createTray() {
 }
 
 function createWindow() {
+  // Prevent creating multiple main windows
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.show();
+    mainWindow.focus();
+    return;
+  }
+
   const settings = settingsStore.store;
 
   mainWindow = new BrowserWindow({

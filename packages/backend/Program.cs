@@ -73,7 +73,13 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.WithOrigins(corsOrigins)
+        policy.SetIsOriginAllowed(origin =>
+            {
+                // Allow null origin for Electron desktop apps (file:// protocol)
+                if (string.IsNullOrEmpty(origin)) return true;
+                // Allow explicitly configured origins
+                return corsOrigins.Contains(origin);
+            })
             .AllowAnyMethod()
             .AllowAnyHeader()
             .AllowCredentials();

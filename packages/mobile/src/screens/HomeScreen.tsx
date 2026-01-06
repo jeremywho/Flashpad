@@ -22,7 +22,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/colors';
 import { SyncManager, SyncStatus } from '../services/syncManager';
 import type { Note, Category, NoteStatus } from '@flashpad/shared';
-import { SignalRClient, ConnectionState } from '@flashpad/shared';
+import { SignalRClient, SignalRManager, ConnectionState } from '@flashpad/shared';
 import { getApiUrl } from '../config';
 
 interface HomeScreenProps {
@@ -163,6 +163,8 @@ function HomeScreen({ navigation }: HomeScreenProps) {
   const syncManagerRef = useRef<SyncManager | null>(null);
   const signalRRef = useRef<SignalRClient | null>(null);
   const fetchNotesRef = useRef<((tab?: TabType, categoryId?: string | null) => Promise<void>) | undefined>(undefined);
+  const selectedTabRef = useRef(selectedTab);
+  const selectedCategoryIdRef = useRef(selectedCategoryId);
 
   const getStatusForTab = (tab: TabType): NoteStatus => {
     switch (tab) {
@@ -297,21 +299,54 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     return false;
   }, [selectedTab]);
 
-  // SignalR real-time sync
+  // Keep refs in sync with state for use in SignalR callbacks
+  useEffect(() => {
+    selectedTabRef.current = selectedTab;
+  }, [selectedTab]);
+
+  useEffect(() => {
+    selectedCategoryIdRef.current = selectedCategoryId;
+  }, [selectedCategoryId]);
+
+  // SignalR real-time sync - uses singleton to survive React re-renders
   useEffect(() => {
     const token = api.getToken();
     if (!token) return;
 
     const signalRUrl = getApiUrl();
-    console.log('SignalR connecting to:', signalRUrl);
 
-    const client = new SignalRClient({
+    // Helper to check if note should show in current view (uses refs for current state)
+    const shouldShowInView = (note: Note): boolean => {
+      const tab = selectedTabRef.current;
+      const categoryId = selectedCategoryIdRef.current;
+
+      // If filtering by category
+      if (categoryId) {
+        return note.status === 0 && note.categoryId === categoryId;
+      }
+
+      // Tab-based filtering
+      if (tab === 'inbox') {
+        return note.status === 0; // NoteStatus.Inbox
+      }
+      if (tab === 'archive') {
+        return note.status === 1; // NoteStatus.Archived
+      }
+      if (tab === 'trash') {
+        return note.status === 2; // NoteStatus.Trash
+      }
+      return false;
+    };
+
+    // Get or create singleton client - callbacks are updated on each call
+    const client = SignalRManager.getInstance({
       baseUrl: signalRUrl,
       getToken: () => api.getToken(),
+      deviceName: 'Mobile App',
       onConnectionStateChange: setConnectionState,
       onNoteCreated: (note) => {
         // Only add if it matches current view
-        if (shouldShowNoteInCurrentView(note)) {
+        if (shouldShowInView(note)) {
           setNotes((prev) => {
             if (prev.some((n) => n.id === note.id)) return prev;
             return [note, ...prev];
@@ -323,7 +358,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
         // Move updated note to top (since it has the newest updatedAt)
         setNotes((prev) => {
           const filtered = prev.filter((n) => n.id !== note.id);
-          if (shouldShowNoteInCurrentView(note)) {
+          if (shouldShowInView(note)) {
             return [note, ...filtered];
           }
           return filtered;
@@ -364,10 +399,9 @@ function HomeScreen({ navigation }: HomeScreenProps) {
 
     return () => {
       appStateSubscription.remove();
-      client.stop();
-      signalRRef.current = null;
+      // Don't stop - singleton persists. Connection stopped via SignalRManager.clear() on logout
     };
-  }, [api, shouldShowNoteInCurrentView, fetchCategories]);
+  }, [api, fetchCategories]);
 
   const onRefresh = () => {
     setRefreshing(true);

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { ApiClient } from '@shared/api-client';
-import { User } from '@shared/types';
+import { User, SignalRManager } from '@shared/index';
 
 interface AuthContextType {
   user: User | null;
@@ -46,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     localStorage.removeItem('token');
     api.logout();
+    SignalRManager.clear(); // Stop SignalR connection on logout
     setUser(null);
   };
 

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ApiClient } from '@flashpad/shared';
+import { ApiClient, SignalRManager } from '@flashpad/shared';
 import type { User } from '@flashpad/shared';
 import { getApiUrl } from '../config';
 
@@ -50,6 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     await AsyncStorage.removeItem('token');
     api.logout();
+    SignalRManager.clear(); // Stop SignalR connection on logout
     setUser(null);
   }, [api]);
 
