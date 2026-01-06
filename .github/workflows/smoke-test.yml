@@ -23,10 +23,13 @@ on:
 jobs:
   ios:
     if: ${{ inputs.platforms == 'all' || inputs.platforms == 'all-mobile' || inputs.platforms == 'ios' }}
-    runs-on: macos-latest
+    runs-on: macos-14
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+
+      - name: Select Xcode 15
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
 
       - uses: actions/setup-node@v4
         with:
@@ -48,14 +51,14 @@ jobs:
           xcodebuild -workspace mobile.xcworkspace \
             -scheme mobile \
             -configuration Release \
-            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -destination 'platform=iOS Simulator,name=iPhone 15 Pro,OS=latest' \
             -derivedDataPath build \
             build
 
       - name: Boot simulator and launch app
         run: |
           # Boot simulator
-          xcrun simctl boot "iPhone 16" || true
+          xcrun simctl boot "iPhone 15 Pro" || true
 
           # Install the app
           APP_PATH=$(find packages/mobile/ios/build -name "*.app" -type d | head -1)
@@ -105,6 +108,7 @@ jobs:
       - name: Build Android APK
         run: |
           cd packages/mobile/android
+          chmod +x gradlew
           ./gradlew assembleRelease
 
       - name: Run Android emulator and test
@@ -180,14 +184,13 @@ jobs:
         run: cd packages/shared && npm run build
 
       - name: Build Electron app for macOS
-        run: cd packages/electron && npm run build
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: cd packages/electron && npm run build:ci
 
       - name: Package Electron app
         run: cd packages/electron && npx electron-builder --mac --dir
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Launch and test app
         run: |
@@ -226,10 +229,12 @@ jobs:
         run: cd packages/shared && npm run build
 
       - name: Build Electron app for Windows
-        run: cd packages/electron && npm run build
+        run: cd packages/electron && npm run build:ci
 
       - name: Package Electron app
         run: cd packages/electron && npx electron-builder --win --dir
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Launch and test app
         shell: pwsh
@@ -270,10 +275,12 @@ jobs:
         run: cd packages/shared && npm run build
 
       - name: Build Electron app for Linux
-        run: cd packages/electron && npm run build
+        run: cd packages/electron && npm run build:ci
 
       - name: Package Electron app
         run: cd packages/electron && npx electron-builder --linux --dir
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install virtual display
         run: |
