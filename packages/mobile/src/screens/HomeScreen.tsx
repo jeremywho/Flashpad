@@ -63,6 +63,11 @@ function getTitle(content: string): string {
 
 type TabType = 'inbox' | 'archive' | 'trash';
 
+// Approximate item height for FlatList optimization
+// This is an estimate based on the note item design (title + preview + meta)
+// Adjust if the actual rendered height differs significantly
+const ESTIMATED_ITEM_HEIGHT = 100;
+
 interface SwipeableNoteItemProps {
   children: React.ReactNode;
   onSwipeLeft: () => void;
@@ -384,7 +389,55 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     await logout();
   };
 
-  const renderNote = ({ item }: { item: Note }) => {
+  // Selection mode handlers
+  const enterSelectionMode = useCallback((noteId: string) => {
+    setIsSelectionMode(true);
+    setSelectedNoteIds(new Set([noteId]));
+  }, []);
+
+  const exitSelectionMode = useCallback(() => {
+    setIsSelectionMode(false);
+    setSelectedNoteIds(new Set());
+  }, []);
+
+  const toggleNoteSelection = useCallback((noteId: string) => {
+    setSelectedNoteIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(noteId)) {
+        newSet.delete(noteId);
+        // Exit selection mode if no notes selected
+        if (newSet.size === 0) {
+          setIsSelectionMode(false);
+        }
+      } else {
+        newSet.add(noteId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const handleSwipeToTrash = useCallback(async (noteId: string) => {
+    if (!syncManagerRef.current) return;
+    try {
+      await syncManagerRef.current.trashNote(noteId);
+      setNotes((prev) => prev.filter((n) => n.id !== noteId));
+      fetchCategories();
+    } catch (error) {
+      console.error('Failed to trash note:', error);
+    }
+  }, [fetchCategories]);
+
+  const handleSwipeToPermanentDelete = useCallback(async (noteId: string) => {
+    if (!syncManagerRef.current) return;
+    try {
+      await syncManagerRef.current.deleteNotePermanently(noteId);
+      setNotes((prev) => prev.filter((n) => n.id !== noteId));
+    } catch (error) {
+      console.error('Failed to permanently delete note:', error);
+    }
+  }, []);
+
+  const renderNote = useCallback(({ item }: { item: Note }) => {
     const isSelected = selectedNoteIds.has(item.id);
     // Enable swipe for all notes except during selection mode
     const swipeEnabled = !isSelectionMode;
@@ -456,7 +509,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
         {noteContent}
       </SwipeableNoteItem>
     );
-  };
+  }, [isSelectionMode, selectedNoteIds, selectedTab, handleSwipeToTrash, handleSwipeToPermanentDelete, toggleNoteSelection, enterSelectionMode]);
 
   const getTabTitle = () => {
     if (selectedCategoryId) {
@@ -499,33 +552,6 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     handleTabChange(tab);
   };
 
-  // Selection mode handlers
-  const enterSelectionMode = (noteId: string) => {
-    setIsSelectionMode(true);
-    setSelectedNoteIds(new Set([noteId]));
-  };
-
-  const exitSelectionMode = () => {
-    setIsSelectionMode(false);
-    setSelectedNoteIds(new Set());
-  };
-
-  const toggleNoteSelection = (noteId: string) => {
-    setSelectedNoteIds((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(noteId)) {
-        newSet.delete(noteId);
-        // Exit selection mode if no notes selected
-        if (newSet.size === 0) {
-          setIsSelectionMode(false);
-        }
-      } else {
-        newSet.add(noteId);
-      }
-      return newSet;
-    });
-  };
-
   const selectAllNotes = () => {
     setSelectedNoteIds(new Set(notes.map((n) => n.id)));
   };
@@ -546,27 +572,6 @@ function HomeScreen({ navigation }: HomeScreenProps) {
       fetchCategories();
     } catch (error) {
       console.error('Failed to move notes:', error);
-    }
-  };
-
-  const handleSwipeToTrash = async (noteId: string) => {
-    if (!syncManagerRef.current) return;
-    try {
-      await syncManagerRef.current.trashNote(noteId);
-      setNotes((prev) => prev.filter((n) => n.id !== noteId));
-      fetchCategories();
-    } catch (error) {
-      console.error('Failed to trash note:', error);
-    }
-  };
-
-  const handleSwipeToPermanentDelete = async (noteId: string) => {
-    if (!syncManagerRef.current) return;
-    try {
-      await syncManagerRef.current.deleteNotePermanently(noteId);
-      setNotes((prev) => prev.filter((n) => n.id !== noteId));
-    } catch (error) {
-      console.error('Failed to permanently delete note:', error);
     }
   };
 
@@ -718,6 +723,16 @@ function HomeScreen({ navigation }: HomeScreenProps) {
           data={notes}
           keyExtractor={(item) => item.id}
           renderItem={renderNote}
+          getItemLayout={(data, index) => ({
+            length: ESTIMATED_ITEM_HEIGHT,
+            offset: ESTIMATED_ITEM_HEIGHT * index,
+            index,
+          })}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          updateCellsBatchingPeriod={50}
+          initialNumToRender={15}
+          windowSize={10}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

@@ -8,7 +8,7 @@ import { ToastProvider } from './src/components/Toast';
 import AppNavigator from './src/navigation/AppNavigator';
 import { initConfig } from './src/config';
 
-function AppContent() {
+const AppContent = React.memo(function AppContent() {
   const { isDark } = useTheme();
 
   return (
@@ -21,7 +21,7 @@ function AppContent() {
       </AuthProvider>
     </>
   );
-}
+});
 
 function App() {
   const [configReady, setConfigReady] = useState(false);

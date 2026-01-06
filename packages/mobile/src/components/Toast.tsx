@@ -28,7 +28,7 @@ interface ToastItemProps {
   onRemove: (id: number) => void;
 }
 
-function ToastItem({ toast, onRemove }: ToastItemProps) {
+const ToastItem = React.memo(function ToastItem({ toast, onRemove }: ToastItemProps) {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(-20)).current;
 
@@ -96,7 +96,7 @@ function ToastItem({ toast, onRemove }: ToastItemProps) {
       <Text style={styles.toastMessage}>{toast.message}</Text>
     </Animated.View>
   );
-}
+});
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);

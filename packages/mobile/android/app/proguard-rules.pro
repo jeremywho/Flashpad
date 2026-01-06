@@ -8,3 +8,31 @@
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
 # Add any project specific keep options here:
+
+# Keep native methods
+-keepclassmembers class * {
+    native <methods>;
+}
+
+# Keep classes used by reflection
+-keep class com.facebook.react.** { *; }
+-keep class com.facebook.hermes.** { *; }
+
+# Keep JavaScript Interface methods
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+
+# Hermes
+-keep class com.facebook.jni.** { *; }
+
+# React Native Reanimated
+-keep class com.swmansion.reanimated.** { *; }
+-keep class com.facebook.react.turbomodule.** { *; }
+
+# Optimize
+-optimizationpasses 5
+-dontusemixedcaseclassnames
+-dontskipnonpubliclibraryclasses
+-verbose
+-optimizations !code/simplification/arithmetic,!field/*,!class/merging/*

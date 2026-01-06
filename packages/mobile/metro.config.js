@@ -23,6 +23,31 @@ const config = {
       'react-native': path.resolve(monorepoRoot, 'node_modules/react-native'),
     },
   },
+  transformer: {
+    // Enable minification for better performance
+    minifierConfig: {
+      keep_classnames: true,
+      keep_fnames: true,
+      mangle: {
+        keep_classnames: true,
+        keep_fnames: true,
+      },
+      output: {
+        ascii_only: true,
+        quote_style: 3,
+        wrap_iife: true,
+      },
+      sourceMap: {
+        includeSources: false,
+      },
+      toplevel: false,
+      compress: {
+        reduce_funcs: false,
+      },
+    },
+  },
+  // NOTE: Do not override getModulesRunBeforeMainModule - it removes essential
+  // polyfills (like performance.now()) that React Native needs at startup
 };
 
 module.exports = mergeConfig(getDefaultConfig(__dirname), config);
