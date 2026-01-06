@@ -44,7 +44,7 @@ Flashpad is a lightweight, fast note-capture application designed to quickly cap
 │                         └────────┬────────┘                                 │
 │                                  │                                          │
 │  ┌───────────────────────────────┼───────────────────────────────────────┐  │
-│  │                         BACKEND (.NET 9)                              │  │
+│  │                        BACKEND (.NET 10)                              │  │
 │  │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐               │  │
 │  │  │  REST API   │    │  SignalR    │    │   Auth      │               │  │
 │  │  │  (CRUD)     │    │  Hub        │    │   (JWT)     │               │  │
@@ -925,14 +925,14 @@ All client apps will use environment variables/build-time config to determine th
 #### Prerequisites to Install
 
 ```bash
-# Install .NET 9 Runtime
+# Install .NET 10 Runtime
 wget https://dot.net/v1/dotnet-install.sh
 chmod +x dotnet-install.sh
-./dotnet-install.sh --channel 9.0 --runtime aspnetcore
+./dotnet-install.sh --channel 10.0 --runtime aspnetcore
 
 # Or via apt (if available)
 sudo apt update
-sudo apt install -y aspnetcore-runtime-9.0
+sudo apt install -y aspnetcore-runtime-10.0
 ```
 
 #### Directory Structure
@@ -1092,7 +1092,7 @@ find $BACKUP_DIR -name "flashpad_*.db" -mtime +30 -delete
 ### Deployment Checklist
 
 - [ ] **Server Setup**
-  - [ ] Install .NET 9 ASP.NET Core Runtime
+  - [x] Install .NET 10 ASP.NET Core Runtime
   - [ ] Create directory structure
   - [ ] Create systemd service
   - [ ] Set up backup cron job

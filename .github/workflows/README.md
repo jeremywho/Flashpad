@@ -8,7 +8,7 @@ This project uses GitHub Actions for continuous integration and deployment. All 
 **Triggers:** Push or PR to main/master/develop that affects backend files
 
 **What it does:**
-- Sets up .NET 9
+- Sets up .NET 10
 - Restores dependencies
 - Builds the backend in Release mode
 - Runs tests (if any exist)

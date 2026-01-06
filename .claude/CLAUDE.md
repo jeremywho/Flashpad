@@ -12,7 +12,7 @@ When starting work on this project, read the following documentation files:
 ## Project Overview
 
 Flashpad is a cross-platform quick note capture application with:
-- **Backend**: .NET 9 Web API with SQLite, JWT auth, and SignalR for real-time sync
+- **Backend**: .NET 10 Web API with SQLite, JWT auth, and SignalR for real-time sync
 - **Electron**: Desktop app with global hotkey (`Ctrl+Alt+N`) and quick capture popup
 - **Web**: React web app served from the backend
 - **Mobile**: React Native CLI for iOS/Android
@@ -223,7 +223,7 @@ See `DEPLOY.md` for full deployment documentation.
 ## Server Deployment
 
 The production server runs on Ubuntu 24.04 with:
-- .NET 9 ASP.NET Runtime
+- .NET 10 ASP.NET Runtime
 - Caddy as reverse proxy
 - systemd for the API service (`flashpad-api`)
 - Daily SQLite backups at 2 AM (7-day retention)

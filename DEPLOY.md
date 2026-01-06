@@ -59,7 +59,7 @@ The Electron app checks for updates on launch. When a new release is available:
 ### Server Setup
 
 The server runs Ubuntu 24.04 with:
-- .NET 9 ASP.NET Runtime
+- .NET 10 ASP.NET Runtime
 - Caddy as reverse proxy
 - systemd for process management
 

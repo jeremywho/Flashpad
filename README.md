@@ -24,7 +24,7 @@ A cross-platform quick note capture app for Windows, Mac, iOS, Android, and Web.
 | **Desktop** | Electron 39, React 19, TypeScript, Vite |
 | **Web** | React 19, TypeScript, Vite |
 | **Mobile** | React Native 0.83, TypeScript |
-| **Backend** | .NET 9, ASP.NET Core, EF Core, SQLite, SignalR |
+| **Backend** | .NET 10, ASP.NET Core, EF Core, SQLite, SignalR |
 | **Shared** | TypeScript types and API client |
 
 ## Project Structure
@@ -44,7 +44,7 @@ Flashpad/
 ## Prerequisites
 
 - **Node.js** 20+ and npm
-- **.NET 9 SDK**
+- **.NET 10 SDK**
 - **Git**
 
 ### For Mobile Development

@@ -1,6 +1,6 @@
 # Backend API
 
-.NET 9 Web API with SQLite, Entity Framework Core, and JWT authentication.
+.NET 10 Web API with SQLite, Entity Framework Core, and JWT authentication.
 
 ## Structure
 
