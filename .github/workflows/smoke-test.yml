@@ -11,13 +11,18 @@ on:
         type: choice
         options:
           - all
+          - all-mobile
+          - all-desktop
           - ios
           - android
           - web
+          - electron-mac
+          - electron-windows
+          - electron-linux
 
 jobs:
   ios:
-    if: ${{ inputs.platforms == 'all' || inputs.platforms == 'ios' }}
+    if: ${{ inputs.platforms == 'all' || inputs.platforms == 'all-mobile' || inputs.platforms == 'ios' }}
     runs-on: macos-latest
     timeout-minutes: 30
     steps:
@@ -69,7 +74,7 @@ jobs:
           fi
 
   android:
-    if: ${{ inputs.platforms == 'all' || inputs.platforms == 'android' }}
+    if: ${{ inputs.platforms == 'all' || inputs.platforms == 'all-mobile' || inputs.platforms == 'android' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -153,5 +158,150 @@ jobs:
             ls -la packages/web/dist/
           else
             echo "Web build failed - no index.html"
+            exit 1
+          fi
+
+  electron-mac:
+    if: ${{ inputs.platforms == 'all' || inputs.platforms == 'all-desktop' || inputs.platforms == 'electron-mac' }}
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared package
+        run: cd packages/shared && npm run build
+
+      - name: Build Electron app for macOS
+        run: cd packages/electron && npm run build
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Package Electron app
+        run: cd packages/electron && npx electron-builder --mac --dir
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Launch and test app
+        run: |
+          APP_PATH=$(find packages/electron/dist -name "*.app" -type d | head -1)
+          echo "Found app at: $APP_PATH"
+
+          # Launch the app
+          open -a "$APP_PATH" &
+          sleep 10
+
+          # Check if app is running
+          if pgrep -f "Flashpad" > /dev/null; then
+            echo "Electron app launched successfully on macOS"
+            pkill -f "Flashpad" || true
+          else
+            echo "Electron app failed to launch"
+            exit 1
+          fi
+
+  electron-windows:
+    if: ${{ inputs.platforms == 'all' || inputs.platforms == 'all-desktop' || inputs.platforms == 'electron-windows' }}
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared package
+        run: cd packages/shared && npm run build
+
+      - name: Build Electron app for Windows
+        run: cd packages/electron && npm run build
+
+      - name: Package Electron app
+        run: cd packages/electron && npx electron-builder --win --dir
+
+      - name: Launch and test app
+        shell: pwsh
+        run: |
+          $exePath = Get-ChildItem -Path "packages/electron/dist" -Filter "*.exe" -Recurse | Select-Object -First 1
+          Write-Host "Found exe at: $($exePath.FullName)"
+
+          # Launch the app
+          Start-Process -FilePath $exePath.FullName
+          Start-Sleep -Seconds 10
+
+          # Check if app is running
+          $process = Get-Process -Name "Flashpad" -ErrorAction SilentlyContinue
+          if ($process) {
+            Write-Host "Electron app launched successfully on Windows"
+            Stop-Process -Name "Flashpad" -Force -ErrorAction SilentlyContinue
+          } else {
+            Write-Host "Electron app failed to launch"
+            exit 1
+          }
+
+  electron-linux:
+    if: ${{ inputs.platforms == 'all' || inputs.platforms == 'all-desktop' || inputs.platforms == 'electron-linux' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared package
+        run: cd packages/shared && npm run build
+
+      - name: Build Electron app for Linux
+        run: cd packages/electron && npm run build
+
+      - name: Package Electron app
+        run: cd packages/electron && npx electron-builder --linux --dir
+
+      - name: Install virtual display
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+
+      - name: Launch and test app
+        run: |
+          APP_PATH=$(find packages/electron/dist -name "flashpad" -type f -executable | head -1)
+          if [ -z "$APP_PATH" ]; then
+            APP_PATH=$(find packages/electron/dist -name "Flashpad" -type f -executable | head -1)
+          fi
+          echo "Found app at: $APP_PATH"
+
+          # Start virtual display
+          export DISPLAY=:99
+          Xvfb :99 -screen 0 1024x768x24 &
+          sleep 2
+
+          # Launch the app
+          "$APP_PATH" --no-sandbox &
+          sleep 10
+
+          # Check if app is running
+          if pgrep -f "flashpad\|Flashpad" > /dev/null; then
+            echo "Electron app launched successfully on Linux"
+            pkill -f "flashpad\|Flashpad" || true
+          else
+            echo "Electron app failed to launch"
             exit 1
           fi
