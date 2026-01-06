@@ -103,7 +103,12 @@ jobs:
         run: |
           # React Native gradle expects node_modules in packages/mobile
           # but npm workspaces hoists to root. Create symlink to fix paths.
+          rm -rf packages/mobile/node_modules 2>/dev/null || true
           ln -sf $GITHUB_WORKSPACE/node_modules packages/mobile/node_modules
+          # Verify symlink works
+          echo "Checking symlink..."
+          ls -la packages/mobile/node_modules
+          ls packages/mobile/node_modules/@react-native/gradle-plugin || echo "gradle-plugin not found!"
 
       - name: Enable KVM for Android emulator
         run: |
