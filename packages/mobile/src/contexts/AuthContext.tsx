@@ -18,14 +18,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Create API client with current config URL
+  // Create API client with current config URL - memoized to prevent recreation
   const api = useMemo(() => new ApiClient(getApiUrl()), []);
 
-  useEffect(() => {
-    loadUser();
-  }, []);
-
-  const loadUser = async () => {
+  const loadUser = useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('token');
       if (token) {
@@ -39,22 +35,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [api]);
 
-  const login = async (token: string, userData: User) => {
+  useEffect(() => {
+    loadUser();
+  }, [loadUser]);
+
+  const login = useCallback(async (token: string, userData: User) => {
     await AsyncStorage.setItem('token', token);
     api.setToken(token);
     setUser(userData);
-  };
+  }, [api]);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     await AsyncStorage.removeItem('token');
     api.logout();
     setUser(null);
-  };
+  }, [api]);
+
+  const contextValue = useMemo(
+    () => ({ user, api, isLoading, login, logout }),
+    [user, api, isLoading, login, logout]
+  );
 
   return (
-    <AuthContext.Provider value={{ user, api, isLoading, login, logout }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

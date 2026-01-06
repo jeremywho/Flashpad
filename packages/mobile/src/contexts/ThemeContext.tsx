@@ -21,11 +21,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [themeMode, setThemeModeState] = useState<ThemeMode>('system');
   const [isLoaded, setIsLoaded] = useState(false);
 
-  useEffect(() => {
-    loadTheme();
-  }, []);
-
-  const loadTheme = async () => {
+  const loadTheme = useCallback(async () => {
     try {
       const savedTheme = await AsyncStorage.getItem(THEME_STORAGE_KEY);
       if (savedTheme && ['dark', 'light', 'system'].includes(savedTheme)) {
@@ -36,23 +32,34 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoaded(true);
     }
-  };
+  }, []);
 
-  const setThemeMode = async (mode: ThemeMode) => {
+  useEffect(() => {
+    loadTheme();
+  }, [loadTheme]);
+
+  const setThemeMode = useCallback(async (mode: ThemeMode) => {
     setThemeModeState(mode);
     try {
       await AsyncStorage.setItem(THEME_STORAGE_KEY, mode);
     } catch (error) {
       console.error('Failed to save theme:', error);
     }
-  };
+  }, []);
 
-  const isDark =
+  const isDark = useMemo(() => 
     themeMode === 'system'
       ? systemColorScheme === 'dark'
-      : themeMode === 'dark';
+      : themeMode === 'dark',
+    [themeMode, systemColorScheme]
+  );
 
-  const theme = isDark ? darkTheme : lightTheme;
+  const theme = useMemo(() => isDark ? darkTheme : lightTheme, [isDark]);
+
+  const contextValue = useMemo(
+    () => ({ theme, themeMode, isDark, setThemeMode }),
+    [theme, themeMode, isDark, setThemeMode]
+  );
 
   // Don't render until we've loaded the saved theme
   if (!isLoaded) {
@@ -60,7 +67,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <ThemeContext.Provider value={{ theme, themeMode, isDark, setThemeMode }}>
+    <ThemeContext.Provider value={contextValue}>
       {children}
     </ThemeContext.Provider>
   );

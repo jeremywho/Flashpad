@@ -384,7 +384,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     await logout();
   };
 
-  const renderNote = ({ item }: { item: Note }) => {
+  const renderNote = useCallback(({ item }: { item: Note }) => {
     const isSelected = selectedNoteIds.has(item.id);
     // Enable swipe for all notes except during selection mode
     const swipeEnabled = !isSelectionMode;
@@ -456,7 +456,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
         {noteContent}
       </SwipeableNoteItem>
     );
-  };
+  }, [isSelectionMode, selectedNoteIds, selectedTab, handleSwipeToTrash, handleSwipeToPermanentDelete, toggleNoteSelection, handleNotePress, enterSelectionMode]);
 
   const getTabTitle = () => {
     if (selectedCategoryId) {
@@ -718,6 +718,16 @@ function HomeScreen({ navigation }: HomeScreenProps) {
           data={notes}
           keyExtractor={(item) => item.id}
           renderItem={renderNote}
+          getItemLayout={(data, index) => ({
+            length: 100,
+            offset: 100 * index,
+            index,
+          })}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          updateCellsBatchingPeriod={50}
+          initialNumToRender={15}
+          windowSize={10}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

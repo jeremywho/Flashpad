@@ -23,6 +23,33 @@ const config = {
       'react-native': path.resolve(monorepoRoot, 'node_modules/react-native'),
     },
   },
+  transformer: {
+    // Enable minification for better performance
+    minifierConfig: {
+      keep_classnames: true,
+      keep_fnames: true,
+      mangle: {
+        keep_classnames: true,
+        keep_fnames: true,
+      },
+      output: {
+        ascii_only: true,
+        quote_style: 3,
+        wrap_iife: true,
+      },
+      sourceMap: {
+        includeSources: false,
+      },
+      toplevel: false,
+      compress: {
+        reduce_funcs: false,
+      },
+    },
+  },
+  serializer: {
+    // Enable inline requires for better bundle performance
+    getModulesRunBeforeMainModule: () => [],
+  },
 };
 
 module.exports = mergeConfig(getDefaultConfig(__dirname), config);
