@@ -99,6 +99,12 @@ jobs:
       - name: Build shared package
         run: cd packages/shared && npm run build
 
+      - name: Create symlink for monorepo node_modules
+        run: |
+          # React Native gradle expects node_modules in packages/mobile
+          # but npm workspaces hoists to root. Create symlink to fix paths.
+          ln -sf $GITHUB_WORKSPACE/node_modules packages/mobile/node_modules
+
       - name: Enable KVM for Android emulator
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
