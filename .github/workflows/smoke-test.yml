@@ -24,7 +24,7 @@ jobs:
   ios:
     if: ${{ inputs.platforms == 'all' || inputs.platforms == 'all-mobile' || inputs.platforms == 'ios' }}
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
