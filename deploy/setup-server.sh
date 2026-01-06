@@ -6,19 +6,19 @@ set -e
 
 echo "=== Flashpad Server Setup ==="
 
-# 1. Install .NET 9 ASP.NET Runtime
+# 1. Install .NET 10 ASP.NET Runtime
 echo ""
-echo "Step 1: Installing .NET 9 Runtime..."
+echo "Step 1: Installing .NET 10 Runtime..."
 
 apt-get update
 apt-get install -y wget
 
-# Use official dotnet-install script for .NET 9
+# Use official dotnet-install script for .NET 10
 wget https://dot.net/v1/dotnet-install.sh -O /tmp/dotnet-install.sh
 chmod +x /tmp/dotnet-install.sh
 
-# Install ASP.NET Core runtime 9.0 system-wide
-/tmp/dotnet-install.sh --channel 9.0 --runtime aspnetcore --install-dir /usr/share/dotnet
+# Install ASP.NET Core runtime 10.0 system-wide
+/tmp/dotnet-install.sh --channel 10.0 --runtime aspnetcore --install-dir /usr/share/dotnet
 rm /tmp/dotnet-install.sh
 
 # Create symlink if it doesn't exist
