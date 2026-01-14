@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "postinstall": "rm -rf packages/mobile/node_modules/react packages/mobile/node_modules/react-native packages/electron/node_modules/react packages/web/node_modules/react 2>/dev/null || true",
+    "postinstall": "node -e \"['packages/mobile/node_modules/react','packages/mobile/node_modules/react-native','packages/electron/node_modules/react','packages/web/node_modules/react'].forEach(p=>{try{require('fs').rmSync(p,{recursive:true,force:true})}catch{}})\"",
     "backend": "cd packages/backend && dotnet run",
     "electron": "cd packages/electron && npm run electron:dev",
     "electron:prod": "cd packages/electron && npm run electron:prod",

@@ -64,7 +64,8 @@ export default function NoteEditor({
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newContent = e.target.value;
     setContent(newContent);
-    if (!isNew) {
+    // Autosave for both new and existing notes (as long as content isn't empty)
+    if (newContent.trim()) {
       debouncedSave(newContent);
     }
   };
@@ -221,18 +222,6 @@ export default function NoteEditor({
         placeholder="Start typing your note..."
         autoFocus={isNew}
       />
-
-      {isNew && (
-        <div className="note-editor-new-actions">
-          <button
-            className="note-editor-save-btn"
-            onClick={handleManualSave}
-            disabled={!content.trim() || isSaving}
-          >
-            {isSaving ? 'Saving...' : 'Save Note'}
-          </button>
-        </div>
-      )}
     </div>
   );
 }
