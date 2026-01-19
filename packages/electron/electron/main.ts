@@ -1,12 +1,69 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, globalShortcut, screen } from 'electron';
+import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, globalShortcut, screen, dialog } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import path from 'path';
+import * as fs from 'fs/promises';
+import chokidar from 'chokidar';
 import { settingsStore, AppSettings } from './settings';
 
 let mainWindow: BrowserWindow | null = null;
 let quickCaptureWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
+
+// File system storage
+let watcher: chokidar.FSWatcher | null = null;
+
+function getDataDir(): string {
+  const customDir = settingsStore.store.dataDirectory;
+  return customDir || path.join(app.getPath('userData'), 'data');
+}
+
+function getNotesDir(): string {
+  return path.join(getDataDir(), 'notes');
+}
+
+async function ensureDataDirectories(): Promise<void> {
+  const dataDir = getDataDir();
+  const notesDir = getNotesDir();
+  await fs.mkdir(dataDir, { recursive: true });
+  await fs.mkdir(notesDir, { recursive: true });
+}
+
+function startFileWatcher(): void {
+  stopFileWatcher();
+  const notesDir = getNotesDir();
+  watcher = chokidar.watch(path.join(notesDir, '*.md'), {
+    ignoreInitial: true,
+    awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
+    persistent: true,
+  });
+
+  watcher.on('all', (event, filePath) => {
+    const filename = path.basename(filePath);
+    // Map chokidar events to simpler types
+    let type: 'add' | 'change' | 'unlink';
+    if (event === 'add') type = 'add';
+    else if (event === 'change') type = 'change';
+    else if (event === 'unlink') type = 'unlink';
+    else return; // Ignore other events
+
+    // Send to all windows
+    BrowserWindow.getAllWindows().forEach((win) => {
+      win.webContents.send('fs:file-changed', { type, filename });
+    });
+  });
+
+  watcher.on('error', (error) => {
+    console.error('File watcher error:', error);
+  });
+}
+
+function stopFileWatcher(): void {
+  if (watcher) {
+    watcher.close();
+    watcher = null;
+  }
+}
 
 // Auto-updater configuration
 autoUpdater.autoDownload = true;
@@ -280,6 +337,103 @@ ipcMain.handle('note-created-from-quick-capture', () => {
   }
 });
 
+// File system IPC handlers
+ipcMain.handle('fs:ensure-data-dir', async () => {
+  await ensureDataDirectories();
+  return getDataDir();
+});
+
+ipcMain.handle('fs:get-data-dir', () => {
+  return getDataDir();
+});
+
+ipcMain.handle('fs:set-data-dir', async (_event, newPath: string | null) => {
+  settingsStore.set('dataDirectory', newPath);
+  await ensureDataDirectories();
+  // Restart file watcher for new directory
+  startFileWatcher();
+  return getDataDir();
+});
+
+ipcMain.handle('fs:select-directory', async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openDirectory', 'createDirectory'],
+    title: 'Select Notes Directory',
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+
+ipcMain.handle('fs:list-notes', async () => {
+  try {
+    await ensureDataDirectories();
+    const notesDir = getNotesDir();
+    const files = await fs.readdir(notesDir);
+    return files.filter((f) => f.endsWith('.md'));
+  } catch {
+    return [];
+  }
+});
+
+ipcMain.handle('fs:read-note', async (_event, id: string) => {
+  try {
+    const notesDir = getNotesDir();
+    const filePath = path.join(notesDir, `${id}.md`);
+    const content = await fs.readFile(filePath, 'utf-8');
+    return content;
+  } catch {
+    return null;
+  }
+});
+
+ipcMain.handle('fs:write-note', async (_event, id: string, content: string) => {
+  await ensureDataDirectories();
+  const notesDir = getNotesDir();
+  const filePath = path.join(notesDir, `${id}.md`);
+  await fs.writeFile(filePath, content, 'utf-8');
+});
+
+ipcMain.handle('fs:delete-note', async (_event, id: string) => {
+  try {
+    const notesDir = getNotesDir();
+    const filePath = path.join(notesDir, `${id}.md`);
+    await fs.unlink(filePath);
+  } catch {
+    // File may not exist, ignore error
+  }
+});
+
+ipcMain.handle('fs:read-json', async (_event, filename: string) => {
+  try {
+    const dataDir = getDataDir();
+    const filePath = path.join(dataDir, filename);
+    const content = await fs.readFile(filePath, 'utf-8');
+    return JSON.parse(content);
+  } catch {
+    return null;
+  }
+});
+
+ipcMain.handle('fs:write-json', async (_event, filename: string, data: unknown) => {
+  await ensureDataDirectories();
+  const dataDir = getDataDir();
+  const filePath = path.join(dataDir, filename);
+  await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
+});
+
+ipcMain.handle('fs:watch-start', () => {
+  startFileWatcher();
+});
+
+ipcMain.handle('fs:watch-stop', () => {
+  stopFileWatcher();
+});
+
+ipcMain.handle('fs:check-migration-needed', async () => {
+  // Check if old localStorage database marker exists
+  // This will be sent from renderer since localStorage is renderer-side
+  return true;
+});
+
 app.whenReady().then(() => {
   createTray();
   createWindow();
@@ -307,4 +461,5 @@ app.on('before-quit', () => {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+  stopFileWatcher();
 });

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { useTheme } from '../ThemeContext';
+import { reloadAllData } from '../services/database';
 import type { AppSettings } from '../types/electron';
 
 function Settings() {
@@ -14,7 +15,9 @@ function Settings() {
     closeToTray: true,
     quickCaptureHotkey: 'CommandOrControl+Alt+N',
     theme: 'dark',
+    dataDirectory: null,
   });
+  const [dataDir, setDataDir] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
 
@@ -27,6 +30,11 @@ function Settings() {
       const currentSettings = await window.electron?.settings.get();
       if (currentSettings) {
         setSettings(currentSettings);
+      }
+      // Load actual data directory path
+      const dir = await window.electron?.fs.getDataDir();
+      if (dir) {
+        setDataDir(dir);
       }
     } catch (err) {
       console.error('Failed to load settings:', err);
@@ -76,6 +84,41 @@ function Settings() {
     navigate('/login');
   };
 
+  const handleSelectDataDirectory = async () => {
+    try {
+      const selectedPath = await window.electron?.fs.selectDirectory();
+      if (selectedPath) {
+        // Update the data directory
+        const newPath = await window.electron?.fs.setDataDir(selectedPath);
+        if (newPath) {
+          setDataDir(newPath);
+          setSettings({ ...settings, dataDirectory: selectedPath });
+          // Reload database from new directory
+          await reloadAllData();
+          setSuccess('Notes directory changed successfully. Please refresh to load notes from the new location.');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to change data directory:', err);
+    }
+  };
+
+  const handleResetDataDirectory = async () => {
+    try {
+      // Reset to default directory (null)
+      const newPath = await window.electron?.fs.setDataDir(null);
+      if (newPath) {
+        setDataDir(newPath);
+        setSettings({ ...settings, dataDirectory: null });
+        // Reload database from default directory
+        await reloadAllData();
+        setSuccess('Notes directory reset to default. Please refresh to load notes.');
+      }
+    } catch (err) {
+      console.error('Failed to reset data directory:', err);
+    }
+  };
+
   return (
     <>
       <nav className="nav">
@@ -121,6 +164,36 @@ function Settings() {
                   System
                 </button>
               </div>
+            </div>
+
+            <div className="form-group">
+              <label>Notes Directory</label>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  value={dataDir}
+                  readOnly
+                  style={{ flex: 1, backgroundColor: 'var(--bg-tertiary)', cursor: 'default' }}
+                />
+                <button
+                  type="button"
+                  onClick={handleSelectDataDirectory}
+                  style={{ width: 'auto', padding: '8px 16px' }}
+                >
+                  Browse
+                </button>
+              </div>
+              <small className="settings-hint">
+                Notes are stored as individual markdown files in this directory.
+                {settings.dataDirectory && (
+                  <span
+                    onClick={handleResetDataDirectory}
+                    style={{ marginLeft: '8px', color: 'var(--accent-color)', cursor: 'pointer' }}
+                  >
+                    Reset to default
+                  </span>
+                )}
+              </small>
             </div>
 
             <div className="form-group">

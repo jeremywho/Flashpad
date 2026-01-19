@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
 import { ThemeProvider } from './ThemeContext';
@@ -9,6 +10,7 @@ import Home from './pages/Home';
 import Account from './pages/Account';
 import Settings from './pages/Settings';
 import QuickCapture from './pages/QuickCapture';
+import { isMigrationNeeded, migrateFromLocalStorage } from './services/migration';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -79,6 +81,37 @@ function AppRoutes() {
 }
 
 function App() {
+  const [isMigrating, setIsMigrating] = useState(false);
+
+  useEffect(() => {
+    const runMigration = async () => {
+      if (isMigrationNeeded()) {
+        setIsMigrating(true);
+        try {
+          const result = await migrateFromLocalStorage();
+          console.log('Migration complete:', result);
+        } catch (error) {
+          console.error('Migration failed:', error);
+        } finally {
+          setIsMigrating(false);
+        }
+      }
+    };
+
+    runMigration();
+  }, []);
+
+  if (isMigrating) {
+    return (
+      <div className="container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <div style={{ textAlign: 'center' }}>
+          <h2>Migrating data...</h2>
+          <p>Please wait while we migrate your notes to the new file-based storage.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <HashRouter>

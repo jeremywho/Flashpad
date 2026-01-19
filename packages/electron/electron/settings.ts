@@ -6,6 +6,7 @@ export interface AppSettings {
   closeToTray: boolean;
   quickCaptureHotkey: string;
   theme: 'dark' | 'light' | 'system';
+  dataDirectory: string | null; // null means use default (app.getPath('userData')/data)
 }
 
 export const defaultSettings: AppSettings = {
@@ -14,6 +15,7 @@ export const defaultSettings: AppSettings = {
   closeToTray: true,
   quickCaptureHotkey: 'CommandOrControl+Alt+N',
   theme: 'dark',
+  dataDirectory: null,
 };
 
 export const settingsStore = new Store<AppSettings>({

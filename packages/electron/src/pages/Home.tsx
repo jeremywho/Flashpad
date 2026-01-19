@@ -8,6 +8,7 @@ import CategoryManager from '../components/CategoryManager';
 import ConnectionStatus from '../components/ConnectionStatus';
 import { useToast } from '../components/Toast';
 import { SyncManager, SyncStatus } from '../services/syncManager';
+import { startFileWatcher, stopFileWatcher } from '../services/file-watcher';
 
 type ViewType = 'inbox' | 'archive' | 'trash' | string;
 
@@ -206,6 +207,31 @@ function Home() {
       window.electron.removeRefreshNotesListener();
     };
   }, [fetchNotes, fetchCategories, fetchInboxCount]);
+
+  // Initialize file watcher for external file changes
+  useEffect(() => {
+    const handleFileChange = (event: 'noteUpdated' | 'noteDeleted', noteId: string) => {
+      // Refresh notes when files change externally
+      fetchNotes();
+      fetchInboxCount();
+      fetchCategories();
+
+      // If the currently selected note was deleted, clear selection
+      if (event === 'noteDeleted' && selectedNote?.id === noteId) {
+        setSelectedNote(null);
+      }
+    };
+
+    startFileWatcher(handleFileChange).catch((err) => {
+      console.error('Failed to start file watcher:', err);
+    });
+
+    return () => {
+      stopFileWatcher().catch((err) => {
+        console.error('Failed to stop file watcher:', err);
+      });
+    };
+  }, [fetchNotes, fetchInboxCount, fetchCategories, selectedNote?.id]);
 
   // SignalR real-time sync - uses singleton to survive React re-renders
   useEffect(() => {

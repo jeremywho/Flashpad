@@ -1,10 +1,19 @@
-import initSqlJs, { Database } from 'sql.js';
 import { Note, Category, NoteStatus } from '@shared/index';
+import {
+  parseNoteFile,
+  serializeNote,
+  extractIdFromFilename,
+  NoteMetadata,
+} from './markdown-parser';
 
-let db: Database | null = null;
-let dbInitialized = false;
+// In-memory cache for notes and categories
+let notesCache: Map<string, LocalNote> = new Map();
+let categoriesCache: Map<string, LocalCategory> = new Map();
+let syncQueueCache: SyncQueueItem[] = [];
+let initialized = false;
 
-const DB_KEY = 'flashpad_local_db';
+// Track which note IDs are being written to avoid reacting to our own file changes
+const writingNotes: Set<string> = new Set();
 
 export interface LocalNote {
   id: string;
@@ -15,8 +24,8 @@ export interface LocalNote {
   deviceId: string;
   createdAt: string;
   updatedAt: string;
-  isLocal: boolean; // true if created offline and not yet synced
-  serverId: string | null; // server ID once synced
+  isLocal: boolean;
+  serverId: string | null;
 }
 
 export interface LocalCategory {
@@ -46,92 +55,133 @@ export interface SyncQueueItem {
   entityType: 'note' | 'category';
   entityId: string;
   operation: SyncOperation;
-  payload: string; // JSON stringified data
+  payload: string;
   baseVersion: number | null;
   createdAt: string;
   retryCount: number;
   lastError: string | null;
 }
 
-async function initDatabase(): Promise<Database> {
-  if (db && dbInitialized) return db;
+interface CategoriesFile {
+  categories: LocalCategory[];
+}
 
-  const SQL = await initSqlJs({
-    locateFile: (file: string) => `https://sql.js.org/dist/${file}`,
-  });
+interface SyncQueueFile {
+  items: SyncQueueItem[];
+  nextId: number;
+}
 
-  // Try to load existing database from localStorage
-  const savedDb = localStorage.getItem(DB_KEY);
-  if (savedDb) {
-    const data = Uint8Array.from(atob(savedDb), (c) => c.charCodeAt(0));
-    db = new SQL.Database(data);
-  } else {
-    db = new SQL.Database();
-    createTables(db);
+// Initialize database from file system
+async function initDatabase(): Promise<void> {
+  if (initialized) return;
+
+  try {
+    await window.electron.fs.ensureDataDir();
+
+    // Load notes from files
+    await loadNotesFromFiles();
+
+    // Load categories from JSON
+    await loadCategoriesFromFile();
+
+    // Load sync queue from JSON
+    await loadSyncQueueFromFile();
+
+    initialized = true;
+  } catch (error) {
+    console.error('Failed to initialize database:', error);
+    throw error;
   }
-
-  dbInitialized = true;
-  return db;
 }
 
-function createTables(database: Database): void {
-  // Notes table
-  database.run(`
-    CREATE TABLE IF NOT EXISTS notes (
-      id TEXT PRIMARY KEY,
-      content TEXT NOT NULL,
-      category_id TEXT,
-      status INTEGER NOT NULL DEFAULT 0,
-      version INTEGER NOT NULL DEFAULT 1,
-      device_id TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      is_local INTEGER NOT NULL DEFAULT 0,
-      server_id TEXT
-    )
-  `);
+async function loadNotesFromFiles(): Promise<void> {
+  notesCache.clear();
 
-  // Categories table
-  database.run(`
-    CREATE TABLE IF NOT EXISTS categories (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      color TEXT NOT NULL,
-      icon TEXT,
-      sort_order INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      is_local INTEGER NOT NULL DEFAULT 0,
-      server_id TEXT
-    )
-  `);
+  const files = await window.electron.fs.listNotes();
 
-  // Sync queue table
-  database.run(`
-    CREATE TABLE IF NOT EXISTS sync_queue (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      entity_type TEXT NOT NULL,
-      entity_id TEXT NOT NULL,
-      operation TEXT NOT NULL,
-      payload TEXT NOT NULL,
-      base_version INTEGER,
-      created_at TEXT NOT NULL,
-      retry_count INTEGER NOT NULL DEFAULT 0,
-      last_error TEXT
-    )
-  `);
+  for (const filename of files) {
+    const id = extractIdFromFilename(filename);
+    const content = await window.electron.fs.readNote(id);
 
-  // Index for faster lookups
-  database.run('CREATE INDEX IF NOT EXISTS idx_notes_status ON notes(status)');
-  database.run('CREATE INDEX IF NOT EXISTS idx_notes_category ON notes(category_id)');
-  database.run('CREATE INDEX IF NOT EXISTS idx_sync_queue_entity ON sync_queue(entity_type, entity_id)');
+    if (content) {
+      const parsed = parseNoteFile(content);
+      if (parsed) {
+        const note: LocalNote = {
+          id: parsed.metadata.id,
+          content: parsed.content,
+          categoryId: parsed.metadata.categoryId,
+          status: parsed.metadata.status,
+          version: parsed.metadata.version,
+          deviceId: parsed.metadata.deviceId,
+          createdAt: parsed.metadata.createdAt,
+          updatedAt: parsed.metadata.updatedAt,
+          isLocal: parsed.metadata.isLocal,
+          serverId: parsed.metadata.serverId,
+        };
+        notesCache.set(note.id, note);
+      }
+    }
+  }
 }
 
-function saveDatabase(): void {
-  if (!db) return;
-  const data = db.export();
-  const base64 = btoa(String.fromCharCode(...data));
-  localStorage.setItem(DB_KEY, base64);
+async function loadCategoriesFromFile(): Promise<void> {
+  categoriesCache.clear();
+
+  const data = await window.electron.fs.readJsonFile<CategoriesFile>('categories.json');
+  if (data && Array.isArray(data.categories)) {
+    for (const cat of data.categories) {
+      categoriesCache.set(cat.id, cat);
+    }
+  }
+}
+
+async function saveCategoriesFile(): Promise<void> {
+  const data: CategoriesFile = {
+    categories: Array.from(categoriesCache.values()),
+  };
+  await window.electron.fs.writeJsonFile('categories.json', data);
+}
+
+async function loadSyncQueueFromFile(): Promise<void> {
+  syncQueueCache = [];
+
+  const data = await window.electron.fs.readJsonFile<SyncQueueFile>('sync-queue.json');
+  if (data && Array.isArray(data.items)) {
+    syncQueueCache = data.items;
+  }
+}
+
+async function saveSyncQueueFile(): Promise<void> {
+  const nextId =
+    syncQueueCache.length > 0 ? Math.max(...syncQueueCache.map((i) => i.id)) + 1 : 1;
+  const data: SyncQueueFile = {
+    items: syncQueueCache,
+    nextId,
+  };
+  await window.electron.fs.writeJsonFile('sync-queue.json', data);
+}
+
+async function writeNoteFile(note: LocalNote): Promise<void> {
+  const metadata: NoteMetadata = {
+    id: note.id,
+    categoryId: note.categoryId,
+    status: note.status,
+    version: note.version,
+    deviceId: note.deviceId,
+    createdAt: note.createdAt,
+    updatedAt: note.updatedAt,
+    isLocal: note.isLocal,
+    serverId: note.serverId,
+  };
+
+  const fileContent = serializeNote(metadata, note.content);
+  writingNotes.add(note.id);
+  try {
+    await window.electron.fs.writeNote(note.id, fileContent);
+  } finally {
+    // Remove from writing set after a short delay to account for file system events
+    setTimeout(() => writingNotes.delete(note.id), 500);
+  }
 }
 
 // Note operations
@@ -139,381 +189,372 @@ export async function getLocalNotes(params: {
   status?: NoteStatus;
   categoryId?: string;
 }): Promise<Note[]> {
-  const database = await initDatabase();
+  await initDatabase();
 
-  let sql = 'SELECT * FROM notes WHERE 1=1';
-  const sqlParams: (number | string)[] = [];
+  let notes = Array.from(notesCache.values());
 
   if (params.status !== undefined) {
-    sql += ' AND status = ?';
-    sqlParams.push(params.status);
+    notes = notes.filter((n) => n.status === params.status);
   }
 
   if (params.categoryId !== undefined) {
     if (params.categoryId === null || params.categoryId === '') {
-      sql += ' AND category_id IS NULL';
+      notes = notes.filter((n) => n.categoryId === null);
     } else {
-      sql += ' AND category_id = ?';
-      sqlParams.push(params.categoryId);
+      notes = notes.filter((n) => n.categoryId === params.categoryId);
     }
   }
 
-  sql += ' ORDER BY updated_at DESC';
+  // Sort by updatedAt descending
+  notes.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
-  const results = database.exec(sql, sqlParams);
-  if (results.length === 0) return [];
-
-  const columns = results[0].columns;
-  return results[0].values.map((row: unknown[]) => rowToNote(columns, row));
+  return notes.map(localNoteToNote);
 }
 
 export async function getLocalNote(id: string): Promise<Note | null> {
-  const database = await initDatabase();
-  const results = database.exec('SELECT * FROM notes WHERE id = ?', [id]);
-  if (results.length === 0 || results[0].values.length === 0) return null;
-  return rowToNote(results[0].columns, results[0].values[0]);
+  await initDatabase();
+
+  const note = notesCache.get(id);
+  return note ? localNoteToNote(note) : null;
 }
 
 export async function saveLocalNote(note: Note, isLocal = false): Promise<void> {
-  const database = await initDatabase();
+  await initDatabase();
 
-  const existing = await getLocalNote(note.id);
+  const existing = notesCache.get(note.id);
 
-  if (existing) {
-    database.run(
-      `UPDATE notes SET
-        content = ?, category_id = ?, status = ?, version = ?,
-        device_id = ?, updated_at = ?, is_local = ?, server_id = ?
-      WHERE id = ?`,
-      [
-        note.content,
-        note.categoryId || null,
-        note.status,
-        note.version,
-        note.deviceId || null,
-        note.updatedAt,
-        isLocal ? 1 : 0,
-        isLocal ? null : note.id,
-        note.id,
-      ]
-    );
-  } else {
-    database.run(
-      `INSERT INTO notes (id, content, category_id, status, version, device_id, created_at, updated_at, is_local, server_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        note.id,
-        note.content,
-        note.categoryId || null,
-        note.status,
-        note.version,
-        note.deviceId || null,
-        note.createdAt,
-        note.updatedAt,
-        isLocal ? 1 : 0,
-        isLocal ? null : note.id,
-      ]
-    );
-  }
+  const localNote: LocalNote = {
+    id: note.id,
+    content: note.content,
+    categoryId: note.categoryId || null,
+    status: note.status,
+    version: note.version,
+    deviceId: note.deviceId || '',
+    createdAt: existing?.createdAt || note.createdAt,
+    updatedAt: note.updatedAt,
+    isLocal: isLocal,
+    serverId: isLocal ? null : note.id,
+  };
 
-  saveDatabase();
+  notesCache.set(note.id, localNote);
+  await writeNoteFile(localNote);
 }
 
 export async function deleteLocalNote(id: string): Promise<void> {
-  const database = await initDatabase();
-  database.run('DELETE FROM notes WHERE id = ?', [id]);
-  saveDatabase();
+  await initDatabase();
+
+  notesCache.delete(id);
+  await window.electron.fs.deleteNote(id);
 }
 
 export async function bulkSaveNotes(notes: Note[]): Promise<void> {
-  const database = await initDatabase();
+  await initDatabase();
 
   for (const note of notes) {
-    const existing = await getLocalNote(note.id);
+    const existing = notesCache.get(note.id);
 
     if (existing) {
-      // Only update if server version is newer or same
-      if (note.version >= existing.version) {
-        database.run(
-          `UPDATE notes SET
-            content = ?, category_id = ?, status = ?, version = ?,
-            device_id = ?, updated_at = ?, server_id = ?
-          WHERE id = ? AND is_local = 0`,
-          [
-            note.content,
-            note.categoryId || null,
-            note.status,
-            note.version,
-            note.deviceId || null,
-            note.updatedAt,
-            note.id,
-            note.id,
-          ]
-        );
+      // Only update if server version is newer or same, and note is not local
+      if (note.version >= existing.version && !existing.isLocal) {
+        const localNote: LocalNote = {
+          ...existing,
+          content: note.content,
+          categoryId: note.categoryId || null,
+          status: note.status,
+          version: note.version,
+          deviceId: note.deviceId || '',
+          updatedAt: note.updatedAt,
+          serverId: note.id,
+        };
+        notesCache.set(note.id, localNote);
+        await writeNoteFile(localNote);
       }
     } else {
-      database.run(
-        `INSERT INTO notes (id, content, category_id, status, version, device_id, created_at, updated_at, is_local, server_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
-        [
-          note.id,
-          note.content,
-          note.categoryId || null,
-          note.status,
-          note.version,
-          note.deviceId || null,
-          note.createdAt,
-          note.updatedAt,
-          note.id,
-        ]
-      );
+      const localNote: LocalNote = {
+        id: note.id,
+        content: note.content,
+        categoryId: note.categoryId || null,
+        status: note.status,
+        version: note.version,
+        deviceId: note.deviceId || '',
+        createdAt: note.createdAt,
+        updatedAt: note.updatedAt,
+        isLocal: false,
+        serverId: note.id,
+      };
+      notesCache.set(note.id, localNote);
+      await writeNoteFile(localNote);
     }
   }
-
-  saveDatabase();
 }
 
 // Category operations
 export async function getLocalCategories(): Promise<Category[]> {
-  const database = await initDatabase();
-  const results = database.exec('SELECT * FROM categories ORDER BY sort_order ASC');
-  if (results.length === 0) return [];
+  await initDatabase();
 
-  const columns = results[0].columns;
-  return results[0].values.map((row: unknown[]) => rowToCategory(columns, row));
+  const categories = Array.from(categoriesCache.values());
+  categories.sort((a, b) => a.sortOrder - b.sortOrder);
+
+  return categories.map(localCategoryToCategory);
 }
 
 export async function saveLocalCategory(category: Category, isLocal = false): Promise<void> {
-  const database = await initDatabase();
+  await initDatabase();
 
-  const results = database.exec('SELECT id FROM categories WHERE id = ?', [category.id]);
-  const existing = results.length > 0 && results[0].values.length > 0;
+  const existing = categoriesCache.get(category.id);
 
-  if (existing) {
-    database.run(
-      `UPDATE categories SET
-        name = ?, color = ?, icon = ?, sort_order = ?, updated_at = ?, is_local = ?, server_id = ?
-      WHERE id = ?`,
-      [
-        category.name,
-        category.color,
-        category.icon || null,
-        category.sortOrder,
-        category.updatedAt,
-        isLocal ? 1 : 0,
-        isLocal ? null : category.id,
-        category.id,
-      ]
-    );
-  } else {
-    database.run(
-      `INSERT INTO categories (id, name, color, icon, sort_order, created_at, updated_at, is_local, server_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        category.id,
-        category.name,
-        category.color,
-        category.icon || null,
-        category.sortOrder,
-        category.createdAt,
-        category.updatedAt,
-        isLocal ? 1 : 0,
-        isLocal ? null : category.id,
-      ]
-    );
-  }
+  const localCategory: LocalCategory = {
+    id: category.id,
+    name: category.name,
+    color: category.color,
+    icon: category.icon || null,
+    sortOrder: category.sortOrder,
+    createdAt: existing?.createdAt || category.createdAt,
+    updatedAt: category.updatedAt,
+    isLocal: isLocal,
+    serverId: isLocal ? null : category.id,
+  };
 
-  saveDatabase();
+  categoriesCache.set(category.id, localCategory);
+  await saveCategoriesFile();
 }
 
 export async function deleteLocalCategory(id: string): Promise<void> {
-  const database = await initDatabase();
-  database.run('DELETE FROM categories WHERE id = ?', [id]);
-  saveDatabase();
+  await initDatabase();
+
+  categoriesCache.delete(id);
+  await saveCategoriesFile();
 }
 
 export async function bulkSaveCategories(categories: Category[]): Promise<void> {
-  const database = await initDatabase();
+  await initDatabase();
 
   for (const category of categories) {
-    const results = database.exec('SELECT id FROM categories WHERE id = ?', [category.id]);
-    const existing = results.length > 0 && results[0].values.length > 0;
+    const existing = categoriesCache.get(category.id);
 
     if (existing) {
-      database.run(
-        `UPDATE categories SET
-          name = ?, color = ?, icon = ?, sort_order = ?, updated_at = ?, server_id = ?
-        WHERE id = ? AND is_local = 0`,
-        [
-          category.name,
-          category.color,
-          category.icon || null,
-          category.sortOrder,
-          category.updatedAt,
-          category.id,
-          category.id,
-        ]
-      );
+      // Only update if not a local category
+      if (!existing.isLocal) {
+        const localCategory: LocalCategory = {
+          ...existing,
+          name: category.name,
+          color: category.color,
+          icon: category.icon || null,
+          sortOrder: category.sortOrder,
+          updatedAt: category.updatedAt,
+          serverId: category.id,
+        };
+        categoriesCache.set(category.id, localCategory);
+      }
     } else {
-      database.run(
-        `INSERT INTO categories (id, name, color, icon, sort_order, created_at, updated_at, is_local, server_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)`,
-        [
-          category.id,
-          category.name,
-          category.color,
-          category.icon || null,
-          category.sortOrder,
-          category.createdAt,
-          category.updatedAt,
-          category.id,
-        ]
-      );
+      const localCategory: LocalCategory = {
+        id: category.id,
+        name: category.name,
+        color: category.color,
+        icon: category.icon || null,
+        sortOrder: category.sortOrder,
+        createdAt: category.createdAt,
+        updatedAt: category.updatedAt,
+        isLocal: false,
+        serverId: category.id,
+      };
+      categoriesCache.set(category.id, localCategory);
     }
   }
 
-  saveDatabase();
+  await saveCategoriesFile();
 }
 
 // Sync queue operations
-export async function addToSyncQueue(item: Omit<SyncQueueItem, 'id' | 'createdAt' | 'retryCount' | 'lastError'>): Promise<void> {
-  const database = await initDatabase();
+export async function addToSyncQueue(
+  item: Omit<SyncQueueItem, 'id' | 'createdAt' | 'retryCount' | 'lastError'>
+): Promise<void> {
+  await initDatabase();
 
-  // Remove any existing pending operations for the same entity
-  database.run(
-    'DELETE FROM sync_queue WHERE entity_type = ? AND entity_id = ? AND operation = ?',
-    [item.entityType, item.entityId, item.operation]
+  // Remove any existing pending operations for the same entity with same operation
+  syncQueueCache = syncQueueCache.filter(
+    (i) =>
+      !(
+        i.entityType === item.entityType &&
+        i.entityId === item.entityId &&
+        i.operation === item.operation
+      )
   );
 
-  database.run(
-    `INSERT INTO sync_queue (entity_type, entity_id, operation, payload, base_version, created_at, retry_count)
-    VALUES (?, ?, ?, ?, ?, ?, 0)`,
-    [
-      item.entityType,
-      item.entityId,
-      item.operation,
-      item.payload,
-      item.baseVersion || null,
-      new Date().toISOString(),
-    ]
-  );
+  const nextId =
+    syncQueueCache.length > 0 ? Math.max(...syncQueueCache.map((i) => i.id)) + 1 : 1;
 
-  saveDatabase();
+  const newItem: SyncQueueItem = {
+    id: nextId,
+    entityType: item.entityType,
+    entityId: item.entityId,
+    operation: item.operation,
+    payload: item.payload,
+    baseVersion: item.baseVersion || null,
+    createdAt: new Date().toISOString(),
+    retryCount: 0,
+    lastError: null,
+  };
+
+  syncQueueCache.push(newItem);
+  await saveSyncQueueFile();
 }
 
 export async function getSyncQueue(): Promise<SyncQueueItem[]> {
-  const database = await initDatabase();
-  const results = database.exec('SELECT * FROM sync_queue ORDER BY created_at ASC');
-  if (results.length === 0) return [];
+  await initDatabase();
 
-  const columns = results[0].columns;
-  return results[0].values.map((row: unknown[]) => {
-    const obj: Record<string, unknown> = {};
-    columns.forEach((col: string, i: number) => {
-      obj[col] = row[i];
-    });
-    return {
-      id: obj.id as number,
-      entityType: obj.entity_type as 'note' | 'category',
-      entityId: obj.entity_id as string,
-      operation: obj.operation as SyncOperation,
-      payload: obj.payload as string,
-      baseVersion: obj.base_version as number | null,
-      createdAt: obj.created_at as string,
-      retryCount: obj.retry_count as number,
-      lastError: obj.last_error as string | null,
-    };
-  });
+  return [...syncQueueCache].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
 }
 
 export async function removeSyncQueueItem(id: number): Promise<void> {
-  const database = await initDatabase();
-  database.run('DELETE FROM sync_queue WHERE id = ?', [id]);
-  saveDatabase();
+  await initDatabase();
+
+  syncQueueCache = syncQueueCache.filter((i) => i.id !== id);
+  await saveSyncQueueFile();
 }
 
 export async function updateSyncQueueItemError(id: number, error: string): Promise<void> {
-  const database = await initDatabase();
-  database.run(
-    'UPDATE sync_queue SET retry_count = retry_count + 1, last_error = ? WHERE id = ?',
-    [error, id]
-  );
-  saveDatabase();
+  await initDatabase();
+
+  const item = syncQueueCache.find((i) => i.id === id);
+  if (item) {
+    item.retryCount += 1;
+    item.lastError = error;
+    await saveSyncQueueFile();
+  }
 }
 
 export async function getSyncQueueCount(): Promise<number> {
-  const database = await initDatabase();
-  const results = database.exec('SELECT COUNT(*) as count FROM sync_queue');
-  if (results.length === 0) return 0;
-  return results[0].values[0][0] as number;
+  await initDatabase();
+  return syncQueueCache.length;
 }
 
 export async function clearLocalData(): Promise<void> {
-  const database = await initDatabase();
-  database.run('DELETE FROM notes');
-  database.run('DELETE FROM categories');
-  database.run('DELETE FROM sync_queue');
-  saveDatabase();
-}
+  await initDatabase();
 
-// Helper functions
-function rowToNote(columns: string[], row: unknown[]): Note {
-  const obj: Record<string, unknown> = {};
-  columns.forEach((col, i) => {
-    obj[col] = row[i];
-  });
+  // Delete all note files
+  for (const id of notesCache.keys()) {
+    await window.electron.fs.deleteNote(id);
+  }
 
-  return {
-    id: obj.id as string,
-    content: obj.content as string,
-    categoryId: obj.category_id as string | undefined,
-    status: obj.status as NoteStatus,
-    version: obj.version as number,
-    deviceId: obj.device_id as string | undefined,
-    createdAt: obj.created_at as string,
-    updatedAt: obj.updated_at as string,
-  };
-}
+  notesCache.clear();
+  categoriesCache.clear();
+  syncQueueCache = [];
 
-function rowToCategory(columns: string[], row: unknown[]): Category {
-  const obj: Record<string, unknown> = {};
-  columns.forEach((col, i) => {
-    obj[col] = row[i];
-  });
-
-  return {
-    id: obj.id as string,
-    name: obj.name as string,
-    color: obj.color as string,
-    icon: obj.icon as string | undefined,
-    sortOrder: obj.sort_order as number,
-    noteCount: 0, // Will be calculated from notes
-    createdAt: obj.created_at as string,
-    updatedAt: obj.updated_at as string,
-  };
+  await saveCategoriesFile();
+  await saveSyncQueueFile();
 }
 
 // Get note counts for categories
 export async function getCategoryCounts(): Promise<Record<string, number>> {
-  const database = await initDatabase();
-  const results = database.exec(
-    'SELECT category_id, COUNT(*) as count FROM notes WHERE status = 0 AND category_id IS NOT NULL GROUP BY category_id'
-  );
+  await initDatabase();
 
   const counts: Record<string, number> = {};
-  if (results.length > 0) {
-    results[0].values.forEach((row: unknown[]) => {
-      counts[row[0] as string] = row[1] as number;
-    });
+
+  for (const note of notesCache.values()) {
+    if (note.status === NoteStatus.Inbox && note.categoryId) {
+      counts[note.categoryId] = (counts[note.categoryId] || 0) + 1;
+    }
   }
+
   return counts;
 }
 
 export async function getInboxCount(): Promise<number> {
-  const database = await initDatabase();
-  const results = database.exec(
-    'SELECT COUNT(*) FROM notes WHERE status = 0 AND category_id IS NULL'
-  );
-  if (results.length === 0) return 0;
-  return results[0].values[0][0] as number;
+  await initDatabase();
+
+  let count = 0;
+  for (const note of notesCache.values()) {
+    if (note.status === NoteStatus.Inbox && !note.categoryId) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+// Helper functions
+function localNoteToNote(localNote: LocalNote): Note {
+  return {
+    id: localNote.id,
+    content: localNote.content,
+    categoryId: localNote.categoryId || undefined,
+    status: localNote.status,
+    version: localNote.version,
+    deviceId: localNote.deviceId || undefined,
+    createdAt: localNote.createdAt,
+    updatedAt: localNote.updatedAt,
+  };
+}
+
+function localCategoryToCategory(localCategory: LocalCategory): Category {
+  return {
+    id: localCategory.id,
+    name: localCategory.name,
+    color: localCategory.color,
+    icon: localCategory.icon || undefined,
+    sortOrder: localCategory.sortOrder,
+    noteCount: 0, // Will be calculated from notes
+    createdAt: localCategory.createdAt,
+    updatedAt: localCategory.updatedAt,
+  };
+}
+
+// File watcher integration
+export function isWritingNote(id: string): boolean {
+  return writingNotes.has(id);
+}
+
+export async function reloadNoteFromFile(id: string): Promise<Note | null> {
+  const content = await window.electron.fs.readNote(id);
+  if (!content) {
+    // File was deleted
+    notesCache.delete(id);
+    return null;
+  }
+
+  const parsed = parseNoteFile(content);
+  if (!parsed) {
+    return null;
+  }
+
+  const note: LocalNote = {
+    id: parsed.metadata.id,
+    content: parsed.content,
+    categoryId: parsed.metadata.categoryId,
+    status: parsed.metadata.status,
+    version: parsed.metadata.version,
+    deviceId: parsed.metadata.deviceId,
+    createdAt: parsed.metadata.createdAt,
+    updatedAt: parsed.metadata.updatedAt,
+    isLocal: parsed.metadata.isLocal,
+    serverId: parsed.metadata.serverId,
+  };
+
+  notesCache.set(note.id, note);
+  return localNoteToNote(note);
+}
+
+export async function handleFileDeleted(id: string): Promise<void> {
+  notesCache.delete(id);
+}
+
+// Force reload all data (useful after changing data directory)
+export async function reloadAllData(): Promise<void> {
+  initialized = false;
+  notesCache.clear();
+  categoriesCache.clear();
+  syncQueueCache = [];
+  await initDatabase();
+}
+
+// Export cache for inspection (useful for migration)
+export function getNotesCache(): Map<string, LocalNote> {
+  return notesCache;
+}
+
+export function getCategoriesCache(): Map<string, LocalCategory> {
+  return categoriesCache;
 }

@@ -42,9 +42,16 @@ export class SignalRClient {
 
   /**
    * Update callbacks without reconnecting. Useful for React re-renders.
+   * Immediately notifies the new callback of the current connection state.
    */
   updateCallbacks(callbacks: Partial<SignalRClientOptions>): void {
     Object.assign(this.options, callbacks);
+    // Immediately notify the new callback of the current state
+    // This handles the case where the connection is already established
+    // but the React component re-rendered and has a new callback
+    if (callbacks.onConnectionStateChange) {
+      callbacks.onConnectionStateChange(this.connectionState);
+    }
   }
 
   private setConnectionState(state: ConnectionState) {
