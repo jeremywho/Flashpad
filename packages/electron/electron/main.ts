@@ -138,6 +138,7 @@ function createTray() {
   });
   tray = new Tray(icon);
 
+  const version = app.getVersion();
   const contextMenu = Menu.buildFromTemplate([
     {
       label: 'Quick Capture',
@@ -156,6 +157,13 @@ function createTray() {
         } else {
           createWindow();
         }
+      },
+    },
+    { type: 'separator' },
+    {
+      label: `Check for Updates (v${version})`,
+      click: () => {
+        autoUpdater.checkForUpdatesAndNotify();
       },
     },
     { type: 'separator' },
@@ -342,6 +350,14 @@ ipcMain.handle('set-settings', (_event, settings: Partial<AppSettings>) => {
 ipcMain.handle('reset-settings', () => {
   settingsStore.clear();
   return settingsStore.store;
+});
+
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
+});
+
+ipcMain.handle('check-for-updates', () => {
+  autoUpdater.checkForUpdatesAndNotify();
 });
 
 // Quick capture IPC handlers

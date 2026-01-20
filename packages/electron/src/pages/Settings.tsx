@@ -20,6 +20,7 @@ function Settings() {
   const [dataDir, setDataDir] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
+  const [appVersion, setAppVersion] = useState<string>('');
 
   useEffect(() => {
     loadSettings();
@@ -35,6 +36,11 @@ function Settings() {
       const dir = await window.electron?.fs.getDataDir();
       if (dir) {
         setDataDir(dir);
+      }
+      // Load app version
+      const version = await window.electron?.app.getVersion();
+      if (version) {
+        setAppVersion(version);
       }
     } catch (err) {
       console.error('Failed to load settings:', err);
@@ -116,6 +122,15 @@ function Settings() {
       }
     } catch (err) {
       console.error('Failed to reset data directory:', err);
+    }
+  };
+
+  const handleCheckForUpdates = async () => {
+    try {
+      await window.electron?.app.checkForUpdates();
+      setSuccess('Checking for updates...');
+    } catch (err) {
+      console.error('Failed to check for updates:', err);
     }
   };
 
@@ -285,6 +300,20 @@ function Settings() {
               <li><strong>macOS/Linux:</strong> Double-click tray icon to show window. Right-click for menu.</li>
               <li>Use the "Quit" option in the tray context menu to completely exit the app.</li>
             </ul>
+          </div>
+
+          <div className="settings-about" style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid var(--border-color)' }}>
+            <h3>About</h3>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '12px' }}>
+              Flashpad v{appVersion || '...'}
+            </p>
+            <button
+              type="button"
+              onClick={handleCheckForUpdates}
+              style={{ width: 'auto', padding: '8px 16px' }}
+            >
+              Check for Updates
+            </button>
           </div>
         </div>
       </div>

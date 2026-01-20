@@ -33,6 +33,10 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke('set-settings', settings),
     reset: (): Promise<AppSettings> => ipcRenderer.invoke('reset-settings'),
   },
+  app: {
+    getVersion: (): Promise<string> => ipcRenderer.invoke('get-app-version'),
+    checkForUpdates: (): Promise<void> => ipcRenderer.invoke('check-for-updates'),
+  },
   quickCapture: {
     close: (): Promise<void> => ipcRenderer.invoke('close-quick-capture'),
     getAuthToken: (): Promise<string | null> => ipcRenderer.invoke('get-auth-token'),

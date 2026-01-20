@@ -46,6 +46,10 @@ export interface ElectronAPI {
     set: (settings: Partial<AppSettings>) => Promise<AppSettings>;
     reset: () => Promise<AppSettings>;
   };
+  app: {
+    getVersion: () => Promise<string>;
+    checkForUpdates: () => Promise<void>;
+  };
   quickCapture: {
     close: () => Promise<void>;
     getAuthToken: () => Promise<string | null>;
