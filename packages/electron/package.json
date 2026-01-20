@@ -1,6 +1,6 @@
 {
   "name": "@flashpad/electron",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Flashpad desktop app - Quick note capture for Windows and Mac",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -24,7 +24,6 @@
   "homepage": "https://flashpad.cc",
   "license": "MIT",
   "dependencies": {
-    "chokidar": "^3.6.0",
     "electron-store": "^11.0.2",
     "electron-updater": "^6.7.3",
     "gray-matter": "^4.0.3",
@@ -53,24 +52,7 @@
     "productName": "Flashpad",
     "files": [
       "dist/**/*",
-      "dist-electron/**/*",
-      "node_modules/chokidar/**/*",
-      "node_modules/readdirp/**/*",
-      "node_modules/picomatch/**/*",
-      "node_modules/braces/**/*",
-      "node_modules/fill-range/**/*",
-      "node_modules/to-regex-range/**/*",
-      "node_modules/is-number/**/*",
-      "node_modules/normalize-path/**/*",
-      "node_modules/anymatch/**/*",
-      "node_modules/is-extglob/**/*",
-      "node_modules/is-glob/**/*",
-      "node_modules/glob-parent/**/*",
-      "node_modules/binary-extensions/**/*"
-    ],
-    "asarUnpack": [
-      "node_modules/chokidar/**/*",
-      "node_modules/fsevents/**/*"
+      "dist-electron/**/*"
     ],
     "directories": {
       "output": "release",
