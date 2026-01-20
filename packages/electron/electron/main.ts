@@ -39,7 +39,7 @@ function startFileWatcher(): void {
     fsSync.mkdirSync(notesDir, { recursive: true });
   }
 
-  watcher = fsSync.watch(notesDir, { persistent: true }, (eventType, filename) => {
+  watcher = fsSync.watch(notesDir, { persistent: true }, (_eventType, filename) => {
     if (!filename || !filename.endsWith('.md')) return;
 
     // Debounce rapid events (file systems often fire multiple events)
