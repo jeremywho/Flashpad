@@ -9,7 +9,7 @@ function Settings() {
     <div className="settings-page">
       <div className="settings-container">
         <div className="settings-header">
-          <button className="settings-back" onClick={() => navigate('/')}>
+          <button className="settings-back" onClick={() => navigate('/app')}>
             &larr; Back
           </button>
           <h1>Settings</h1>

@@ -25,7 +25,7 @@ function Register() {
         fullName: fullName || undefined,
       });
       login(response.token, response.user);
-      navigate('/');
+      navigate('/app');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {

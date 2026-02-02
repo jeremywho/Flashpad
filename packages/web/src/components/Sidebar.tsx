@@ -132,11 +132,11 @@ export default function Sidebar({
       </nav>
 
       <div className="sidebar-footer">
-        <button className="sidebar-item" onClick={() => navigate('/settings')}>
+        <button className="sidebar-item" onClick={() => navigate('/app/settings')}>
           <span className="sidebar-icon">&#9881;</span>
           <span className="sidebar-label">Settings</span>
         </button>
-        <button className="sidebar-item" onClick={() => navigate('/account')}>
+        <button className="sidebar-item" onClick={() => navigate('/app/account')}>
           <span className="sidebar-icon">&#128100;</span>
           <span className="sidebar-label">Account</span>
         </button>

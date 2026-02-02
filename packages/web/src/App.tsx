@@ -6,6 +6,9 @@ import Register from './pages/Register';
 import Home from './pages/Home';
 import Settings from './pages/Settings';
 import Account from './pages/Account';
+import LandingPage from './pages/LandingPage';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import Download from './pages/Download';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -24,7 +27,17 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
     return <div className="loading-screen">Loading...</div>;
   }
 
-  return !isAuthenticated ? <>{children}</> : <Navigate to="/" />;
+  return !isAuthenticated ? <>{children}</> : <Navigate to="/app" />;
+}
+
+function LandingRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <div className="loading-screen">Loading...</div>;
+  }
+
+  return isAuthenticated ? <Navigate to="/app" /> : <>{children}</>;
 }
 
 function App() {
@@ -33,6 +46,14 @@ function App() {
       <AuthProvider>
         <ThemeProvider>
           <Routes>
+            <Route
+              path="/"
+              element={
+                <LandingRoute>
+                  <LandingPage />
+                </LandingRoute>
+              }
+            />
             <Route
               path="/login"
               element={
@@ -50,7 +71,7 @@ function App() {
               }
             />
             <Route
-              path="/"
+              path="/app"
               element={
                 <PrivateRoute>
                   <Home />
@@ -58,7 +79,7 @@ function App() {
               }
             />
             <Route
-              path="/settings"
+              path="/app/settings"
               element={
                 <PrivateRoute>
                   <Settings />
@@ -66,13 +87,15 @@ function App() {
               }
             />
             <Route
-              path="/account"
+              path="/app/account"
               element={
                 <PrivateRoute>
                   <Account />
                 </PrivateRoute>
               }
             />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/download" element={<Download />} />
           </Routes>
         </ThemeProvider>
       </AuthProvider>
