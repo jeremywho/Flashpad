@@ -626,12 +626,13 @@ h1, h2, h3 {
 
 .note-editor-content {
   flex: 1;
-  padding: 20px;
+  padding: 24px;
   background: var(--bg-primary);
   border: none;
   color: var(--text-primary);
-  font-size: 15px;
-  line-height: 1.6;
+  font-size: 17px;
+  line-height: 1.7;
+  letter-spacing: 0.01em;
   resize: none;
   outline: none;
   font-family: inherit;
@@ -676,12 +677,13 @@ h1, h2, h3 {
 .quick-capture-input {
   width: 100%;
   height: 100px;
-  padding: 12px;
+  padding: 16px;
   background: #2d2d2d;
   border: 1px solid #404040;
   border-radius: 8px;
   color: #e0e0e0;
-  font-size: 14px;
+  font-size: 16px;
+  line-height: 1.6;
   font-family: inherit;
   resize: none;
   outline: none;

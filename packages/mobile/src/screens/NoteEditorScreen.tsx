@@ -459,9 +459,10 @@ const styles = StyleSheet.create({
   },
   editor: {
     flex: 1,
-    padding: 20,
-    fontSize: 16,
-    lineHeight: 24,
+    padding: 24,
+    fontSize: 18,
+    lineHeight: 30,
+    letterSpacing: 0.2,
     color: colors.text,
   },
   headerActions: {

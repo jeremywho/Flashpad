@@ -205,9 +205,10 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    padding: 20,
+    padding: 24,
     fontSize: 18,
-    lineHeight: 26,
+    lineHeight: 30,
+    letterSpacing: 0.2,
     color: colors.text,
   },
   errorContainer: {

@@ -700,12 +700,13 @@ button:disabled {
 
 .note-editor-content {
   flex: 1;
-  padding: 20px;
+  padding: 24px;
   background: var(--bg-primary);
   border: none;
   color: var(--text-primary);
-  font-size: 15px;
-  line-height: 1.6;
+  font-size: 17px;
+  line-height: 1.7;
+  letter-spacing: 0.01em;
   resize: none;
   outline: none;
   font-family: inherit;
