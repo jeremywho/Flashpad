@@ -669,6 +669,12 @@ button:disabled {
 .note-editor-saving {
   font-size: 12px;
   color: var(--text-muted);
+  animation: saving-fade-in 0.2s ease-in;
+}
+
+@keyframes saving-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .note-editor-action-btn {

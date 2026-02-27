@@ -6,6 +6,75 @@ const CODE_LANGUAGES = [
   'html', 'css', 'sql', 'bash', 'json', 'yaml', 'xml', 'markdown',
 ];
 
+/**
+ * Hook that debounces the visibility of the saving indicator.
+ * - Only shows "Saving..." if the save takes longer than `showDelay` ms (default 500ms).
+ * - Once visible, stays visible for at least `minVisible` ms (default 800ms) to avoid flicker.
+ */
+function useDebouncedSavingIndicator(
+  isSaving: boolean,
+  showDelay = 500,
+  minVisible = 800
+): boolean {
+  const [visible, setVisible] = useState(false);
+  const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const visibleSinceRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (isSaving) {
+      // Clear any pending hide timer since we're saving again
+      if (hideTimerRef.current) {
+        clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = null;
+      }
+      // Start a delay before showing the indicator
+      if (!visible && !showTimerRef.current) {
+        showTimerRef.current = setTimeout(() => {
+          showTimerRef.current = null;
+          visibleSinceRef.current = Date.now();
+          setVisible(true);
+        }, showDelay);
+      }
+    } else {
+      // Save finished — clear the show timer if it hasn't fired yet
+      if (showTimerRef.current) {
+        clearTimeout(showTimerRef.current);
+        showTimerRef.current = null;
+      }
+      // If indicator is visible, ensure it stays for minVisible ms
+      if (visible && visibleSinceRef.current !== null) {
+        const elapsed = Date.now() - visibleSinceRef.current;
+        const remaining = minVisible - elapsed;
+        if (remaining > 0) {
+          hideTimerRef.current = setTimeout(() => {
+            hideTimerRef.current = null;
+            visibleSinceRef.current = null;
+            setVisible(false);
+          }, remaining);
+        } else {
+          visibleSinceRef.current = null;
+          setVisible(false);
+        }
+      }
+    }
+
+    return () => {
+      // Cleanup only the show timer on effect re-run; hide timer is managed separately
+    };
+  }, [isSaving, showDelay, minVisible, visible]);
+
+  // Cleanup all timers on unmount
+  useEffect(() => {
+    return () => {
+      if (showTimerRef.current) clearTimeout(showTimerRef.current);
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    };
+  }, []);
+
+  return visible;
+}
+
 interface NoteEditorProps {
   note: Note | null;
   categories: Category[];
@@ -33,6 +102,7 @@ export default function NoteEditor({
   onCategoryChanged,
   initialCategoryId,
 }: NoteEditorProps) {
+  const showSavingIndicator = useDebouncedSavingIndicator(isSaving);
   const [content, setContent] = useState(note?.content || '');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(
     note?.categoryId ?? initialCategoryId
@@ -294,7 +364,7 @@ export default function NoteEditor({
               </div>
             )}
           </div>
-          {isSaving && <span className="note-editor-saving">Saving...</span>}
+          {showSavingIndicator && <span className="note-editor-saving">Saving...</span>}
         </div>
 
         <div className="note-editor-toolbar-right">
