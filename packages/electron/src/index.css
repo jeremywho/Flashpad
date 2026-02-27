@@ -762,6 +762,98 @@ h1, h2, h3 {
   padding: 20px;
 }
 
+/* Code Block Toolbar */
+.note-editor-code-block-selector {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.note-editor-code-lang-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 4px;
+  min-width: 160px;
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 100;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.note-editor-code-lang-option {
+  display: block;
+  width: 100%;
+  padding: 7px 12px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Consolas', 'Courier New', monospace;
+}
+
+.note-editor-code-lang-option:hover {
+  background: var(--bg-hover);
+}
+
+/* Quick Capture Code Window Styles */
+.quick-capture-code-window {
+  max-width: 600px;
+}
+
+.quick-capture-code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.quick-capture-code-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6366f1;
+  font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Consolas', 'Courier New', monospace;
+}
+
+.quick-capture-code-lang-select {
+  padding: 5px 10px;
+  background: #2d2d2d;
+  border: 1px solid #404040;
+  border-radius: 6px;
+  color: #e0e0e0;
+  font-size: 13px;
+  font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Consolas', 'Courier New', monospace;
+  outline: none;
+  cursor: pointer;
+}
+
+.quick-capture-code-lang-select:focus {
+  border-color: #6366f1;
+}
+
+.quick-capture-code-lang-select option {
+  background: #1e1e1e;
+  color: #e0e0e0;
+}
+
+.quick-capture-code-input {
+  font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Consolas', 'Courier New', monospace !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  tab-size: 2;
+  height: 180px !important;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+}
+
 /* Settings Page Styles */
 .settings-theme-options {
   display: flex;

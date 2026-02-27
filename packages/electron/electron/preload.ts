@@ -5,6 +5,7 @@ export interface AppSettings {
   startMinimized: boolean;
   closeToTray: boolean;
   quickCaptureHotkey: string;
+  quickCaptureCodeHotkey: string;
   theme: 'dark' | 'light' | 'system';
   dataDirectory: string | null;
 }
@@ -41,6 +42,9 @@ contextBridge.exposeInMainWorld('electron', {
     close: (): Promise<void> => ipcRenderer.invoke('close-quick-capture'),
     getAuthToken: (): Promise<string | null> => ipcRenderer.invoke('get-auth-token'),
     notifyNoteCreated: (): Promise<void> => ipcRenderer.invoke('note-created-from-quick-capture'),
+  },
+  quickCaptureCode: {
+    close: (): Promise<void> => ipcRenderer.invoke('close-quick-capture-code'),
   },
   fs: {
     // Notes directory operations
