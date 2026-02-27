@@ -313,6 +313,50 @@ Basic note capture and sync across all platforms with offline support.
   - Clear loading states
   - Smooth transitions
 
+### 1.17 UX Backlog
+
+**Vision**: "Gmail for notes" - ultra cross-platform with fast new note entry and excellent organization.
+
+#### Bugs
+- [ ] **Mobile: Timestamps showing UTC** - Timestamps display UTC instead of converted local time
+- [ ] **Mobile: Search bar X not centered** - Close button misaligned in search bar
+- [ ] **Mobile: Keyboard covers content** - Page not auto-scrolling when keyboard appears, content gets covered
+- [ ] **Mobile: Buttons flicker on save** - Top header buttons flicker during save operations
+
+#### Auto-Save Issues
+- [ ] **Auto-save transition is jarring** - Investigate and smooth out the save feedback
+- [ ] **Auto-save removes trailing whitespace** - Seems to strip last newline or whitespace on save
+
+#### Typography & Spacing
+- [ ] **Increase line spacing** (mobile and desktop) - Notes need more breathing room
+- [ ] **Improve font** (mobile and desktop) - Consider larger/better font for readability
+
+#### UI/UX Improvements
+- [ ] **Archive/Trash: Use icons instead of text** (mobile) - More compact navigation
+- [ ] **Improve category page UI** (mobile) - Current design needs refinement
+- [ ] **Investigate iOS keyboard appearance** - Verify if keyboard looks native or needs styling
+
+#### Note Title Behavior
+- [ ] **Rethink note titles** - Current title behavior is unclear
+  - Option A: Remove titles entirely (pure content)
+  - Option B: First line becomes title automatically (like Apple Notes)
+  - Option C: Make title an explicit optional field
+  - Decision needed: Which approach fits "capture first" philosophy?
+
+#### Category Deletion Behavior
+- [ ] **Handle notes when category deleted** - Currently unclear what happens
+  - Should move notes to Inbox automatically?
+  - Should prompt user: "Delete notes or move to Inbox?"
+  - Decision needed: What's the safest/most intuitive behavior?
+
+#### Search Enhancements
+- [ ] **Global search across all notes** - Not just current category
+- [ ] **Show category badge/label in search results** - So user knows where note lives
+- [ ] **Consider advanced search features**:
+  - Search within specific categories
+  - Search by date range
+  - Search archived/trash separately or include them
+
 ---
 
 ## Phase 1.5: Beta Environment
