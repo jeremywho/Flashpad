@@ -87,6 +87,8 @@ interface NoteEditorProps {
   isSaving: boolean;
   onCategoryChanged?: (categoryName: string) => void;
   initialCategoryId?: string;
+  isFocusMode?: boolean;
+  onToggleFocusMode?: () => void;
 }
 
 export default function NoteEditor({
@@ -101,6 +103,8 @@ export default function NoteEditor({
   isSaving,
   onCategoryChanged,
   initialCategoryId,
+  isFocusMode,
+  onToggleFocusMode,
 }: NoteEditorProps) {
   const showSavingIndicator = useDebouncedSavingIndicator(isSaving);
   const [content, setContent] = useState(note?.content || '');
@@ -289,6 +293,15 @@ export default function NoteEditor({
           <span className="note-editor-empty-icon">&#128221;</span>
           <p>Select a note or create a new one</p>
         </div>
+        {onToggleFocusMode && (
+          <button
+            className="focus-mode-toggle-btn"
+            onClick={onToggleFocusMode}
+            title={isFocusMode ? 'Exit Focus Mode (Ctrl+Shift+F)' : 'Focus Mode (Ctrl+Shift+F)'}
+          >
+            {isFocusMode ? '\u2715' : '\u2922'}
+          </button>
+        )}
       </div>
     );
   }
@@ -368,6 +381,15 @@ export default function NoteEditor({
         </div>
 
         <div className="note-editor-toolbar-right">
+          {onToggleFocusMode && (
+            <button
+              className="note-editor-action-btn focus-mode-toolbar-btn"
+              onClick={onToggleFocusMode}
+              title={isFocusMode ? 'Exit Focus Mode (Ctrl+Shift+F)' : 'Focus Mode (Ctrl+Shift+F)'}
+            >
+              {isFocusMode ? '\u2715' : '\u2922'}
+            </button>
+          )}
           {note?.status === NoteStatus.Inbox && (
             <button
               className="note-editor-action-btn"
