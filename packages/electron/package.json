@@ -38,7 +38,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.2",
     "concurrently": "^9.1.2",
-    "electron": "40.0.0",
+    "electron": "40.6.1",
     "electron-builder": "^26.0.12",
     "png-to-ico": "^3.0.1",
     "typescript": "^5.8.3",
