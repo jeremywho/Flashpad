@@ -10,6 +10,7 @@ import Home from './pages/Home';
 import Account from './pages/Account';
 import Settings from './pages/Settings';
 import QuickCapture from './pages/QuickCapture';
+import QuickCaptureCode from './pages/QuickCaptureCode';
 import { isMigrationNeeded, migrateFromLocalStorage } from './services/migration';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -36,6 +37,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/quick-capture" element={<QuickCapture />} />
+      <Route path="/quick-capture-code" element={<QuickCaptureCode />} />
       <Route
         path="/login"
         element={

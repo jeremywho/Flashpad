@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Note, Category, NoteStatus } from '@shared/types';
 
+const CODE_LANGUAGES = [
+  '', 'javascript', 'typescript', 'python', 'csharp', 'java', 'go', 'rust',
+  'html', 'css', 'sql', 'bash', 'json', 'yaml', 'xml', 'markdown',
+];
+
 interface NoteEditorProps {
   note: Note | null;
   categories: Category[];
@@ -33,6 +38,7 @@ export default function NoteEditor({
     note?.categoryId ?? initialCategoryId
   );
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showCodeLangDropdown, setShowCodeLangDropdown] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -95,10 +101,75 @@ export default function NoteEditor({
     }
   };
 
+  const insertCodeBlock = useCallback((language: string = '') => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = content.substring(start, end);
+    const before = content.substring(0, start);
+    const after = content.substring(end);
+
+    // Add newlines before if not at start of line
+    const needsNewlineBefore = before.length > 0 && !before.endsWith('\n');
+    const prefix = needsNewlineBefore ? '\n' : '';
+
+    const codeBlock = `${prefix}\`\`\`${language}\n${selectedText || ''}\n\`\`\`\n`;
+    const newContent = before + codeBlock + after;
+
+    setContent(newContent);
+    if (newContent.trim()) {
+      debouncedSave(newContent);
+    }
+
+    // Position cursor inside the code block
+    const cursorPos = before.length + prefix.length + 3 + language.length + 1 + (selectedText?.length || 0);
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(cursorPos, cursorPos);
+    });
+  }, [content, debouncedSave]);
+
+  const handleCodeBlockInsert = (language: string) => {
+    setShowCodeLangDropdown(false);
+    insertCodeBlock(language);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 's' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       handleManualSave();
+    }
+    // Ctrl+Shift+K to insert code block
+    if (e.key === 'k' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+      e.preventDefault();
+      insertCodeBlock('');
+    }
+    // Tab key inside code block: insert 2 spaces instead of changing focus
+    if (e.key === 'Tab' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
+      const textarea = textareaRef.current;
+      if (textarea) {
+        const pos = textarea.selectionStart;
+        const val = content;
+        // Check if cursor is inside a code block
+        const beforeCursor = val.substring(0, pos);
+        const openFences = (beforeCursor.match(/```/g) || []).length;
+        if (openFences % 2 === 1) {
+          // Inside a code block - insert spaces instead of tab
+          e.preventDefault();
+          const before = val.substring(0, pos);
+          const after = val.substring(textarea.selectionEnd);
+          const newContent = before + '  ' + after;
+          setContent(newContent);
+          if (newContent.trim()) {
+            debouncedSave(newContent);
+          }
+          requestAnimationFrame(() => {
+            textarea.setSelectionRange(pos + 2, pos + 2);
+          });
+        }
+      }
     }
   };
 
@@ -157,6 +228,28 @@ export default function NoteEditor({
                       style={{ backgroundColor: category.color }}
                     />
                     {category.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="note-editor-code-block-selector">
+            <button
+              className="note-editor-action-btn"
+              onClick={() => setShowCodeLangDropdown(!showCodeLangDropdown)}
+              title="Insert Code Block (Ctrl+Shift+K)"
+            >
+              &lt;/&gt;
+            </button>
+            {showCodeLangDropdown && (
+              <div className="note-editor-code-lang-dropdown">
+                {CODE_LANGUAGES.map((lang) => (
+                  <button
+                    key={lang || '_plain'}
+                    className="note-editor-code-lang-option"
+                    onClick={() => handleCodeBlockInsert(lang)}
+                  >
+                    {lang || 'Plain text'}
                   </button>
                 ))}
               </div>

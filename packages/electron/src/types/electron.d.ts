@@ -3,6 +3,7 @@ export interface AppSettings {
   startMinimized: boolean;
   closeToTray: boolean;
   quickCaptureHotkey: string;
+  quickCaptureCodeHotkey: string;
   theme: 'dark' | 'light' | 'system';
   dataDirectory: string | null;
 }
@@ -54,6 +55,9 @@ export interface ElectronAPI {
     close: () => Promise<void>;
     getAuthToken: () => Promise<string | null>;
     notifyNoteCreated: () => Promise<void>;
+  };
+  quickCaptureCode: {
+    close: () => Promise<void>;
   };
   fs: ElectronFsAPI;
 }

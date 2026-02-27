@@ -14,6 +14,7 @@ function Settings() {
     startMinimized: false,
     closeToTray: true,
     quickCaptureHotkey: 'CommandOrControl+Alt+N',
+    quickCaptureCodeHotkey: 'CommandOrControl+Alt+C',
     theme: 'dark',
     dataDirectory: null,
   });
@@ -223,6 +224,21 @@ function Settings() {
               />
               <small className="settings-hint">
                 Use Ctrl/Cmd+Alt+N format (e.g., CommandOrControl+Shift+N)
+              </small>
+            </div>
+
+            <div className="form-group">
+              <label>Quick Code Snippet Hotkey</label>
+              <input
+                type="text"
+                value={settings.quickCaptureCodeHotkey}
+                onChange={(e) =>
+                  setSettings({ ...settings, quickCaptureCodeHotkey: e.target.value })
+                }
+                placeholder="e.g., CommandOrControl+Alt+C"
+              />
+              <small className="settings-hint">
+                Global shortcut to quickly capture a code snippet (e.g., CommandOrControl+Alt+C)
               </small>
             </div>
 

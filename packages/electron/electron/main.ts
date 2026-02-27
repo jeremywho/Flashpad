@@ -7,6 +7,7 @@ import { settingsStore, AppSettings } from './settings';
 
 let mainWindow: BrowserWindow | null = null;
 let quickCaptureWindow: BrowserWindow | null = null;
+let quickCaptureCodeWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 
@@ -145,6 +146,13 @@ function createTray() {
       accelerator: settingsStore.store.quickCaptureHotkey,
       click: () => {
         createQuickCaptureWindow();
+      },
+    },
+    {
+      label: 'Quick Code Snippet',
+      accelerator: settingsStore.store.quickCaptureCodeHotkey,
+      click: () => {
+        createQuickCaptureCodeWindow();
       },
     },
     { type: 'separator' },
@@ -301,6 +309,54 @@ function createQuickCaptureWindow() {
   });
 }
 
+function createQuickCaptureCodeWindow() {
+  if (quickCaptureCodeWindow && !quickCaptureCodeWindow.isDestroyed()) {
+    quickCaptureCodeWindow.show();
+    quickCaptureCodeWindow.focus();
+    return;
+  }
+
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.workAreaSize;
+
+  quickCaptureCodeWindow = new BrowserWindow({
+    width: 600,
+    height: 350,
+    x: Math.round((width - 600) / 2),
+    y: Math.round(height * 0.15),
+    frame: false,
+    resizable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    show: false,
+    transparent: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  const quickCaptureCodeUrl = process.env.VITE_DEV_SERVER_URL
+    ? `${process.env.VITE_DEV_SERVER_URL}#/quick-capture-code`
+    : `file://${path.join(__dirname, '../dist/index.html')}#/quick-capture-code`;
+
+  quickCaptureCodeWindow.loadURL(quickCaptureCodeUrl);
+
+  quickCaptureCodeWindow.once('ready-to-show', () => {
+    quickCaptureCodeWindow?.show();
+    quickCaptureCodeWindow?.focus();
+  });
+
+  quickCaptureCodeWindow.on('blur', () => {
+    quickCaptureCodeWindow?.hide();
+  });
+
+  quickCaptureCodeWindow.on('closed', () => {
+    quickCaptureCodeWindow = null;
+  });
+}
+
 function registerGlobalShortcut() {
   const settings = settingsStore.store;
 
@@ -312,6 +368,14 @@ function registerGlobalShortcut() {
 
   if (!registered) {
     console.error('Failed to register global shortcut:', settings.quickCaptureHotkey);
+  }
+
+  const registeredCode = globalShortcut.register(settings.quickCaptureCodeHotkey, () => {
+    createQuickCaptureCodeWindow();
+  });
+
+  if (!registeredCode) {
+    console.error('Failed to register global shortcut:', settings.quickCaptureCodeHotkey);
   }
 }
 
@@ -337,10 +401,14 @@ ipcMain.handle('get-settings', () => {
 
 ipcMain.handle('set-settings', (_event, settings: Partial<AppSettings>) => {
   const oldHotkey = settingsStore.store.quickCaptureHotkey;
+  const oldCodeHotkey = settingsStore.store.quickCaptureCodeHotkey;
   Object.assign(settingsStore.store, settings);
 
-  // Re-register global shortcut if hotkey changed
-  if (settings.quickCaptureHotkey && settings.quickCaptureHotkey !== oldHotkey) {
+  // Re-register global shortcuts if hotkeys changed
+  if (
+    (settings.quickCaptureHotkey && settings.quickCaptureHotkey !== oldHotkey) ||
+    (settings.quickCaptureCodeHotkey && settings.quickCaptureCodeHotkey !== oldCodeHotkey)
+  ) {
     registerGlobalShortcut();
   }
 
@@ -364,6 +432,12 @@ ipcMain.handle('check-for-updates', () => {
 ipcMain.handle('close-quick-capture', () => {
   if (quickCaptureWindow && !quickCaptureWindow.isDestroyed()) {
     quickCaptureWindow.hide();
+  }
+});
+
+ipcMain.handle('close-quick-capture-code', () => {
+  if (quickCaptureCodeWindow && !quickCaptureCodeWindow.isDestroyed()) {
+    quickCaptureCodeWindow.hide();
   }
 });
 
