@@ -1054,6 +1054,47 @@ button:disabled {
   background: #dc2626;
 }
 
+/* Focus Mode */
+.app-layout.focus-mode .note-editor,
+.app-layout.focus-mode .note-editor-empty {
+  flex: 1;
+}
+
+.focus-mode-toggle-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, opacity 0.15s;
+  opacity: 0.5;
+  z-index: 10;
+}
+
+.focus-mode-toggle-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  opacity: 1;
+}
+
+.focus-mode-toolbar-btn {
+  opacity: 0.7;
+}
+
+.focus-mode-toolbar-btn:hover {
+  opacity: 1;
+}
+
 /* Responsive */
 @media (max-width: 900px) {
   .app-layout {

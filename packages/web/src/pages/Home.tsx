@@ -34,6 +34,9 @@ function Home() {
   });
   const [isResizing, setIsResizing] = useState<'sidebar' | 'noteslist' | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isFocusMode, setIsFocusMode] = useState(() => {
+    return localStorage.getItem('flashpad-focus-mode') === 'true';
+  });
   const [newNoteInitialCategoryId, setNewNoteInitialCategoryId] = useState<string | undefined>();
   const signalRRef = useRef<SignalRClient | null>(null);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -76,6 +79,27 @@ function Home() {
       document.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isResizing, sidebarWidth]);
+
+  // Focus mode toggle
+  const toggleFocusMode = useCallback(() => {
+    setIsFocusMode((prev) => {
+      const next = !prev;
+      localStorage.setItem('flashpad-focus-mode', String(next));
+      return next;
+    });
+  }, []);
+
+  // Keyboard shortcut: Ctrl+Shift+F to toggle focus mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'F') {
+        e.preventDefault();
+        toggleFocusMode();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [toggleFocusMode]);
 
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
@@ -397,38 +421,42 @@ function Home() {
   };
 
   return (
-    <div className="app-layout">
-      <Sidebar
-        categories={categories}
-        selectedView={selectedView}
-        onViewChange={handleViewChange}
-        onManageCategories={() => setShowCategoryManager(true)}
-        onNewNoteInCategory={handleNewNoteInCategory}
-        inboxCount={inboxCount}
-        archiveCount={0}
-        trashCount={0}
-        style={{ width: sidebarWidth }}
-      />
-      <div
-        className="resize-handle"
-        onMouseDown={() => setIsResizing('sidebar')}
-      />
-      <NotesList
-        notes={searchQuery.trim() ? notes.filter(n => n.content.toLowerCase().includes(searchQuery.toLowerCase())) : notes}
-        selectedNoteId={selectedNote?.id || null}
-        onNoteSelect={handleNoteSelect}
-        onNewNote={handleNewNote}
-        isLoading={isLoading}
-        viewTitle={getViewTitle()}
-        style={{ width: notesListWidth }}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        showCategory={selectedView === 'inbox' || selectedView === 'archive' || selectedView === 'trash'}
-      />
-      <div
-        className="resize-handle"
-        onMouseDown={() => setIsResizing('noteslist')}
-      />
+    <div className={`app-layout${isFocusMode ? ' focus-mode' : ''}`}>
+      {!isFocusMode && (
+        <>
+          <Sidebar
+            categories={categories}
+            selectedView={selectedView}
+            onViewChange={handleViewChange}
+            onManageCategories={() => setShowCategoryManager(true)}
+            onNewNoteInCategory={handleNewNoteInCategory}
+            inboxCount={inboxCount}
+            archiveCount={0}
+            trashCount={0}
+            style={{ width: sidebarWidth }}
+          />
+          <div
+            className="resize-handle"
+            onMouseDown={() => setIsResizing('sidebar')}
+          />
+          <NotesList
+            notes={searchQuery.trim() ? notes.filter(n => n.content.toLowerCase().includes(searchQuery.toLowerCase())) : notes}
+            selectedNoteId={selectedNote?.id || null}
+            onNoteSelect={handleNoteSelect}
+            onNewNote={handleNewNote}
+            isLoading={isLoading}
+            viewTitle={getViewTitle()}
+            style={{ width: notesListWidth }}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            showCategory={selectedView === 'inbox' || selectedView === 'archive' || selectedView === 'trash'}
+          />
+          <div
+            className="resize-handle"
+            onMouseDown={() => setIsResizing('noteslist')}
+          />
+        </>
+      )}
       <NoteEditor
         note={selectedNote}
         categories={categories}
@@ -441,6 +469,8 @@ function Home() {
         isSaving={isSaving}
         onCategoryChanged={handleCategoryChanged}
         initialCategoryId={newNoteInitialCategoryId}
+        isFocusMode={isFocusMode}
+        onToggleFocusMode={toggleFocusMode}
       />
       {showCategoryManager && (
         <CategoryManager
