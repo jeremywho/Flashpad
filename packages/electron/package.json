@@ -1,6 +1,6 @@
 {
   "name": "@flashpad/electron",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Flashpad desktop app - Quick note capture for Windows and Mac",
   "main": "dist-electron/main.js",
   "scripts": {
