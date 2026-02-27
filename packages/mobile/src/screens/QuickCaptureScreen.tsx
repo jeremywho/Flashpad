@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
+  BackHandler,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/colors';
@@ -46,6 +47,44 @@ function QuickCaptureScreen({ navigation }: QuickCaptureScreenProps) {
     };
   }, [api]);
 
+  const handleCancel = useCallback(() => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else if (user) {
+      // Launched from lock screen / deep link with no back stack (cold start).
+      // Reset to the Home screen so the user lands somewhere useful.
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Home' }],
+      });
+    } else {
+      // Unauthenticated cold start from lock screen — no Home to go to.
+      // Minimize the app, which is the expected cancel behaviour here.
+      BackHandler.exitApp();
+    }
+  }, [navigation, user]);
+
+  // Handle Android hardware back button when there is no back stack
+  // (e.g. launched from lock screen quick settings tile or widget).
+  useEffect(() => {
+    const onBackPress = () => {
+      if (!navigation.canGoBack()) {
+        handleCancel();
+        return true; // Prevent default (which does nothing anyway)
+      }
+      return false; // Let default back behaviour handle it
+    };
+
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      onBackPress,
+    );
+
+    return () => {
+      subscription.remove();
+    };
+  }, [navigation, handleCancel]);
+
   const handleSave = async () => {
     if (!content.trim() || !syncManagerRef.current) return;
 
@@ -68,10 +107,6 @@ function QuickCaptureScreen({ navigation }: QuickCaptureScreenProps) {
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const handleCancel = () => {
-    navigation.goBack();
   };
 
   if (!user) {
