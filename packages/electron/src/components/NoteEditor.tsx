@@ -41,11 +41,47 @@ export default function NoteEditor({
   const [showCodeLangDropdown, setShowCodeLangDropdown] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Track the last content we sent to onSave to distinguish our own saves
+  // from external updates (e.g., edits from another device via SignalR).
+  const lastSavedContentRef = useRef<string>(note?.content || '');
+  // Track the note ID to detect when the user switches to a different note.
+  const prevNoteIdRef = useRef<string | undefined>(note?.id);
 
+  // Reset content when switching to a different note (note ID changed).
   useEffect(() => {
-    setContent(note?.content || '');
+    if (note?.id !== prevNoteIdRef.current) {
+      setContent(note?.content || '');
+      lastSavedContentRef.current = note?.content || '';
+      prevNoteIdRef.current = note?.id;
+    }
+  }, [note?.id, note?.content]);
+
+  // Sync category when the note changes or initialCategoryId changes.
+  useEffect(() => {
     setSelectedCategoryId(note?.categoryId ?? initialCategoryId);
-  }, [note?.id, note?.content, note?.categoryId, initialCategoryId]);
+  }, [note?.id, note?.categoryId, initialCategoryId]);
+
+  // Handle external content changes (e.g., edits from another device via SignalR)
+  // without disrupting cursor position during the user's own auto-saves.
+  // Only update if the incoming content differs from what we last saved AND
+  // differs from what is currently in the editor (i.e., a true external change).
+  useEffect(() => {
+    const incomingContent = note?.content || '';
+    // Skip if we are on a different note (handled by the ID-change effect above)
+    if (note?.id !== prevNoteIdRef.current) return;
+    // Skip if incoming content matches what we last saved -- this is just our
+    // own save round-tripping back to us and should NOT reset the editor.
+    if (incomingContent === lastSavedContentRef.current) return;
+    // The content was changed externally. Only apply it if the user is not
+    // actively typing (textarea not focused), to avoid cursor jumps.
+    if (textareaRef.current && document.activeElement === textareaRef.current) {
+      // User is typing -- store the external version but don't disrupt them.
+      // Their next save will merge/overwrite anyway.
+      return;
+    }
+    setContent(incomingContent);
+    lastSavedContentRef.current = incomingContent;
+  }, [note?.content, note?.id]);
 
   useEffect(() => {
     if (isNew && textareaRef.current) {
@@ -60,6 +96,7 @@ export default function NoteEditor({
       }
       saveTimeoutRef.current = setTimeout(() => {
         if (newContent.trim()) {
+          lastSavedContentRef.current = newContent;
           onSave(newContent, selectedCategoryId);
         }
       }, 1000);
@@ -81,6 +118,7 @@ export default function NoteEditor({
       clearTimeout(saveTimeoutRef.current);
     }
     if (content.trim()) {
+      lastSavedContentRef.current = content;
       onSave(content, selectedCategoryId);
     }
   };
@@ -90,6 +128,7 @@ export default function NoteEditor({
     setSelectedCategoryId(categoryId);
     setShowCategoryDropdown(false);
     if (!isNew && content.trim()) {
+      lastSavedContentRef.current = content;
       onSave(content, categoryId);
       // Notify parent if category actually changed
       if (previousCategoryId !== categoryId && onCategoryChanged) {
