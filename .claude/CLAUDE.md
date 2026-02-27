@@ -37,14 +37,34 @@ npm run build:electron   # Build Electron for production
 
 # Build shared (required before frontends on fresh clone)
 cd packages/shared && npm run build
+
+# Other useful commands
+npm run pods              # Install iOS CocoaPods
+npm run pods:clean        # Clean and reinstall pods
+npm run build:mobile:android  # Build Android APK
+npm run build:mobile:ios      # Build iOS
+cd packages/shared && npm run watch  # Watch mode for shared types
+cd packages/electron && npm run build:ci  # CI build (no electron-builder)
 ```
+
+### Testing & Linting
+
+```bash
+# Testing (mobile only - Jest with React Native preset)
+cd packages/mobile && npm test
+
+# Linting (mobile only - ESLint flat config)
+cd packages/mobile && npm run lint
+```
+
+No test suites exist for backend, electron, or web packages.
 
 ## Architecture
 
 ```
 Flashpad/
 ├── packages/
-│   ├── backend/         # ASP.NET Core 9 API
+│   ├── backend/         # ASP.NET Core 10 API
 │   │   ├── Controllers/ # Auth, Users, Notes, Categories
 │   │   ├── Hubs/        # SignalR hub for real-time sync
 │   │   ├── Models/      # User, Note, Category, NoteHistory
@@ -53,8 +73,8 @@ Flashpad/
 │   ├── electron/        # Desktop app
 │   │   ├── electron/    # Main process (main.ts, preload.ts)
 │   │   └── src/         # React app (pages/, components/)
-│   ├── web/             # Web app
-│   │   └── src/         # React app (mirrors electron/src)
+│   ├── web/             # Web app (online-only, direct API calls)
+│   │   └── src/         # React app (similar UI to electron but simpler)
 │   ├── mobile/          # React Native app
 │   │   └── src/         # Screens, navigation
 │   └── shared/          # Shared TypeScript code
@@ -80,7 +100,7 @@ interface Note {
   categoryColor?: string;
   status: NoteStatus;
   version: number;
-  deviceId: string;
+  deviceId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -92,8 +112,11 @@ interface Category {
   id: string;
   name: string;
   color: string;
+  icon?: string;
   sortOrder: number;
   noteCount: number;
+  createdAt: string;
+  updatedAt: string;
 }
 ```
 
@@ -185,6 +208,19 @@ CSS variables in `:root` and `[data-theme="light"]`:
 - `--text-primary`, `--text-secondary`, `--text-muted`
 - `--accent-color`: `#6366f1` (indigo)
 - `--danger-color`: `#ef4444`
+
+## Electron vs Web Architecture
+
+The Electron and Web apps share similar UI components but differ in data architecture:
+
+- **Electron** uses a `SyncManager` with a local SQLite database for offline-first operation. It tracks sync status, pending changes, connected devices, and supports file watching for external changes.
+- **Web** makes direct API calls with no local persistence. It has simpler SignalR integration and no offline support.
+
+When adding a feature to both, implement the UI similarly but handle data differently: use `syncManager.getNotes()` in Electron vs `api.getNotes()` in Web.
+
+## Backend Authentication Pattern
+
+JWT authentication supports both HTTP headers and SignalR WebSocket connections. The `OnMessageReceived` event in `Program.cs` extracts the token from the `access_token` query parameter for WebSocket connections. CORS allows null origin to support Electron's `file://` protocol. The backend also serves the web SPA via `MapFallbackToFile("index.html")`.
 
 ## Working in This Codebase
 
