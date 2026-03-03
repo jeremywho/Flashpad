@@ -7,6 +7,7 @@ import {
   CreateCategoryDto,
   UpdateCategoryDto,
   ApiClient,
+  HttpError,
 } from '@shared/index';
 import {
   getLocalNotes,
@@ -36,6 +37,7 @@ export interface SyncManagerOptions {
   onSyncStatusChange?: (status: SyncStatus) => void;
   onPendingCountChange?: (count: number) => void;
   onDataRefresh?: () => void;
+  onAuthError?: () => void;
 }
 
 export class SyncManager {
@@ -43,15 +45,18 @@ export class SyncManager {
   private isOnline: boolean = navigator.onLine;
   private syncStatus: SyncStatus = 'idle';
   private syncInProgress: boolean = false;
+  private authErrorDetected: boolean = false;
   private onSyncStatusChange?: (status: SyncStatus) => void;
   private onPendingCountChange?: (count: number) => void;
   private onDataRefresh?: () => void;
+  private onAuthError?: () => void;
 
   constructor(options: SyncManagerOptions) {
     this.api = options.api;
     this.onSyncStatusChange = options.onSyncStatusChange;
     this.onPendingCountChange = options.onPendingCountChange;
     this.onDataRefresh = options.onDataRefresh;
+    this.onAuthError = options.onAuthError;
 
     // Set up online/offline listeners
     window.addEventListener('online', this.handleOnline);
@@ -96,6 +101,17 @@ export class SyncManager {
     return this.isOnline;
   }
 
+  private isAuthError(error: unknown): boolean {
+    return error instanceof HttpError && error.status === 401;
+  }
+
+  private handleAuthError(): void {
+    if (this.authErrorDetected) return;
+    this.authErrorDetected = true;
+    this.updateSyncStatus('error');
+    this.onAuthError?.();
+  }
+
   // Initial data sync - fetch from server and populate local DB
   async initialSync(): Promise<void> {
     if (!this.isOnline) {
@@ -120,13 +136,17 @@ export class SyncManager {
       console.log('Initial sync complete');
     } catch (error) {
       console.error('Initial sync failed:', error);
+      if (this.isAuthError(error)) {
+        this.handleAuthError();
+        return;
+      }
       this.updateSyncStatus('error');
     }
   }
 
   // Process pending sync queue
   async processSyncQueue(): Promise<void> {
-    if (!this.isOnline || this.syncInProgress) return;
+    if (!this.isOnline || this.syncInProgress || this.authErrorDetected) return;
 
     this.syncInProgress = true;
     this.updateSyncStatus('syncing');
@@ -196,6 +216,11 @@ export class SyncManager {
           await removeSyncQueueItem(item.id);
           await this.updatePendingCount();
         } catch (error) {
+          if (this.isAuthError(error)) {
+            // Leave items in queue so they sync after re-login
+            this.handleAuthError();
+            return;
+          }
           console.error(`Failed to sync item ${item.id}:`, error);
           await updateSyncQueueItemError(item.id, (error as Error).message);
 
@@ -228,7 +253,13 @@ export class SyncManager {
         .then(async (response) => {
           await bulkSaveNotes(response.notes);
         })
-        .catch(console.error);
+        .catch((error) => {
+          if (this.isAuthError(error)) {
+            this.handleAuthError();
+            return;
+          }
+          console.error(error);
+        });
     }
 
     return localNotes;
@@ -270,6 +301,7 @@ export class SyncManager {
           baseVersion: null,
         });
         await this.updatePendingCount();
+        if (this.isAuthError(error)) this.handleAuthError();
         return localNote;
       }
     } else {
@@ -318,6 +350,7 @@ export class SyncManager {
           baseVersion: existingNote.version,
         });
         await this.updatePendingCount();
+        if (this.isAuthError(error)) this.handleAuthError();
         return updatedNote;
       }
     } else {
@@ -357,6 +390,7 @@ export class SyncManager {
           baseVersion: null,
         });
         await this.updatePendingCount();
+        if (this.isAuthError(error)) this.handleAuthError();
       }
     } else if (!id.startsWith('local_')) {
       await addToSyncQueue({
@@ -391,6 +425,7 @@ export class SyncManager {
           baseVersion: null,
         });
         await this.updatePendingCount();
+        if (this.isAuthError(error)) this.handleAuthError();
       }
     } else if (!id.startsWith('local_')) {
       await addToSyncQueue({
@@ -425,6 +460,7 @@ export class SyncManager {
           baseVersion: null,
         });
         await this.updatePendingCount();
+        if (this.isAuthError(error)) this.handleAuthError();
       }
     } else if (!id.startsWith('local_')) {
       await addToSyncQueue({
@@ -454,6 +490,7 @@ export class SyncManager {
           baseVersion: null,
         });
         await this.updatePendingCount();
+        if (this.isAuthError(error)) this.handleAuthError();
       }
     } else if (!id.startsWith('local_')) {
       await addToSyncQueue({
@@ -484,7 +521,13 @@ export class SyncManager {
         .then(async (categories) => {
           await bulkSaveCategories(categories);
         })
-        .catch(console.error);
+        .catch((error) => {
+          if (this.isAuthError(error)) {
+            this.handleAuthError();
+            return;
+          }
+          console.error(error);
+        });
     }
 
     return categoriesWithCounts;
@@ -523,6 +566,7 @@ export class SyncManager {
           baseVersion: null,
         });
         await this.updatePendingCount();
+        if (this.isAuthError(error)) this.handleAuthError();
         return localCategory;
       }
     } else {
@@ -572,6 +616,7 @@ export class SyncManager {
           baseVersion: null,
         });
         await this.updatePendingCount();
+        if (this.isAuthError(error)) this.handleAuthError();
         return updatedCategory;
       }
     } else if (!id.startsWith('local_')) {
@@ -604,6 +649,7 @@ export class SyncManager {
           baseVersion: null,
         });
         await this.updatePendingCount();
+        if (this.isAuthError(error)) this.handleAuthError();
       }
     } else if (!id.startsWith('local_')) {
       await addToSyncQueue({

@@ -34,6 +34,13 @@ export interface ApiError {
   message: string;
 }
 
+export class HttpError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message);
+    this.name = 'HttpError';
+  }
+}
+
 // Note types
 export enum NoteStatus {
   Inbox = 0,

@@ -15,7 +15,7 @@ type ViewType = 'inbox' | 'archive' | 'trash' | string;
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 function Home() {
-  const { api } = useAuth();
+  const { api, logout } = useAuth();
   const toast = useToast();
   const [notes, setNotes] = useState<Note[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -124,6 +124,7 @@ function Home() {
         fetchCategories();
         fetchInboxCount();
       },
+      onAuthError: logout,
     });
 
     syncManagerRef.current = syncManager;
@@ -139,7 +140,7 @@ function Home() {
       syncManager.destroy();
       syncManagerRef.current = null;
     };
-  }, [api]);
+  }, [api, logout]);
 
   const fetchNotes = useCallback(async () => {
     if (!syncManagerRef.current) return;
@@ -302,6 +303,7 @@ function Home() {
       onDeviceDisconnected: (device) => {
         console.log('Device disconnected:', device.deviceName);
       },
+      onAuthError: logout,
       onNoteCreated: (note) => {
         // Only add if it matches current view
         if (shouldShowInView(note)) {
@@ -354,7 +356,7 @@ function Home() {
 
     // Don't stop on cleanup - singleton persists across re-renders
     // Connection is only stopped via SignalRManager.removeInstance() on logout
-  }, [api, fetchCategories, fetchInboxCount]);
+  }, [api, logout, fetchCategories, fetchInboxCount]);
 
   // Helper to check if a note should show in current view
   const shouldShowNoteInCurrentView = (note: Note): boolean => {

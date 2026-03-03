@@ -26,6 +26,7 @@ export interface SignalRClientOptions {
   onPresenceUpdated?: (devices: DevicePresence[]) => void;
   onDeviceConnected?: (device: DevicePresence) => void;
   onDeviceDisconnected?: (device: DevicePresence) => void;
+  onAuthError?: () => void;
 }
 
 export class SignalRClient {
@@ -91,11 +92,9 @@ export class SignalRClient {
   }
 
   private async doStart(): Promise<void> {
-    const token = this.options.getToken()!;
-
     this.connection = new signalR.HubConnectionBuilder()
       .withUrl(`${this.options.baseUrl}/hubs/notes`, {
-        accessTokenFactory: () => token,
+        accessTokenFactory: () => this.options.getToken() ?? '',
       })
       .withAutomaticReconnect({
         nextRetryDelayInMilliseconds: (retryContext) => {
@@ -167,6 +166,11 @@ export class SignalRClient {
       this.setConnectionState('disconnected');
       if (error) {
         console.error('SignalR connection closed with error:', error);
+        // Detect auth-related closure (401/403 from server)
+        const msg = error.message?.toLowerCase() ?? '';
+        if (msg.includes('unauthorized') || msg.includes('401') || msg.includes('403')) {
+          this.options.onAuthError?.();
+        }
       }
     });
 

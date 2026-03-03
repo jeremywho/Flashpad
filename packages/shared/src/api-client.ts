@@ -5,6 +5,7 @@ import {
   UpdateUserDto,
   AuthResponse,
   ApiError,
+  HttpError,
   Note,
   CreateNoteDto,
   UpdateNoteDto,
@@ -57,7 +58,7 @@ export class ApiClient {
       const error: ApiError = await response.json().catch(() => ({
         message: response.statusText,
       }));
-      throw new Error(error.message);
+      throw new HttpError(response.status, error.message);
     }
 
     // Handle empty responses (204 No Content or empty body)
