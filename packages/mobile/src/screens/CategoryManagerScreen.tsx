@@ -10,8 +10,10 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { Pencil, Trash2 } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/colors';
+import { fonts } from '../theme/fonts';
 import { SyncManager } from '../services/syncManager';
 import type { Category, CreateCategoryDto } from '@flashpad/shared';
 
@@ -143,13 +145,13 @@ function CategoryManagerScreen({ navigation }: CategoryManagerScreenProps) {
           style={styles.actionButton}
           onPress={() => handleEdit(item)}
         >
-          <Text style={styles.actionButtonText}>Edit</Text>
+          <Pencil size={16} strokeWidth={1.75} color={colors.accent} />
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionButton, styles.deleteButton]}
           onPress={() => handleDelete(item)}
         >
-          <Text style={styles.deleteButtonText}>Delete</Text>
+          <Trash2 size={16} strokeWidth={1.75} color={colors.danger} />
         </TouchableOpacity>
       </View>
     </View>
@@ -249,6 +251,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
+    fontFamily: fonts.regular,
     color: colors.text,
     borderWidth: 1,
     borderColor: colors.border,
@@ -288,6 +291,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: fonts.medium,
   },
   cancelButton: {
     paddingVertical: 12,
@@ -317,11 +321,13 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 18,
+    fontFamily: fonts.regular,
     color: colors.textSecondary,
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
+    fontFamily: fonts.regular,
     color: colors.textMuted,
     textAlign: 'center',
   },
@@ -343,9 +349,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   categoryColor: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
     marginRight: 12,
   },
   categoryText: {
@@ -354,10 +360,12 @@ const styles = StyleSheet.create({
   categoryName: {
     fontSize: 16,
     fontWeight: '500',
+    fontFamily: fonts.medium,
     color: colors.text,
   },
   categoryCount: {
     fontSize: 13,
+    fontFamily: fonts.mono,
     color: colors.textMuted,
     marginTop: 2,
   },

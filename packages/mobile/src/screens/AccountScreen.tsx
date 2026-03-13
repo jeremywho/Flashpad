@@ -13,8 +13,10 @@ import {
   Switch,
 } from 'react-native';
 import RNRestart from 'react-native-restart';
+import { LogOut } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { fonts } from '../theme/fonts';
 import { isUsingProduction, setUseProduction, getApiUrl } from '../config';
 
 function AccountScreen() {
@@ -97,12 +99,14 @@ function AccountScreen() {
     sectionTitle: {
       fontSize: 18,
       fontWeight: '600',
+      fontFamily: fonts.semiBold,
       color: theme.text,
       marginBottom: 16,
     },
     title: {
       fontSize: 20,
       fontWeight: 'bold',
+      fontFamily: fonts.semiBold,
       marginBottom: 20,
       color: theme.text,
     },
@@ -112,6 +116,7 @@ function AccountScreen() {
     label: {
       marginBottom: 6,
       fontWeight: '500',
+      fontFamily: fonts.medium,
       color: theme.text,
       fontSize: 14,
     },
@@ -121,6 +126,7 @@ function AccountScreen() {
       borderRadius: 8,
       padding: 12,
       fontSize: 16,
+      fontFamily: fonts.regular,
       backgroundColor: theme.surfaceElevated,
       color: theme.text,
     },
@@ -130,6 +136,7 @@ function AccountScreen() {
     },
     helperText: {
       fontSize: 12,
+      fontFamily: fonts.regular,
       color: theme.textMuted,
       marginTop: 4,
     },
@@ -147,6 +154,7 @@ function AccountScreen() {
       color: '#fff',
       fontSize: 16,
       fontWeight: '600',
+      fontFamily: fonts.medium,
     },
     error: {
       color: theme.danger,
@@ -178,6 +186,7 @@ function AccountScreen() {
     },
     themeOptionText: {
       fontSize: 14,
+      fontFamily: fonts.medium,
       color: theme.textSecondary,
       fontWeight: '500',
     },
@@ -186,15 +195,19 @@ function AccountScreen() {
       fontWeight: '600',
     },
     logoutButton: {
+      flexDirection: 'row',
       backgroundColor: 'rgba(239, 68, 68, 0.1)',
       padding: 14,
       borderRadius: 8,
       alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
     },
     logoutButtonText: {
       color: theme.danger,
       fontSize: 16,
       fontWeight: '600',
+      fontFamily: fonts.medium,
     },
     developerRow: {
       flexDirection: 'row',
@@ -204,11 +217,13 @@ function AccountScreen() {
     },
     developerLabel: {
       fontSize: 16,
+      fontFamily: fonts.medium,
       color: theme.text,
       fontWeight: '500',
     },
     developerHint: {
       fontSize: 12,
+      fontFamily: fonts.mono,
       color: theme.textMuted,
       marginTop: 4,
     },
@@ -337,6 +352,7 @@ function AccountScreen() {
               ]);
             }}
           >
+            <LogOut size={20} strokeWidth={1.75} color={theme.danger} />
             <Text style={styles.logoutButtonText}>Logout</Text>
           </TouchableOpacity>
         </View>
