@@ -5,7 +5,6 @@ import Sidebar from '../components/Sidebar';
 import NotesList from '../components/NotesList';
 import NoteEditor from '../components/NoteEditor';
 import CategoryManager from '../components/CategoryManager';
-import ConnectionStatus from '../components/ConnectionStatus';
 
 type ViewType = 'inbox' | 'archive' | 'trash' | string;
 
@@ -434,6 +433,7 @@ function Home() {
             archiveCount={0}
             trashCount={0}
             style={{ width: sidebarWidth }}
+            connectionState={connectionState}
           />
           <div
             className="resize-handle"
@@ -471,6 +471,7 @@ function Home() {
         initialCategoryId={newNoteInitialCategoryId}
         isFocusMode={isFocusMode}
         onToggleFocusMode={toggleFocusMode}
+        connectionState={connectionState}
       />
       {showCategoryManager && (
         <CategoryManager
@@ -481,7 +482,6 @@ function Home() {
           onClose={() => setShowCategoryManager(false)}
         />
       )}
-      <ConnectionStatus state={connectionState} />
       {toastMessage && (
         <div className="toast-container">
           <div className="toast">{toastMessage}</div>

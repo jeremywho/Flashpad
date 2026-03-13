@@ -13,6 +13,7 @@ interface SidebarProps {
   archiveCount: number;
   trashCount: number;
   style?: React.CSSProperties;
+  connectionState?: string;
 }
 
 interface ContextMenuState {
@@ -33,6 +34,7 @@ export default function Sidebar({
   archiveCount,
   trashCount,
   style,
+  connectionState,
 }: SidebarProps) {
   const navigate = useNavigate();
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
@@ -141,6 +143,20 @@ export default function Sidebar({
           <span className="sidebar-icon"><User size={15} strokeWidth={1.75} /></span>
           <span className="sidebar-label">Account</span>
         </button>
+        {/* Sync status */}
+        {(() => {
+          let dotClass = 'connected';
+          let label = 'synced';
+          if (connectionState === 'disconnected') { dotClass = 'disconnected'; label = 'offline'; }
+          else if (connectionState === 'connecting') { dotClass = 'connecting'; label = 'connecting'; }
+          else if (connectionState === 'reconnecting') { dotClass = 'reconnecting'; label = 'reconnecting'; }
+          return (
+            <div className="sidebar-sync-status">
+              <span className={`sidebar-sync-dot ${dotClass}`} />
+              <span>{label}</span>
+            </div>
+          );
+        })()}
       </div>
 
       {contextMenu.visible && (
