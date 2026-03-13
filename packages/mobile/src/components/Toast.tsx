@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
+import { colors } from '../theme/colors';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -149,7 +150,7 @@ const styles = StyleSheet.create({
   toast: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: colors.surface,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 8,
@@ -169,7 +170,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   toastMessage: {
-    color: '#e0e0e0',
+    color: colors.text,
     fontSize: 14,
     flex: 1,
   },

@@ -18,8 +18,10 @@ import Reanimated, {
   SharedValue,
   useAnimatedStyle,
 } from 'react-native-reanimated';
+import { Inbox, Archive, Trash2, User, Plus, X } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/colors';
+import { fonts } from '../theme/fonts';
 import { SyncManager, SyncStatus } from '../services/syncManager';
 import type { Note, Category, NoteStatus } from '@flashpad/shared';
 import { SignalRClient, SignalRManager, ConnectionState } from '@flashpad/shared';
@@ -721,10 +723,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
             style={styles.headerIconButton}
             onPress={() => navigation.navigate('Account')}
           >
-            <View style={styles.profileIcon}>
-              <View style={styles.profileIconHead} />
-              <View style={styles.profileIconBody} />
-            </View>
+            <User size={20} strokeWidth={1.75} color={colors.accent} />
           </TouchableOpacity>
         </View>
       </View>
@@ -743,7 +742,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
             style={styles.searchClear}
             onPress={() => setSearchQuery('')}
           >
-            <Text style={styles.searchClearText}>×</Text>
+            <X size={14} strokeWidth={1.75} color={colors.textSecondary} />
           </TouchableOpacity>
         )}
       </View>
@@ -798,7 +797,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
 
       {selectedTab === 'inbox' && !isSelectionMode && (
         <TouchableOpacity style={styles.fab} onPress={handleNewNote}>
-          <Text style={styles.fabText}>+</Text>
+          <Plus size={24} strokeWidth={1.75} color={colors.textMuted} />
         </TouchableOpacity>
       )}
 
@@ -857,7 +856,9 @@ function HomeScreen({ navigation }: HomeScreenProps) {
               ]}
               onPress={() => handleStatusSelect('inbox')}
             >
-              <Text style={styles.filterOptionIcon}>📥</Text>
+              <View style={styles.filterOptionIcon}>
+                <Inbox size={16} strokeWidth={1.75} color={selectedTab === 'inbox' && !selectedCategoryId ? colors.accent : colors.text} />
+              </View>
               <Text
                 style={[
                   styles.filterOptionText,
@@ -877,7 +878,9 @@ function HomeScreen({ navigation }: HomeScreenProps) {
               ]}
               onPress={() => handleStatusSelect('archive')}
             >
-              <Text style={styles.filterOptionIcon}>📦</Text>
+              <View style={styles.filterOptionIcon}>
+                <Archive size={16} strokeWidth={1.75} color={selectedTab === 'archive' ? colors.accent : colors.text} />
+              </View>
               <Text
                 style={[
                   styles.filterOptionText,
@@ -897,7 +900,9 @@ function HomeScreen({ navigation }: HomeScreenProps) {
               ]}
               onPress={() => handleStatusSelect('trash')}
             >
-              <Text style={styles.filterOptionIcon}>🗑</Text>
+              <View style={styles.filterOptionIcon}>
+                <Trash2 size={16} strokeWidth={1.75} color={selectedTab === 'trash' ? colors.accent : colors.text} />
+              </View>
               <Text
                 style={[
                   styles.filterOptionText,
@@ -1025,6 +1030,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: '700',
+    fontFamily: fonts.semiBold,
     color: colors.text,
   },
   headerActions: {
@@ -1053,31 +1059,6 @@ const styles = StyleSheet.create({
   headerIcon: {
     fontSize: 24,
     color: colors.accent,
-  },
-  profileIcon: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: 2,
-    borderColor: colors.accent,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    overflow: 'hidden',
-  },
-  profileIconHead: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.accent,
-    position: 'absolute',
-    top: 3,
-  },
-  profileIconBody: {
-    width: 16,
-    height: 10,
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-    backgroundColor: colors.accent,
   },
   searchContainer: {
     padding: 12,
@@ -1110,11 +1091,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  searchClearText: {
-    fontSize: 18,
-    color: colors.textSecondary,
-    lineHeight: 20,
-  },
   syncBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1125,9 +1101,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   syncDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
   },
   syncDotSyncing: {
     backgroundColor: colors.accent,
@@ -1145,7 +1121,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#6366f1',
   },
   syncText: {
-    fontSize: 12,
+    fontFamily: fonts.mono,
+    fontSize: 11,
     color: colors.textSecondary,
   },
   centered: {
@@ -1190,6 +1167,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: fonts.semiBold,
     color: colors.text,
     marginRight: 8,
   },
@@ -1199,7 +1177,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   noteDate: {
-    fontSize: 12,
+    fontFamily: fonts.mono,
+    fontSize: 11,
     color: colors.textMuted,
   },
   localBadge: {
@@ -1215,6 +1194,7 @@ const styles = StyleSheet.create({
   },
   notePreview: {
     fontSize: 14,
+    fontFamily: fonts.regular,
     color: colors.textSecondary,
     lineHeight: 20,
   },
@@ -1224,9 +1204,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   categoryDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
     marginRight: 6,
   },
   categoryName: {
@@ -1265,19 +1245,11 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: colors.accent,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  fabText: {
-    fontSize: 28,
-    color: '#fff',
-    lineHeight: 30,
   },
   // Header title button styles
   headerTitleButton: {
@@ -1285,9 +1257,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerCategoryDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
     marginRight: 8,
   },
   headerTitleArrow: {
@@ -1343,8 +1315,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   filterOptionIcon: {
-    fontSize: 18,
+    width: 20,
     marginRight: 12,
+    alignItems: 'center',
   },
   filterOption: {
     flexDirection: 'row',

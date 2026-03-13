@@ -7,8 +7,10 @@ import {
   StyleSheet,
   RefreshControl,
 } from 'react-native';
+import { Plus } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/colors';
+import { fonts } from '../theme/fonts';
 import type { Note, NoteStatus } from '@flashpad/shared';
 
 interface NotesScreenProps {
@@ -156,7 +158,7 @@ function NotesScreen({ navigation, route }: NotesScreenProps) {
         contentContainerStyle={notes.length === 0 ? styles.emptyList : undefined}
       />
       <TouchableOpacity style={styles.fab} onPress={handleNewNote}>
-        <Text style={styles.fabText}>+</Text>
+        <Plus size={24} strokeWidth={1.75} color={colors.textMuted} />
       </TouchableOpacity>
     </View>
   );
@@ -193,15 +195,18 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: fonts.semiBold,
     color: colors.text,
     marginRight: 8,
   },
   noteDate: {
-    fontSize: 12,
+    fontFamily: fonts.mono,
+    fontSize: 11,
     color: colors.textMuted,
   },
   notePreview: {
     fontSize: 14,
+    fontFamily: fonts.regular,
     color: colors.textSecondary,
     lineHeight: 20,
   },
@@ -211,9 +216,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   categoryDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
     marginRight: 6,
   },
   categoryName: {
@@ -252,19 +257,11 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: colors.accent,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  fabText: {
-    fontSize: 28,
-    color: '#fff',
-    lineHeight: 30,
   },
 });
 

@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/colors';
+import { fonts } from '../theme/fonts';
 import { SyncManager } from '../services/syncManager';
 
 interface QuickCaptureScreenProps {
@@ -210,6 +211,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 17,
     fontWeight: '600',
+    fontFamily: fonts.semiBold,
     color: colors.text,
   },
   headerButton: {
@@ -219,11 +221,13 @@ const styles = StyleSheet.create({
   },
   headerButtonText: {
     fontSize: 16,
+    fontFamily: fonts.regular,
     color: colors.textSecondary,
   },
   saveButtonText: {
     color: colors.accent,
     fontWeight: '600',
+    fontFamily: fonts.medium,
   },
   disabledText: {
     color: colors.textMuted,
@@ -244,6 +248,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 30,
     letterSpacing: 0.2,
+    fontFamily: fonts.regular,
     color: colors.text,
   },
   errorContainer: {
@@ -266,6 +271,7 @@ const styles = StyleSheet.create({
   footerHint: {
     color: colors.textMuted,
     fontSize: 13,
+    fontFamily: fonts.regular,
     textAlign: 'center',
   },
   authMessage: {
