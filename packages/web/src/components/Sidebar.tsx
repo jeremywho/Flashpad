@@ -84,7 +84,7 @@ export default function Sidebar({
             className={`sidebar-item ${selectedView === 'inbox' ? 'active' : ''}`}
             onClick={() => onViewChange('inbox')}
           >
-            <span className="sidebar-icon"><Inbox size={15} strokeWidth={1.75} /></span>
+            <span className="sidebar-icon"><Inbox size={17} strokeWidth={1.75} /></span>
             <span className="sidebar-label">Inbox</span>
             {inboxCount > 0 && <span className="sidebar-count">{inboxCount}</span>}
           </button>
@@ -93,7 +93,7 @@ export default function Sidebar({
             className={`sidebar-item ${selectedView === 'archive' ? 'active' : ''}`}
             onClick={() => onViewChange('archive')}
           >
-            <span className="sidebar-icon"><Archive size={15} strokeWidth={1.75} /></span>
+            <span className="sidebar-icon"><Archive size={17} strokeWidth={1.75} /></span>
             <span className="sidebar-label">Archive</span>
             {archiveCount > 0 && <span className="sidebar-count">{archiveCount}</span>}
           </button>
@@ -102,7 +102,7 @@ export default function Sidebar({
             className={`sidebar-item ${selectedView === 'trash' ? 'active' : ''}`}
             onClick={() => onViewChange('trash')}
           >
-            <span className="sidebar-icon"><Trash2 size={15} strokeWidth={1.75} /></span>
+            <span className="sidebar-icon"><Trash2 size={17} strokeWidth={1.75} /></span>
             <span className="sidebar-label">Trash</span>
             {trashCount > 0 && <span className="sidebar-count">{trashCount}</span>}
           </button>
@@ -136,11 +136,11 @@ export default function Sidebar({
 
       <div className="sidebar-footer">
         <button className="sidebar-item" onClick={() => navigate('/app/settings')}>
-          <span className="sidebar-icon"><Settings size={15} strokeWidth={1.75} /></span>
+          <span className="sidebar-icon"><Settings size={17} strokeWidth={1.75} /></span>
           <span className="sidebar-label">Settings</span>
         </button>
         <button className="sidebar-item" onClick={() => navigate('/app/account')}>
-          <span className="sidebar-icon"><User size={15} strokeWidth={1.75} /></span>
+          <span className="sidebar-icon"><User size={17} strokeWidth={1.75} /></span>
           <span className="sidebar-label">Account</span>
         </button>
         {/* Sync status */}
