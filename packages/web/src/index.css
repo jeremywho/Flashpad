@@ -419,12 +419,14 @@ button:disabled {
 }
 
 .notes-list-new-btn {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  background: var(--accent-color);
+  background: transparent;
+  border: 1px solid #2a2a2a;
   border-radius: 6px;
-  font-size: 20px;
+  color: var(--text-muted);
+  font-size: 18px;
   line-height: 1;
   display: flex;
   align-items: center;
@@ -432,7 +434,9 @@ button:disabled {
 }
 
 .notes-list-new-btn:hover {
-  background: var(--accent-hover);
+  background: #1e1e1e;
+  border-color: #444;
+  color: var(--text-secondary);
 }
 
 .notes-list-search {
@@ -509,7 +513,9 @@ button:disabled {
 }
 
 .notes-list-item.active {
-  background: var(--bg-tertiary);
+  background: var(--bg-active);
+  border-left: 2px solid var(--accent-color);
+  padding-left: 18px;
 }
 
 .notes-list-item-header {
@@ -530,6 +536,7 @@ button:disabled {
 }
 
 .notes-list-item-date {
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-muted);
   flex-shrink: 0;
@@ -556,8 +563,8 @@ button:disabled {
 }
 
 .notes-list-item-category-dot {
-  width: 8px;
-  height: 8px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
 }
 
