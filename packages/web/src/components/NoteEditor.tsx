@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Note, Category, NoteStatus } from '@shared/types';
+import { Archive, Inbox, RotateCcw, Trash2, Maximize2, X, Code, FileText } from 'lucide-react';
 
 const CODE_LANGUAGES = [
   '', 'javascript', 'typescript', 'python', 'csharp', 'java', 'go', 'rust',
@@ -75,6 +76,9 @@ function useDebouncedSavingIndicator(
   return visible;
 }
 
+const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+const modKey = isMac ? '⌘' : 'Ctrl';
+
 interface NoteEditorProps {
   note: Note | null;
   categories: Category[];
@@ -89,6 +93,7 @@ interface NoteEditorProps {
   initialCategoryId?: string;
   isFocusMode?: boolean;
   onToggleFocusMode?: () => void;
+  connectionState?: string;
 }
 
 export default function NoteEditor({
@@ -105,6 +110,7 @@ export default function NoteEditor({
   initialCategoryId,
   isFocusMode,
   onToggleFocusMode,
+  connectionState,
 }: NoteEditorProps) {
   const showSavingIndicator = useDebouncedSavingIndicator(isSaving);
   const [content, setContent] = useState(note?.content || '');
@@ -285,11 +291,22 @@ export default function NoteEditor({
     }
   };
 
+  const getSyncLabel = () => {
+    if (connectionState === 'disconnected') return { dotClass: 'disconnected', label: 'offline' };
+    if (connectionState === 'connecting') return { dotClass: 'connecting', label: 'connecting' };
+    if (connectionState === 'reconnecting') return { dotClass: 'reconnecting', label: 'reconnecting' };
+    return { dotClass: 'connected', label: 'synced' };
+  };
+
+  const charCount = content.length;
+  const lineCount = content.split('\n').length;
+  const noteVersion = note?.version || 1;
+
   if (!note && !isNew) {
     return (
       <div className="note-editor-empty">
         <div className="note-editor-empty-content">
-          <span className="note-editor-empty-icon">&#128221;</span>
+          <span className="note-editor-empty-icon"><FileText size={48} strokeWidth={1.5} /></span>
           <p>Select a note or create a new one</p>
         </div>
         {onToggleFocusMode && (
@@ -298,7 +315,7 @@ export default function NoteEditor({
             onClick={onToggleFocusMode}
             title={isFocusMode ? 'Exit Focus Mode (Ctrl+Shift+F)' : 'Focus Mode (Ctrl+Shift+F)'}
           >
-            {isFocusMode ? '\u2715' : '\u2922'}
+            {isFocusMode ? <X size={14} strokeWidth={1.75} /> : <Maximize2 size={14} strokeWidth={1.75} />}
           </button>
         )}
       </div>
@@ -311,8 +328,11 @@ export default function NoteEditor({
     <div className="note-editor">
       <div className="note-editor-toolbar">
         <div className="note-editor-toolbar-left">
+          <button className="note-editor-tab active">Edit</button>
+          <button className="note-editor-tab disabled" title="Preview (coming soon)">Preview</button>
+          <span className="note-editor-toolbar-divider" />
+
           <div className="note-editor-category-selector">
-            <span className="note-editor-category-label">Move to:</span>
             <button
               className="note-editor-category-btn"
               onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
@@ -354,13 +374,14 @@ export default function NoteEditor({
               </div>
             )}
           </div>
+
           <div className="note-editor-code-block-selector">
             <button
               className="note-editor-action-btn"
               onClick={() => setShowCodeLangDropdown(!showCodeLangDropdown)}
               title="Insert Code Block (Ctrl+Shift+K)"
             >
-              &lt;/&gt;
+              <Code size={14} strokeWidth={1.75} />
             </button>
             {showCodeLangDropdown && (
               <div className="note-editor-code-lang-dropdown">
@@ -376,61 +397,53 @@ export default function NoteEditor({
               </div>
             )}
           </div>
+
           {showSavingIndicator && <span className="note-editor-saving">Saving...</span>}
         </div>
 
         <div className="note-editor-toolbar-right">
+          {(() => {
+            const sync = getSyncLabel();
+            return (
+              <span className="note-editor-sync-indicator">
+                <span className={`note-editor-sync-dot ${sync.dotClass}`} />
+                {sync.label}
+              </span>
+            );
+          })()}
+          <span className="note-editor-toolbar-divider" />
+
           {onToggleFocusMode && (
             <button
               className="note-editor-action-btn focus-mode-toolbar-btn"
               onClick={onToggleFocusMode}
               title={isFocusMode ? 'Exit Focus Mode (Ctrl+Shift+F)' : 'Focus Mode (Ctrl+Shift+F)'}
             >
-              {isFocusMode ? '\u2715' : '\u2922'}
+              {isFocusMode ? <X size={14} strokeWidth={1.75} /> : <Maximize2 size={14} strokeWidth={1.75} />}
             </button>
           )}
           {note?.status === NoteStatus.Inbox && (
-            <button
-              className="note-editor-action-btn"
-              onClick={onArchive}
-              title="Archive"
-            >
-              &#128451;
+            <button className="note-editor-action-btn" onClick={onArchive} title="Archive">
+              <Archive size={14} strokeWidth={1.75} />
             </button>
           )}
           {note?.status === NoteStatus.Archived && (
-            <button
-              className="note-editor-action-btn"
-              onClick={onRestore}
-              title="Move to Inbox"
-            >
-              &#128229;
+            <button className="note-editor-action-btn" onClick={onRestore} title="Move to Inbox">
+              <Inbox size={14} strokeWidth={1.75} />
             </button>
           )}
           {note?.status === NoteStatus.Trash ? (
             <>
-              <button
-                className="note-editor-action-btn"
-                onClick={onRestore}
-                title="Restore"
-              >
-                &#8634;
+              <button className="note-editor-action-btn" onClick={onRestore} title="Restore">
+                <RotateCcw size={14} strokeWidth={1.75} />
               </button>
-              <button
-                className="note-editor-action-btn danger"
-                onClick={onDelete}
-                title="Delete Permanently"
-              >
-                &#128465;
+              <button className="note-editor-action-btn danger" onClick={onDelete} title="Delete Permanently">
+                <Trash2 size={14} strokeWidth={1.75} />
               </button>
             </>
           ) : (
-            <button
-              className="note-editor-action-btn"
-              onClick={onTrash}
-              title="Move to Trash"
-            >
-              &#128465;
+            <button className="note-editor-action-btn" onClick={onTrash} title="Move to Trash">
+              <Trash2 size={14} strokeWidth={1.75} />
             </button>
           )}
         </div>
@@ -445,6 +458,23 @@ export default function NoteEditor({
         placeholder="Start typing your note..."
         autoFocus={isNew}
       />
+
+      {/* Editor footer bar */}
+      {!isNew && (
+        <div className="note-editor-footer">
+          <div className="note-editor-footer-left">
+            <span>v{noteVersion}</span>
+            <span>&middot;</span>
+            <span>{charCount} chars</span>
+            <span>&middot;</span>
+            <span>{lineCount} {lineCount === 1 ? 'line' : 'lines'}</span>
+          </div>
+          <div className="note-editor-footer-right">
+            <span><span className="note-editor-kbd">{modKey}+S</span> save</span>
+            <span><span className="note-editor-kbd">{modKey}+Shift+F</span> focus</span>
+          </div>
+        </div>
+      )}
 
       {isNew && (
         <div className="note-editor-new-actions">
