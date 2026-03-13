@@ -121,18 +121,44 @@ Add `className="btn-primary"` to:
 - `packages/web/src/pages/Login.tsx` submit button
 - `packages/web/src/pages/Register.tsx` submit button
 
-The web note editor has a save button (`.note-editor-save-btn`) that currently has its own explicit styles — leave it as-is since it already has custom padding/width.
+### Button Audit — Styles That Need `color: white` Added
+
+The global button change removes `color: white` from the default. These classes set their own `background` but inherit `color` from the global rule, so they need `color: white` added explicitly:
+
+- `.category-manager-submit` — currently relies on global for white text
+- `.note-editor-save-btn` — has its own explicit styles, already sets color — no change needed
+
+These button classes are fully self-contained (set their own `color`, `background`, `width`, `padding`) and need no changes:
+- `.landing-nav-btn`, `.landing-nav-btn.primary` — explicit `color`
+- `.landing-cta-btn`, `.landing-cta-btn.primary` — explicit `color`
+- `.category-manager-cancel` — ghost style already
+- `.notes-list-new-btn` — restyled in section 1.6
+- `.note-editor-action-btn` — restyled in section 1.7
 
 ## 1.4 Icons
 
 Add `lucide-react` dependency to `packages/web/package.json`.
 
-Replace emoji/unicode icons in `packages/web/src/components/Sidebar.tsx`:
+### Sidebar Icons (`Sidebar.tsx`)
+
+Replace emoji/unicode icons:
 - `&#128229;` → `<Inbox size={15} strokeWidth={1.75} />`
 - `&#128451;` → `<Archive size={15} strokeWidth={1.75} />`
 - `&#128465;` → `<Trash2 size={15} strokeWidth={1.75} />`
 - `&#9881;` → `<Settings size={15} strokeWidth={1.75} />`
 - `&#128100;` → `<User size={15} strokeWidth={1.75} />`
+
+### NoteEditor Icons (`NoteEditor.tsx`)
+
+Replace emoji/unicode action button icons:
+- Archive: `&#128451;` → `<Archive size={14} strokeWidth={1.75} />`
+- Restore (to inbox): `&#128229;` → `<Inbox size={14} strokeWidth={1.75} />`
+- Restore (from trash): `&#8634;` → `<RotateCcw size={14} strokeWidth={1.75} />`
+- Trash/Delete: `&#128465;` → `<Trash2 size={14} strokeWidth={1.75} />`
+- Focus mode enter: `\u2922` → `<Maximize2 size={14} strokeWidth={1.75} />`
+- Focus mode exit: `\u2715` → `<X size={14} strokeWidth={1.75} />`
+- Code block: `&lt;/&gt;` → `<Code size={14} strokeWidth={1.75} />`
+- Empty state: `&#128221;` → `<FileText size={48} strokeWidth={1.5} />`
 
 ## 1.5 Sidebar CSS
 
@@ -185,6 +211,8 @@ Mirror Electron's sidebar changes:
 .sidebar-color-dot {
   width: 6px;
   height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .sidebar-logo {
@@ -235,27 +263,137 @@ Mirror Electron's notes list changes:
 
 ## 1.7 Editor Toolbar & Footer
 
-Add Edit/Preview tab placeholders, toolbar dividers, and footer bar — identical CSS to Electron spec sections 3.6 and 3.7.
+### Toolbar Layout
 
-**Toolbar changes:**
-- Add Edit (active) / Preview (disabled placeholder) ghost tab buttons
-- Add `<span className="note-editor-toolbar-divider" />` between button groups
-- Add inline sync indicator (connection state only — web has no offline queue)
-- Ghost-style action buttons (28px, transparent bg, 1px border)
-
-**New footer bar** (below textarea):
-```html
-<div className="note-editor-footer">
-  <div className="note-editor-footer-left">
-    v{version} · {chars} chars · {lines} lines
-  </div>
-  <div className="note-editor-footer-right">
-    <kbd>Ctrl+S</kbd> save · <kbd>Ctrl+Shift+F</kbd> focus
-  </div>
-</div>
+```
+[Edit*] [Preview] | [Category] [Code] ... [● synced] | [Focus] [Archive] [Delete]
 ```
 
-CSS for all editor elements identical to Electron (see Electron spec sections 3.6, 3.7).
+- **Edit/Preview tabs:** Ghost tab buttons. Edit always active. Preview disabled (`opacity: 0.4`, `cursor: not-allowed`), clicking does nothing.
+- **Dividers:** 1px vertical lines (`#2a2a2a`, 16px tall) between button groups.
+- **Sync indicator:** 5px dot + label in JetBrains Mono (see section 1.8).
+- **Action buttons:** Ghost icon-only (28px, transparent bg, 1px border `#2a2a2a`).
+
+### New CSS Classes
+
+```css
+.note-editor-tab {
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  color: #606060;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.note-editor-tab.active {
+  background: #1e1e1e;
+  border-color: #444;
+  color: var(--text-secondary);
+}
+
+.note-editor-tab.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.note-editor-toolbar-divider {
+  width: 1px;
+  height: 16px;
+  background: #2a2a2a;
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.note-editor-sync-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #454545;
+}
+
+.note-editor-sync-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.note-editor-sync-dot.connected { background: var(--success-color); }
+.note-editor-sync-dot.connecting,
+.note-editor-sync-dot.reconnecting { background: #f59e0b; animation: pulse 1.5s ease-in-out infinite; }
+.note-editor-sync-dot.disconnected { background: var(--danger-color); }
+
+.note-editor-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
+  border-top: 1px solid var(--border-color);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #404040;
+}
+
+.note-editor-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.note-editor-footer-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.note-editor-kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: #1e1e1e;
+  border: 1px solid #2a2a2a;
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: #555;
+}
+```
+
+### Updated Action Button CSS
+
+```css
+.note-editor-action-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.note-editor-action-btn:hover {
+  background: #1e1e1e;
+  border-color: #444;
+  color: var(--text-secondary);
+}
+```
+
+### Footer Bar
+
+Added below textarea:
+```
+v{version} · {chars} chars · {lines} lines    [Ctrl+S] save  [Ctrl+Shift+F] focus
+```
 
 ## 1.8 Connection Status Migration
 
@@ -265,6 +403,40 @@ CSS for all editor elements identical to Electron (see Electron spec sections 3.
 - **Delete** old `.connection-status*` CSS rules (preserve `@keyframes pulse`)
 
 Web sync indicator is simpler than Electron — only shows connection state (`connected`, `connecting`, `reconnecting`, `disconnected`). No pending count since web has no offline queue.
+
+### Sidebar Sync Status CSS
+
+```css
+.sidebar-sync-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 20px 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #454545;
+}
+
+.sidebar-sync-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sidebar-sync-dot.connected { background: var(--success-color); }
+.sidebar-sync-dot.connecting,
+.sidebar-sync-dot.reconnecting { background: #f59e0b; animation: pulse 1.5s ease-in-out infinite; }
+.sidebar-sync-dot.disconnected { background: var(--danger-color); }
+```
+
+### New Props
+
+**Sidebar.tsx** — add `connectionState?: string` prop. Render sync dot + label in sidebar footer.
+
+**NoteEditor.tsx** — add `connectionState?: string` prop. Render sync indicator in toolbar.
+
+**Home.tsx** — pass `connectionState` to both Sidebar and NoteEditor.
 
 ## 1.9 Web Files Changed
 
@@ -331,16 +503,18 @@ Run `npx react-native-asset` to link fonts into iOS/Android native projects.
 
 ### Theme Constants
 
-Add font family constants to `packages/mobile/src/theme/colors.ts` (or a new `fonts.ts`):
+Add font family constants to a new `packages/mobile/src/theme/fonts.ts`:
 ```typescript
 export const fonts = {
-  regular: Platform.OS === 'ios' ? 'Inter-Regular' : 'Inter-Regular',
-  medium: Platform.OS === 'ios' ? 'Inter-Medium' : 'Inter-Medium',
-  semiBold: Platform.OS === 'ios' ? 'Inter-SemiBold' : 'Inter-SemiBold',
-  mono: Platform.OS === 'ios' ? 'JetBrainsMono-Regular' : 'JetBrainsMono-Regular',
-  monoMedium: Platform.OS === 'ios' ? 'JetBrainsMono-Medium' : 'JetBrainsMono-Medium',
+  regular: 'Inter-Regular',
+  medium: 'Inter-Medium',
+  semiBold: 'Inter-SemiBold',
+  mono: 'JetBrainsMono-Regular',
+  monoMedium: 'JetBrainsMono-Medium',
 };
 ```
+
+Note: React Native uses the font file name (minus extension) on Android and the PostScript name on iOS. For Inter and JetBrains Mono, these match the file names above.
 
 ### Where JetBrains Mono Applies
 
@@ -389,7 +563,7 @@ Add dependencies:
 
 Update note list item styling in `HomeScreen.tsx`:
 
-**Category dots:** Reduce from 8-12px to 5px diameter.
+**Category dots:** Reduce from 8px (note list `categoryDot`) and 10px (header `headerCategoryDot`) to 5px diameter.
 
 **Timestamps:** Apply JetBrains Mono font, reduce to 11px.
 
@@ -489,9 +663,11 @@ The border-left color indicators (`#22c55e`, `#ef4444`, `#f59e0b`, `#6366f1`) ar
 | File | Change |
 |------|--------|
 | `packages/mobile/package.json` | Add `lucide-react-native`, `react-native-svg` |
-| `packages/mobile/react-native.config.js` | Add font assets path |
+| `packages/mobile/react-native.config.js` | Create new file with font assets path |
 | `packages/mobile/src/assets/fonts/` | Add Inter + JetBrains Mono .ttf files |
-| `packages/mobile/src/theme/colors.ts` | Update dark palette, add `fonts` export |
+| `packages/mobile/src/theme/colors.ts` | Update dark palette values |
+| `packages/mobile/src/theme/fonts.ts` | New file with font family constants |
+| `packages/mobile/src/screens/NotesScreen.tsx` | Update colors import to use theme, font updates |
 | `packages/mobile/src/screens/HomeScreen.tsx` | Lucide icons, ghost FAB, list item styling, font updates |
 | `packages/mobile/src/screens/NoteEditorScreen.tsx` | Footer bar, ghost action buttons, Lucide icons, sync indicator |
 | `packages/mobile/src/screens/LoginScreen.tsx` | Theme-aware colors |
@@ -500,7 +676,9 @@ The border-left color indicators (`#22c55e`, `#ef4444`, `#f59e0b`, `#6366f1`) ar
 | `packages/mobile/src/screens/CategoryManagerScreen.tsx` | Lucide icons |
 | `packages/mobile/src/screens/QuickCaptureScreen.tsx` | Font updates if applicable |
 | `packages/mobile/src/components/Toast.tsx` | Theme-aware background/text colors |
-| iOS/Android native projects | Font linking (via react-native-asset) |
+| iOS `Info.plist` | `UIAppFonts` entries added by react-native-asset |
+| Android `app/src/main/assets/fonts/` | Font files copied by react-native-asset |
+| iOS `Podfile` / `pod install` | Required for `react-native-svg` native module |
 
 ---
 
