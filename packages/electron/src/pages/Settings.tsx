@@ -295,7 +295,7 @@ function Settings() {
 
             {success && <div className="success">{success}</div>}
 
-            <button type="submit" disabled={loading}>
+            <button type="submit" disabled={loading} className="btn-primary">
               {loading ? 'Saving...' : 'Save Settings'}
             </button>
 

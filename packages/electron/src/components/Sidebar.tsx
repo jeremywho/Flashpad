@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Category } from '@shared/types';
+import { Inbox, Archive, Trash2, Settings, User } from 'lucide-react';
 
 interface SidebarProps {
   categories: Category[];
@@ -12,6 +13,9 @@ interface SidebarProps {
   archiveCount: number;
   trashCount: number;
   style?: React.CSSProperties;
+  syncStatus?: string;
+  connectionState?: string;
+  pendingCount?: number;
 }
 
 interface ContextMenuState {
@@ -32,6 +36,9 @@ export default function Sidebar({
   archiveCount,
   trashCount,
   style,
+  syncStatus,
+  connectionState,
+  pendingCount,
 }: SidebarProps) {
   const navigate = useNavigate();
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
@@ -81,7 +88,7 @@ export default function Sidebar({
             className={`sidebar-item ${selectedView === 'inbox' ? 'active' : ''}`}
             onClick={() => onViewChange('inbox')}
           >
-            <span className="sidebar-icon">&#128229;</span>
+            <span className="sidebar-icon"><Inbox size={15} strokeWidth={1.75} /></span>
             <span className="sidebar-label">Inbox</span>
             {inboxCount > 0 && <span className="sidebar-count">{inboxCount}</span>}
           </button>
@@ -90,7 +97,7 @@ export default function Sidebar({
             className={`sidebar-item ${selectedView === 'archive' ? 'active' : ''}`}
             onClick={() => onViewChange('archive')}
           >
-            <span className="sidebar-icon">&#128451;</span>
+            <span className="sidebar-icon"><Archive size={15} strokeWidth={1.75} /></span>
             <span className="sidebar-label">Archive</span>
             {archiveCount > 0 && <span className="sidebar-count">{archiveCount}</span>}
           </button>
@@ -99,7 +106,7 @@ export default function Sidebar({
             className={`sidebar-item ${selectedView === 'trash' ? 'active' : ''}`}
             onClick={() => onViewChange('trash')}
           >
-            <span className="sidebar-icon">&#128465;</span>
+            <span className="sidebar-icon"><Trash2 size={15} strokeWidth={1.75} /></span>
             <span className="sidebar-label">Trash</span>
             {trashCount > 0 && <span className="sidebar-count">{trashCount}</span>}
           </button>
@@ -133,13 +140,29 @@ export default function Sidebar({
 
       <div className="sidebar-footer">
         <button className="sidebar-item" onClick={() => navigate('/settings')}>
-          <span className="sidebar-icon">&#9881;</span>
+          <span className="sidebar-icon"><Settings size={15} strokeWidth={1.75} /></span>
           <span className="sidebar-label">Settings</span>
         </button>
         <button className="sidebar-item" onClick={() => navigate('/account')}>
-          <span className="sidebar-icon">&#128100;</span>
+          <span className="sidebar-icon"><User size={15} strokeWidth={1.75} /></span>
           <span className="sidebar-label">Account</span>
         </button>
+        {/* Sync status fallback indicator */}
+        {(() => {
+          let dotClass = 'connected';
+          let label = 'synced';
+          if (syncStatus === 'syncing') { dotClass = 'syncing'; label = 'syncing'; }
+          else if (pendingCount && pendingCount > 0) { dotClass = 'pending'; label = `${pendingCount} pending`; }
+          else if (connectionState === 'disconnected') { dotClass = 'disconnected'; label = 'offline'; }
+          else if (connectionState === 'connecting') { dotClass = 'connecting'; label = 'connecting'; }
+          else if (connectionState === 'reconnecting') { dotClass = 'reconnecting'; label = 'reconnecting'; }
+          return (
+            <div className="sidebar-sync-status">
+              <span className={`sidebar-sync-dot ${dotClass}`} />
+              <span>{label}</span>
+            </div>
+          );
+        })()}
       </div>
 
       {contextMenu.visible && (

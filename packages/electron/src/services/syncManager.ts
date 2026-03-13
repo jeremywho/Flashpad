@@ -663,6 +663,17 @@ export class SyncManager {
     }
   }
 
+  async getPendingNoteIds(): Promise<Set<string>> {
+    const queue = await getSyncQueue();
+    const noteIds = new Set<string>();
+    for (const item of queue) {
+      if (item.entityType === 'note') {
+        noteIds.add(item.entityId);
+      }
+    }
+    return noteIds;
+  }
+
   // Get inbox count from local DB
   async getInboxCount(): Promise<number> {
     return getLocalInboxCount();

@@ -110,7 +110,7 @@ function Account() {
             </div>
             {error && <div className="error">{error}</div>}
             {success && <div className="success">{success}</div>}
-            <button type="submit" disabled={loading}>
+            <button type="submit" disabled={loading} className="btn-primary">
               {loading ? 'Updating...' : 'Update Account'}
             </button>
           </form>

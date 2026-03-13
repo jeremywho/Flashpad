@@ -5,7 +5,6 @@ import Sidebar from '../components/Sidebar';
 import NotesList from '../components/NotesList';
 import NoteEditor from '../components/NoteEditor';
 import CategoryManager from '../components/CategoryManager';
-import ConnectionStatus from '../components/ConnectionStatus';
 import { useToast } from '../components/Toast';
 import { SyncManager, SyncStatus } from '../services/syncManager';
 import { startFileWatcher, stopFileWatcher } from '../services/file-watcher';
@@ -33,7 +32,7 @@ function Home() {
   const [isFocusMode, setIsFocusMode] = useState(() => {
     return localStorage.getItem('flashpad-focus-mode') === 'true';
   });
-  const [connectedDevices, setConnectedDevices] = useState<DevicePresence[]>([]);
+  const [_connectedDevices, setConnectedDevices] = useState<DevicePresence[]>([]);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem('flashpad-sidebar-width');
     return saved ? parseInt(saved, 10) : 220;
@@ -44,6 +43,7 @@ function Home() {
   });
   const [isResizing, setIsResizing] = useState<'sidebar' | 'noteslist' | null>(null);
   const [newNoteInitialCategoryId, setNewNoteInitialCategoryId] = useState<string | undefined>();
+  const [pendingNoteIds, setPendingNoteIds] = useState<Set<string>>(new Set());
 
   const signalRRef = useRef<SignalRClient | null>(null);
   const syncManagerRef = useRef<SyncManager | null>(null);
@@ -111,6 +111,20 @@ function Home() {
   const handleCategoryChanged = useCallback((categoryName: string) => {
     toast.success(`Moved to ${categoryName}`);
   }, [toast]);
+
+  const fetchPendingNoteIds = useCallback(async () => {
+    if (!syncManagerRef.current) return;
+    try {
+      const ids = await syncManagerRef.current.getPendingNoteIds();
+      setPendingNoteIds(ids);
+    } catch (error) {
+      console.error('Failed to fetch pending note IDs:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPendingNoteIds();
+  }, [pendingCount, fetchPendingNoteIds]);
 
   // Initialize SyncManager
   useEffect(() => {
@@ -568,6 +582,9 @@ function Home() {
             archiveCount={0}
             trashCount={0}
             style={{ width: sidebarWidth }}
+            syncStatus={syncStatus}
+            connectionState={connectionState}
+            pendingCount={pendingCount}
           />
           <div
             className="resize-handle"
@@ -584,6 +601,7 @@ function Home() {
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             showCategory={selectedView === 'inbox' || selectedView === 'archive' || selectedView === 'trash'}
+            pendingNoteIds={pendingNoteIds}
           />
           <div
             className="resize-handle"
@@ -605,6 +623,9 @@ function Home() {
         initialCategoryId={newNoteInitialCategoryId}
         isFocusMode={isFocusMode}
         onToggleFocusMode={toggleFocusMode}
+        syncStatus={syncStatus}
+        connectionState={connectionState}
+        pendingCount={pendingCount}
       />
       {showCategoryManager && (
         <CategoryManager
@@ -615,12 +636,6 @@ function Home() {
           onClose={() => setShowCategoryManager(false)}
         />
       )}
-      <ConnectionStatus
-        connectionState={connectionState}
-        syncStatus={syncStatus}
-        pendingCount={pendingCount}
-        connectedDevices={connectedDevices}
-      />
     </div>
   );
 }

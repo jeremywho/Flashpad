@@ -89,7 +89,13 @@ interface NoteEditorProps {
   initialCategoryId?: string;
   isFocusMode?: boolean;
   onToggleFocusMode?: () => void;
+  syncStatus?: string;
+  connectionState?: string;
+  pendingCount?: number;
 }
+
+const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+const modKey = isMac ? '⌘' : 'Ctrl';
 
 export default function NoteEditor({
   note,
@@ -105,6 +111,9 @@ export default function NoteEditor({
   initialCategoryId,
   isFocusMode,
   onToggleFocusMode,
+  syncStatus,
+  connectionState,
+  pendingCount,
 }: NoteEditorProps) {
   const showSavingIndicator = useDebouncedSavingIndicator(isSaving);
   const [content, setContent] = useState(note?.content || '');
@@ -286,6 +295,26 @@ export default function NoteEditor({
     }
   };
 
+  const getSyncInfo = () => {
+    if (syncStatus === 'syncing') {
+      return { dotClass: 'syncing', label: 'syncing' };
+    }
+    if (pendingCount && pendingCount > 0) {
+      return { dotClass: 'pending', label: `${pendingCount} pending` };
+    }
+    if (connectionState === 'disconnected') {
+      return { dotClass: 'disconnected', label: 'offline' };
+    }
+    if (connectionState === 'connecting' || connectionState === 'reconnecting') {
+      return { dotClass: connectionState, label: connectionState === 'connecting' ? 'connecting' : 'reconnecting' };
+    }
+    return { dotClass: 'connected', label: 'synced' };
+  };
+
+  const charCount = content.length;
+  const lineCount = content.split('\n').length;
+  const noteVersion = note?.version || 1;
+
   if (!note && !isNew) {
     return (
       <div className="note-editor-empty">
@@ -312,8 +341,13 @@ export default function NoteEditor({
     <div className="note-editor">
       <div className="note-editor-toolbar">
         <div className="note-editor-toolbar-left">
+          {/* Edit/Preview tabs */}
+          <button className="note-editor-tab active">Edit</button>
+          <button className="note-editor-tab disabled" title="Preview (coming soon)">Preview</button>
+          <span className="note-editor-toolbar-divider" />
+
+          {/* Category selector */}
           <div className="note-editor-category-selector">
-            <span className="note-editor-category-label">Move to:</span>
             <button
               className="note-editor-category-btn"
               onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
@@ -355,6 +389,8 @@ export default function NoteEditor({
               </div>
             )}
           </div>
+
+          {/* Code block button */}
           <div className="note-editor-code-block-selector">
             <button
               className="note-editor-action-btn"
@@ -377,10 +413,23 @@ export default function NoteEditor({
               </div>
             )}
           </div>
+
           {showSavingIndicator && <span className="note-editor-saving">Saving...</span>}
         </div>
 
         <div className="note-editor-toolbar-right">
+          {/* Sync indicator */}
+          {(() => {
+            const sync = getSyncInfo();
+            return (
+              <span className="note-editor-sync-indicator">
+                <span className={`note-editor-sync-dot ${sync.dotClass}`} />
+                {sync.label}
+              </span>
+            );
+          })()}
+          <span className="note-editor-toolbar-divider" />
+
           {onToggleFocusMode && (
             <button
               className="note-editor-action-btn focus-mode-toolbar-btn"
@@ -391,46 +440,26 @@ export default function NoteEditor({
             </button>
           )}
           {note?.status === NoteStatus.Inbox && (
-            <button
-              className="note-editor-action-btn"
-              onClick={onArchive}
-              title="Archive"
-            >
+            <button className="note-editor-action-btn" onClick={onArchive} title="Archive">
               &#128451;
             </button>
           )}
           {note?.status === NoteStatus.Archived && (
-            <button
-              className="note-editor-action-btn"
-              onClick={onRestore}
-              title="Move to Inbox"
-            >
+            <button className="note-editor-action-btn" onClick={onRestore} title="Move to Inbox">
               &#128229;
             </button>
           )}
           {note?.status === NoteStatus.Trash ? (
             <>
-              <button
-                className="note-editor-action-btn"
-                onClick={onRestore}
-                title="Restore"
-              >
+              <button className="note-editor-action-btn" onClick={onRestore} title="Restore">
                 &#8634;
               </button>
-              <button
-                className="note-editor-action-btn danger"
-                onClick={onDelete}
-                title="Delete Permanently"
-              >
+              <button className="note-editor-action-btn danger" onClick={onDelete} title="Delete Permanently">
                 &#128465;
               </button>
             </>
           ) : (
-            <button
-              className="note-editor-action-btn"
-              onClick={onTrash}
-              title="Move to Trash"
-            >
+            <button className="note-editor-action-btn" onClick={onTrash} title="Move to Trash">
               &#128465;
             </button>
           )}
@@ -446,6 +475,21 @@ export default function NoteEditor({
         placeholder="Start typing your note..."
         autoFocus={isNew}
       />
+
+      {/* Editor footer bar */}
+      <div className="note-editor-footer">
+        <div className="note-editor-footer-left">
+          <span>v{noteVersion}</span>
+          <span>&middot;</span>
+          <span>{charCount} chars</span>
+          <span>&middot;</span>
+          <span>{lineCount} {lineCount === 1 ? 'line' : 'lines'}</span>
+        </div>
+        <div className="note-editor-footer-right">
+          <span><span className="note-editor-kbd">{modKey}+S</span> save</span>
+          <span><span className="note-editor-kbd">{modKey}+Shift+F</span> focus</span>
+        </div>
+      </div>
     </div>
   );
 }

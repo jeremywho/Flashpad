@@ -11,6 +11,7 @@ interface NotesListProps {
   onSearchChange: (query: string) => void;
   showCategory?: boolean;
   style?: React.CSSProperties;
+  pendingNoteIds?: Set<string>;
 }
 
 function formatDate(dateString: string): string {
@@ -52,6 +53,7 @@ export default function NotesList({
   onSearchChange,
   showCategory = true,
   style,
+  pendingNoteIds,
 }: NotesListProps) {
   return (
     <div className="notes-list" style={style}>
@@ -104,7 +106,12 @@ export default function NotesList({
               onClick={() => onNoteSelect(note)}
             >
               <div className="notes-list-item-header">
-                <span className="notes-list-item-title">{getTitle(note.content)}</span>
+                <span className="notes-list-item-title">
+                  {pendingNoteIds?.has(note.id) && (
+                    <span className="notes-list-item-sync-dot" title="Pending sync" />
+                  )}
+                  {getTitle(note.content)}
+                </span>
                 <span className="notes-list-item-date">{formatDate(note.updatedAt)}</span>
               </div>
               <div className="notes-list-item-preview">{getPreview(note.content)}</div>

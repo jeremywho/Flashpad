@@ -1,6 +1,6 @@
 {
   "name": "@flashpad/electron",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "Flashpad desktop app - Quick note capture for Windows and Mac",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -24,9 +24,12 @@
   "homepage": "https://flashpad.cc",
   "license": "MIT",
   "dependencies": {
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
     "electron-store": "^11.0.2",
     "electron-updater": "^6.7.3",
     "gray-matter": "^4.0.3",
+    "lucide-react": "^0.577.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-router-dom": "^7.12.0",
@@ -64,11 +67,17 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["arm64", "x64"]
+          "arch": [
+            "arm64",
+            "x64"
+          ]
         },
         {
           "target": "zip",
-          "arch": ["arm64", "x64"]
+          "arch": [
+            "arm64",
+            "x64"
+          ]
         }
       ]
     },
