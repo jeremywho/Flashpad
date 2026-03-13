@@ -240,10 +240,12 @@ button:disabled {
 }
 
 .sidebar-logo {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--accent-color);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-secondary);
   margin: 0;
+  text-transform: lowercase;
+  letter-spacing: 0.5px;
 }
 
 .sidebar-nav {
@@ -257,26 +259,28 @@ button:disabled {
 }
 
 .sidebar-section-header {
-  padding: 8px 20px;
+  padding: 14px 14px 4px;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  color: var(--text-muted);
-  letter-spacing: 0.5px;
+  color: #454545;
+  letter-spacing: 1px;
 }
 
 .sidebar-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 10px 20px;
+  gap: 8px;
+  width: auto;
+  padding: 6px 14px;
+  margin: 1px 6px;
   background: none;
   border: none;
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
   text-align: left;
+  border-radius: 6px;
   transition: background-color 0.15s, color 0.15s;
 }
 
@@ -290,10 +294,18 @@ button:disabled {
   color: var(--text-primary);
 }
 
+.sidebar-item.active .sidebar-icon {
+  opacity: 1;
+}
+
 .sidebar-icon {
-  font-size: 16px;
-  width: 20px;
-  text-align: center;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.5;
+  flex-shrink: 0;
 }
 
 .sidebar-label {
@@ -301,16 +313,17 @@ button:disabled {
 }
 
 .sidebar-count {
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   color: var(--text-muted);
-  background: var(--bg-tertiary);
-  padding: 2px 8px;
-  border-radius: 10px;
+  background: none;
+  padding: 0;
+  border-radius: 0;
 }
 
 .sidebar-color-dot {
-  width: 10px;
-  height: 10px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -351,7 +364,7 @@ button:disabled {
   padding: 4px;
   min-width: 180px;
   z-index: 1000;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .sidebar-context-menu-item {
