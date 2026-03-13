@@ -12,8 +12,10 @@ import {
   FlatList,
   Pressable,
 } from 'react-native';
+import { Archive, Inbox, RotateCcw, Trash2, ChevronDown } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/colors';
+import { fonts } from '../theme/fonts';
 import { SyncManager } from '../services/syncManager';
 import { getLocalNote } from '../services/database';
 import type { Note, Category, NoteStatus } from '@flashpad/shared';
@@ -269,6 +271,10 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
     );
   };
 
+  const charCount = content.length;
+  const lineCount = content.split('\n').length;
+  const noteVersion = note?.version || 1;
+
   useEffect(() => {
     navigation.setOptions({
       headerRight: () => (
@@ -294,22 +300,22 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
           ) : note && (
             <>
               {note.status === 0 && (
-                <TouchableOpacity onPress={handleArchive} style={styles.headerButton}>
-                  <Text style={styles.headerButtonText}>Archive</Text>
+                <TouchableOpacity onPress={handleArchive} style={styles.ghostButton}>
+                  <Archive size={20} strokeWidth={1.75} color={colors.textMuted} />
                 </TouchableOpacity>
               )}
               {note.status === 1 && (
-                <TouchableOpacity onPress={handleRestore} style={styles.headerButton}>
-                  <Text style={styles.headerButtonText}>Restore</Text>
+                <TouchableOpacity onPress={handleRestore} style={styles.ghostButton}>
+                  <RotateCcw size={20} strokeWidth={1.75} color={colors.textMuted} />
                 </TouchableOpacity>
               )}
               {note.status === 2 ? (
-                <TouchableOpacity onPress={handleDelete} style={styles.headerButton}>
-                  <Text style={[styles.headerButtonText, styles.dangerText]}>Delete</Text>
+                <TouchableOpacity onPress={handleDelete} style={styles.ghostButton}>
+                  <Trash2 size={20} strokeWidth={1.75} color={colors.danger} />
                 </TouchableOpacity>
               ) : (
-                <TouchableOpacity onPress={handleTrash} style={styles.headerButton}>
-                  <Text style={styles.headerButtonText}>Trash</Text>
+                <TouchableOpacity onPress={handleTrash} style={styles.ghostButton}>
+                  <Trash2 size={20} strokeWidth={1.75} color={colors.textMuted} />
                 </TouchableOpacity>
               )}
             </>
@@ -357,7 +363,7 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
         <Text style={selectedCategory ? styles.categoryName : styles.categoryNameMuted}>
           {selectedCategory ? selectedCategory.name : 'Inbox'}
         </Text>
-        <Text style={styles.categoryArrow}>›</Text>
+        <ChevronDown size={14} strokeWidth={1.75} color={colors.textMuted} />
       </TouchableOpacity>
 
       <TextInput
@@ -371,6 +377,15 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
         textAlignVertical="top"
         autoFocus={isNew}
       />
+
+      {/* Editor footer bar */}
+      {!isNew && (
+        <View style={styles.editorFooter}>
+          <Text style={styles.editorFooterText}>
+            v{noteVersion} · {charCount} chars · {lineCount} {lineCount === 1 ? 'line' : 'lines'}
+          </Text>
+        </View>
+      )}
 
       {/* Category Picker Modal */}
       <Modal
@@ -463,6 +478,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 30,
     letterSpacing: 0.2,
+    fontFamily: fonts.regular,
     color: colors.text,
   },
   headerActions: {
@@ -477,6 +493,17 @@ const styles = StyleSheet.create({
   headerButtonText: {
     color: colors.accent,
     fontSize: 16,
+    fontFamily: fonts.medium,
+  },
+  ghostButton: {
+    width: 36,
+    height: 36,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   dangerText: {
     color: colors.danger,
@@ -495,6 +522,18 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     fontSize: 12,
     fontWeight: '600',
+    fontFamily: fonts.mono,
+  },
+  editorFooter: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+  },
+  editorFooterText: {
+    fontFamily: fonts.mono,
+    fontSize: 11,
+    color: '#404040',
   },
   // Category picker row
   categoryRow: {
@@ -516,14 +555,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.text,
     fontWeight: '500',
+    fontFamily: fonts.medium,
   },
   categoryNameMuted: {
     fontSize: 14,
     color: colors.textMuted,
+    fontFamily: fonts.regular,
   },
   categoryArrow: {
-    fontSize: 18,
-    color: colors.textMuted,
     marginLeft: 8,
   },
   // Modal styles
