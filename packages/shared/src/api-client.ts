@@ -19,6 +19,19 @@ import {
   ReorderCategoriesDto,
 } from './types';
 
+export function getTokenExpiryMs(token: string): number | null {
+  try {
+    const payload = token.split('.')[1];
+    const decoded = JSON.parse(atob(payload));
+    if (typeof decoded.exp === 'number') {
+      return decoded.exp * 1000;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export class ApiClient {
   private baseUrl: string;
   private token: string | null = null;
@@ -33,6 +46,11 @@ export class ApiClient {
 
   getToken(): string | null {
     return this.token;
+  }
+
+  getTokenExpiryMs(): number | null {
+    if (!this.token) return null;
+    return getTokenExpiryMs(this.token);
   }
 
   private async request<T>(
@@ -89,6 +107,14 @@ export class ApiClient {
     const response = await this.request<AuthResponse>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+    this.setToken(response.token);
+    return response;
+  }
+
+  async refreshToken(): Promise<AuthResponse> {
+    const response = await this.request<AuthResponse>('/api/auth/refresh', {
+      method: 'POST',
     });
     this.setToken(response.token);
     return response;

@@ -1,7 +1,9 @@
+using System.Security.Claims;
 using Backend.Data;
 using Backend.DTOs;
 using Backend.Models;
 using Backend.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using BCrypt.Net;
@@ -75,6 +77,39 @@ public class AuthController : ControllerBase
         if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
         {
             return Unauthorized(new { message = "Invalid username or password" });
+        }
+
+        var token = _authService.GenerateJwtToken(user);
+
+        return Ok(new AuthResponseDto
+        {
+            Token = token,
+            User = new UserResponseDto
+            {
+                Id = user.Id,
+                Username = user.Username,
+                Email = user.Email,
+                FullName = user.FullName,
+                CreatedAt = user.CreatedAt,
+                UpdatedAt = user.UpdatedAt
+            }
+        });
+    }
+
+    [Authorize]
+    [HttpPost("refresh")]
+    public async Task<ActionResult<AuthResponseDto>> Refresh()
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !int.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new { message = "Invalid token" });
+        }
+
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null)
+        {
+            return Unauthorized(new { message = "User not found" });
         }
 
         var token = _authService.GenerateJwtToken(user);
