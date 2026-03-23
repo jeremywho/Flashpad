@@ -164,6 +164,31 @@ export function serializeNote(
 }
 
 /**
+ * Generate a unique local note ID.
+ */
+export function generateNoteId(): string {
+  return `local_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
+
+/**
+ * Create default metadata for a plain markdown file (no frontmatter).
+ */
+export function createDefaultMetadata(): NoteMetadata {
+  const now = new Date().toISOString();
+  return {
+    id: generateNoteId(),
+    categoryId: null,
+    status: NoteStatus.Inbox,
+    version: 1,
+    deviceId: '',
+    createdAt: now,
+    updatedAt: now,
+    isLocal: true,
+    serverId: null,
+  };
+}
+
+/**
  * Extract note ID from a filename.
  * @param filename The filename (e.g., "abc123.md")
  * @returns The note ID (e.g., "abc123")

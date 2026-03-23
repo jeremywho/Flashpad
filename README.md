@@ -16,6 +16,7 @@ A cross-platform quick note capture app for Windows, Mac, iOS, Android, and Web.
 - **Archive & Trash**: Archive old notes, trash with manual empty
 - **Dark Mode**: Beautiful dark theme by default (light mode available)
 - **Real-time Sync**: Changes sync instantly across all your devices via SignalR
+- **Drop Folder**: Drop plain `.md` files into the notes directory and they're automatically ingested and synced
 
 ## Tech Stack
 
@@ -162,6 +163,17 @@ Configurable in the app's Settings page:
 - **Categories**: Create categories via "Manage Categories" in sidebar
 - **Archive**: Move notes you want to keep but hide from inbox
 - **Trash**: Deleted notes go here; empty manually when ready
+
+### Drop Folder (Desktop)
+
+External programs can create notes by dropping plain `.md` files into the Flashpad notes directory. The app watches the folder and automatically:
+
+1. Detects the new file
+2. Generates metadata (ID, timestamps, Inbox status)
+3. Writes the file back with YAML frontmatter and renames it to `{noteId}.md`
+4. Queues it for sync to the server and all other devices
+
+The notes directory location is configurable in Settings. Files with existing frontmatter are loaded as-is.
 
 ### Real-time Sync
 

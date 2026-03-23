@@ -3,6 +3,7 @@ import {
   parseNoteFile,
   serializeNote,
   extractIdFromFilename,
+  createDefaultMetadata,
   NoteMetadata,
 } from './markdown-parser';
 
@@ -119,6 +120,9 @@ async function loadNotesFromFiles(): Promise<void> {
           serverId: parsed.metadata.serverId,
         };
         notesCache.set(note.id, note);
+      } else {
+        // Plain markdown file without frontmatter - ingest it
+        await ingestPlainMarkdown(id, content);
       }
     }
   }
@@ -517,7 +521,8 @@ export async function reloadNoteFromFile(id: string): Promise<Note | null> {
 
   const parsed = parseNoteFile(content);
   if (!parsed) {
-    return null;
+    // Plain markdown file without frontmatter - ingest it
+    return ingestPlainMarkdown(id, content);
   }
 
   const note: LocalNote = {
@@ -534,6 +539,46 @@ export async function reloadNoteFromFile(id: string): Promise<Note | null> {
   };
 
   notesCache.set(note.id, note);
+  return localNoteToNote(note);
+}
+
+/**
+ * Ingest a plain markdown file (no frontmatter) into the system.
+ * Generates metadata, writes the file back with frontmatter under a new ID,
+ * deletes the original file, and queues it for sync.
+ */
+async function ingestPlainMarkdown(originalFileId: string, content: string): Promise<Note> {
+  const metadata = createDefaultMetadata();
+
+  const note: LocalNote = {
+    id: metadata.id,
+    content: content.trimEnd(),
+    categoryId: null,
+    status: NoteStatus.Inbox,
+    version: 1,
+    deviceId: '',
+    createdAt: metadata.createdAt,
+    updatedAt: metadata.updatedAt,
+    isLocal: true,
+    serverId: null,
+  };
+
+  // Write new file with frontmatter under the generated ID
+  notesCache.set(note.id, note);
+  await writeNoteFile(note);
+
+  // Delete the original plain file
+  await window.electron.fs.deleteNote(originalFileId);
+
+  // Queue for server sync
+  await addToSyncQueue({
+    entityType: 'note',
+    entityId: note.id,
+    operation: SyncOperation.Create,
+    payload: JSON.stringify({ content: note.content }),
+    baseVersion: null,
+  });
+
   return localNoteToNote(note);
 }
 

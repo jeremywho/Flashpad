@@ -213,10 +213,14 @@ CSS variables in `:root` and `[data-theme="light"]`:
 
 The Electron and Web apps share similar UI components but differ in data architecture:
 
-- **Electron** uses a `SyncManager` with a local SQLite database for offline-first operation. It tracks sync status, pending changes, connected devices, and supports file watching for external changes.
+- **Electron** uses a `SyncManager` with markdown files on disk for offline-first operation. Each note is a `.md` file with YAML frontmatter (metadata) in a configurable data directory. It tracks sync status, pending changes, connected devices, and supports file watching for external changes.
 - **Web** makes direct API calls with no local persistence. It has simpler SignalR integration and no offline support.
 
 When adding a feature to both, implement the UI similarly but handle data differently: use `syncManager.getNotes()` in Electron vs `api.getNotes()` in Web.
+
+### Drop Folder / Plain Markdown Ingestion
+
+The Electron app watches its notes directory for new files. Plain `.md` files without frontmatter are automatically ingested: default metadata is generated, the file is rewritten with YAML frontmatter and renamed to `{noteId}.md`, and a sync queue entry is created. This allows external programs (scripts, other editors, automation) to create notes by simply dropping `.md` files into the folder. Key files: `markdown-parser.ts` (`createDefaultMetadata`), `database.ts` (`ingestPlainMarkdown`).
 
 ## Backend Authentication Pattern
 
