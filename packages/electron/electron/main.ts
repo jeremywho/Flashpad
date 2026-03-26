@@ -221,17 +221,23 @@ function createWindow() {
   }
 
   const settings = settingsStore.store;
+  const saved = settings.windowBounds;
 
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    show: !settings.startMinimized, // Don't show window if startMinimized is true
+    width: saved?.width || 1200,
+    height: saved?.height || 800,
+    ...(saved?.x != null && saved?.y != null ? { x: saved.x, y: saved.y } : {}),
+    show: !settings.startMinimized,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
+
+  if (saved?.maximized) {
+    mainWindow.maximize();
+  }
 
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
@@ -241,8 +247,24 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
+  // Save window bounds when resized or moved
+  const saveBounds = () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const maximized = mainWindow.isMaximized();
+    if (!maximized) {
+      const bounds = mainWindow.getBounds();
+      settingsStore.set('windowBounds', { ...bounds, maximized: false });
+    } else {
+      settingsStore.set('windowBounds', { ...settingsStore.store.windowBounds!, maximized: true });
+    }
+  };
+
+  mainWindow.on('resize', saveBounds);
+  mainWindow.on('move', saveBounds);
+
   // Handle window close event based on user settings
   mainWindow.on('close', (event) => {
+    saveBounds();
     const settings = settingsStore.store;
 
     if (settings.closeToTray && !isQuitting) {

@@ -1,5 +1,13 @@
 import Store from 'electron-store';
 
+export interface WindowBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  maximized?: boolean;
+}
+
 export interface AppSettings {
   minimizeToTray: boolean;
   startMinimized: boolean;
@@ -8,6 +16,7 @@ export interface AppSettings {
   quickCaptureCodeHotkey: string;
   theme: 'dark' | 'light' | 'system';
   dataDirectory: string | null; // null means use default (app.getPath('userData')/data)
+  windowBounds: WindowBounds | null;
 }
 
 export const defaultSettings: AppSettings = {
@@ -18,6 +27,7 @@ export const defaultSettings: AppSettings = {
   quickCaptureCodeHotkey: 'CommandOrControl+Alt+C',
   theme: 'dark',
   dataDirectory: null,
+  windowBounds: null,
 };
 
 export const settingsStore = new Store<AppSettings>({
