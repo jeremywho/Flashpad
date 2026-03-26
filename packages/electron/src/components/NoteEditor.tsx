@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Note, Category, NoteStatus } from '@shared/types';
 
 const CODE_LANGUAGES = [
@@ -477,7 +478,7 @@ export default function NoteEditor({
 
       {previewMode ? (
         <div className="note-editor-content note-editor-preview">
-          <Markdown>{content}</Markdown>
+          <Markdown remarkPlugins={[remarkGfm]}>{content}</Markdown>
         </div>
       ) : (
         <textarea
