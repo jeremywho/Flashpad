@@ -134,6 +134,9 @@ export class SyncManager {
 
       this.updateSyncStatus('idle');
       console.log('Initial sync complete');
+
+      // Process any pending outbound changes (e.g. externally created notes)
+      await this.processSyncQueue();
     } catch (error) {
       console.error('Initial sync failed:', error);
       if (this.isAuthError(error)) {
