@@ -1,5 +1,6 @@
 import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, globalShortcut, screen, dialog } from 'electron';
 import { autoUpdater } from 'electron-updater';
+import chokidar from 'chokidar';
 import path from 'path';
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
@@ -12,8 +13,7 @@ let tray: Tray | null = null;
 let isQuitting = false;
 
 // File system storage
-let watcher: fsSync.FSWatcher | null = null;
-let watchDebounceTimers: Map<string, NodeJS.Timeout> = new Map();
+let watcher: ReturnType<typeof chokidar.watch> | null = null;
 
 function getDataDir(): string {
   const customDir = settingsStore.store.dataDirectory;
@@ -40,53 +40,27 @@ function startFileWatcher(): void {
     fsSync.mkdirSync(notesDir, { recursive: true });
   }
 
-  watcher = fsSync.watch(notesDir, { persistent: true }, (_eventType, filename) => {
-    if (!filename || !filename.endsWith('.md')) return;
+  const notify = (type: 'add' | 'change' | 'unlink', filePath: string) => {
+    const filename = path.basename(filePath);
+    BrowserWindow.getAllWindows().forEach((win) => {
+      win.webContents.send('fs:file-changed', { type, filename });
+    });
+  };
 
-    // Debounce rapid events (file systems often fire multiple events)
-    const existingTimer = watchDebounceTimers.get(filename);
-    if (existingTimer) {
-      clearTimeout(existingTimer);
-    }
-
-    const timer = setTimeout(async () => {
-      watchDebounceTimers.delete(filename);
-
-      // Determine event type by checking if file exists
-      const filePath = path.join(notesDir, filename);
-      let type: 'add' | 'change' | 'unlink';
-
-      try {
-        await fs.access(filePath);
-        // File exists - could be add or change, we'll call it change
-        // (the renderer handles both the same way)
-        type = 'change';
-      } catch {
-        // File doesn't exist - it was deleted
-        type = 'unlink';
-      }
-
-      // Send to all windows
-      BrowserWindow.getAllWindows().forEach((win) => {
-        win.webContents.send('fs:file-changed', { type, filename });
-      });
-    }, 300); // 300ms debounce
-
-    watchDebounceTimers.set(filename, timer);
+  watcher = chokidar.watch(path.join(notesDir, '*.md'), {
+    ignoreInitial: true,
+    awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
+    usePolling: false,
   });
 
-  watcher.on('error', (error) => {
-    console.error('File watcher error:', error);
-  });
+  watcher
+    .on('add', (filePath: string) => notify('add', filePath))
+    .on('change', (filePath: string) => notify('change', filePath))
+    .on('unlink', (filePath: string) => notify('unlink', filePath))
+    .on('error', (error: unknown) => console.error('File watcher error:', error));
 }
 
 function stopFileWatcher(): void {
-  // Clear any pending debounce timers
-  for (const timer of watchDebounceTimers.values()) {
-    clearTimeout(timer);
-  }
-  watchDebounceTimers.clear();
-
   if (watcher) {
     watcher.close();
     watcher = null;
