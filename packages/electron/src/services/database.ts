@@ -135,13 +135,19 @@ async function loadNotesFromFiles(): Promise<void> {
     }
   }
 
-  // Queue unsynced notes that don't already have a pending sync entry
+  // Queue unsynced notes that don't already have a pending sync entry.
+  // We push directly to syncQueueCache here (not via addToSyncQueue)
+  // because initDatabase hasn't finished yet and addToSyncQueue would re-enter it.
+  let queueChanged = false;
   for (const note of unsyncedNotes) {
     const existingEntry = syncQueueCache.find(
       (i) => i.entityId === note.id && i.entityType === 'note'
     );
     if (!existingEntry) {
-      await addToSyncQueue({
+      const nextId =
+        syncQueueCache.length > 0 ? Math.max(...syncQueueCache.map((i) => i.id)) + 1 : 1;
+      syncQueueCache.push({
+        id: nextId,
         entityType: 'note',
         entityId: note.id,
         operation: SyncOperation.Create,
@@ -150,8 +156,15 @@ async function loadNotesFromFiles(): Promise<void> {
           categoryId: note.categoryId,
         }),
         baseVersion: null,
+        createdAt: new Date().toISOString(),
+        retryCount: 0,
+        lastError: null,
       });
+      queueChanged = true;
     }
+  }
+  if (queueChanged) {
+    await saveSyncQueueFile();
   }
 }
 
