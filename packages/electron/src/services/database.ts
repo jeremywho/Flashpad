@@ -98,6 +98,9 @@ async function initDatabase(): Promise<void> {
 async function loadNotesFromFiles(): Promise<void> {
   notesCache.clear();
 
+  // Collect unsynced notes to queue after loading
+  const unsyncedNotes: LocalNote[] = [];
+
   const files = await window.electron.fs.listNotes();
 
   for (const filename of files) {
@@ -120,10 +123,34 @@ async function loadNotesFromFiles(): Promise<void> {
           serverId: parsed.metadata.serverId,
         };
         notesCache.set(note.id, note);
+
+        // Track externally created notes that need syncing
+        if (note.isLocal && !note.serverId) {
+          unsyncedNotes.push(note);
+        }
       } else {
         // Plain markdown file without frontmatter - ingest it
         await ingestPlainMarkdown(id, content);
       }
+    }
+  }
+
+  // Queue unsynced notes that don't already have a pending sync entry
+  for (const note of unsyncedNotes) {
+    const existingEntry = syncQueueCache.find(
+      (i) => i.entityId === note.id && i.entityType === 'note'
+    );
+    if (!existingEntry) {
+      await addToSyncQueue({
+        entityType: 'note',
+        entityId: note.id,
+        operation: SyncOperation.Create,
+        payload: JSON.stringify({
+          content: note.content,
+          categoryId: note.categoryId,
+        }),
+        baseVersion: null,
+      });
     }
   }
 }
@@ -538,7 +565,24 @@ export async function reloadNoteFromFile(id: string): Promise<Note | null> {
     serverId: parsed.metadata.serverId,
   };
 
+  const isNew = !notesCache.has(note.id);
   notesCache.set(note.id, note);
+
+  // Externally created note with frontmatter (e.g. dropped by another program)
+  // that hasn't been synced yet — queue it for server sync
+  if (isNew && note.isLocal && !note.serverId) {
+    await addToSyncQueue({
+      entityType: 'note',
+      entityId: note.id,
+      operation: SyncOperation.Create,
+      payload: JSON.stringify({
+        content: note.content,
+        categoryId: note.categoryId,
+      }),
+      baseVersion: null,
+    });
+  }
+
   return localNoteToNote(note);
 }
 
