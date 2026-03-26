@@ -79,14 +79,14 @@ async function initDatabase(): Promise<void> {
   try {
     await window.electron.fs.ensureDataDir();
 
+    // Load sync queue first (needed by loadNotesFromFiles to check for unsynced notes)
+    await loadSyncQueueFromFile();
+
     // Load notes from files
     await loadNotesFromFiles();
 
     // Load categories from JSON
     await loadCategoriesFromFile();
-
-    // Load sync queue from JSON
-    await loadSyncQueueFromFile();
 
     initialized = true;
   } catch (error) {
