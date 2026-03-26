@@ -255,6 +255,9 @@ function Home() {
       fetchInboxCount();
       fetchCategories();
 
+      // Sync any newly queued notes to the server
+      syncManagerRef.current?.processSyncQueue();
+
       // If the currently selected note was deleted, clear selection
       if (event === 'noteDeleted' && selectedNote?.id === noteId) {
         setSelectedNote(null);
