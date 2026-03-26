@@ -873,6 +873,97 @@ h1, h2, h3 {
   color: var(--text-muted);
 }
 
+.note-editor-preview {
+  overflow-y: auto;
+  cursor: default;
+}
+
+.note-editor-preview h1,
+.note-editor-preview h2,
+.note-editor-preview h3,
+.note-editor-preview h4 {
+  color: var(--text-primary);
+  margin: 1em 0 0.5em;
+  line-height: 1.3;
+}
+
+.note-editor-preview h1 { font-size: 1.6em; }
+.note-editor-preview h2 { font-size: 1.35em; }
+.note-editor-preview h3 { font-size: 1.15em; }
+
+.note-editor-preview p {
+  margin: 0.6em 0;
+}
+
+.note-editor-preview ul,
+.note-editor-preview ol {
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+
+.note-editor-preview li {
+  margin: 0.25em 0;
+}
+
+.note-editor-preview code {
+  background: var(--bg-tertiary);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.note-editor-preview pre {
+  background: var(--bg-tertiary);
+  padding: 12px 16px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 0.8em 0;
+}
+
+.note-editor-preview pre code {
+  background: none;
+  padding: 0;
+}
+
+.note-editor-preview blockquote {
+  border-left: 3px solid var(--accent-color);
+  margin: 0.8em 0;
+  padding: 0.25em 1em;
+  color: var(--text-secondary);
+}
+
+.note-editor-preview a {
+  color: var(--accent-color);
+}
+
+.note-editor-preview strong {
+  color: var(--text-primary);
+}
+
+.note-editor-preview hr {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 1.2em 0;
+}
+
+.note-editor-preview table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.8em 0;
+}
+
+.note-editor-preview th,
+.note-editor-preview td {
+  border: 1px solid var(--border-color);
+  padding: 6px 12px;
+  text-align: left;
+}
+
+.note-editor-preview th {
+  background: var(--bg-tertiary);
+}
+
 .note-editor-new-actions {
   padding: 16px 20px;
   border-top: 1px solid var(--border-color);

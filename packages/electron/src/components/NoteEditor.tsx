@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import Markdown from 'react-markdown';
 import { Note, Category, NoteStatus } from '@shared/types';
 
 const CODE_LANGUAGES = [
@@ -117,6 +118,7 @@ export default function NoteEditor({
 }: NoteEditorProps) {
   const showSavingIndicator = useDebouncedSavingIndicator(isSaving);
   const [content, setContent] = useState(note?.content || '');
+  const [previewMode, setPreviewMode] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(
     note?.categoryId ?? initialCategoryId
   );
@@ -136,6 +138,7 @@ export default function NoteEditor({
       setContent(note?.content || '');
       lastSavedContentRef.current = note?.content || '';
       prevNoteIdRef.current = note?.id;
+      setPreviewMode(false);
     }
   }, [note?.id, note?.content]);
 
@@ -342,8 +345,14 @@ export default function NoteEditor({
       <div className="note-editor-toolbar">
         <div className="note-editor-toolbar-left">
           {/* Edit/Preview tabs */}
-          <button className="note-editor-tab active">Edit</button>
-          <button className="note-editor-tab disabled" title="Preview (coming soon)">Preview</button>
+          <button
+            className={`note-editor-tab ${!previewMode ? 'active' : ''}`}
+            onClick={() => setPreviewMode(false)}
+          >Edit</button>
+          <button
+            className={`note-editor-tab ${previewMode ? 'active' : ''}`}
+            onClick={() => setPreviewMode(true)}
+          >Preview</button>
           <span className="note-editor-toolbar-divider" />
 
           {/* Category selector */}
@@ -466,15 +475,21 @@ export default function NoteEditor({
         </div>
       </div>
 
-      <textarea
-        ref={textareaRef}
-        className="note-editor-content"
-        value={content}
-        onChange={handleContentChange}
-        onKeyDown={handleKeyDown}
-        placeholder="Start typing your note..."
-        autoFocus={isNew}
-      />
+      {previewMode ? (
+        <div className="note-editor-content note-editor-preview">
+          <Markdown>{content}</Markdown>
+        </div>
+      ) : (
+        <textarea
+          ref={textareaRef}
+          className="note-editor-content"
+          value={content}
+          onChange={handleContentChange}
+          onKeyDown={handleKeyDown}
+          placeholder="Start typing your note..."
+          autoFocus={isNew}
+        />
+      )}
 
       {/* Editor footer bar */}
       <div className="note-editor-footer">
