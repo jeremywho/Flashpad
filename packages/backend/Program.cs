@@ -1,5 +1,6 @@
 using System.Text;
 using Backend.Data;
+using H4.Sdk;
 using Backend.Hubs;
 using Backend.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -62,6 +63,14 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
+// H4 Observability
+builder.Services.AddH4(options =>
+{
+    options.Endpoint = builder.Configuration["H4:Endpoint"] ?? "https://h4.gg";
+    options.ApiKey = builder.Configuration["H4:ApiKey"] ?? "";
+    options.Source = "backend";
+});
+
 // Services
 builder.Services.AddScoped<IAuthService, AuthService>();
 
@@ -109,6 +118,7 @@ app.UseStaticFiles();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseH4Tracing();
 
 app.MapControllers();
 app.MapHub<NotesHub>("/hubs/notes");
