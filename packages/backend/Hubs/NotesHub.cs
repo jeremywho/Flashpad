@@ -1,4 +1,5 @@
 using Backend.DTOs;
+using H4.Sdk;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using System.Collections.Concurrent;
@@ -67,7 +68,7 @@ public static class PresenceTracker
 }
 
 [Authorize]
-public class NotesHub : Hub
+public class NotesHub(IH4Logger h4) : Hub
 {
     private int GetCurrentUserId()
     {
@@ -83,6 +84,7 @@ public class NotesHub : Hub
     {
         var userId = GetCurrentUserId();
         await Groups.AddToGroupAsync(Context.ConnectionId, $"user_{userId}");
+        h4.Info("SignalR connected", new { userId, connectionId = Context.ConnectionId });
         await base.OnConnectedAsync();
     }
 
@@ -95,6 +97,7 @@ public class NotesHub : Hub
         var removed = PresenceTracker.RemoveDevice(userId, Context.ConnectionId);
         if (removed != null)
         {
+            h4.Info("SignalR disconnected", new { userId, connectionId = Context.ConnectionId, deviceId = removed.DeviceId, deviceName = removed.DeviceName, reason = exception?.Message });
             var devices = PresenceTracker.GetUserDevices(userId);
             await Clients.Group($"user_{userId}").SendAsync("DeviceDisconnected", new
             {
@@ -110,6 +113,10 @@ public class NotesHub : Hub
                 d.LastSeen
             }));
         }
+        else
+        {
+            h4.Warning("SignalR disconnected (no device registration)", new { userId, connectionId = Context.ConnectionId, reason = exception?.Message });
+        }
 
         await base.OnDisconnectedAsync(exception);
     }
@@ -119,6 +126,7 @@ public class NotesHub : Hub
     {
         var userId = GetCurrentUserId();
         await Groups.AddToGroupAsync(Context.ConnectionId, $"user_{userId}");
+        h4.Debug("JoinUserGroup", new { userId, connectionId = Context.ConnectionId });
     }
 
     // Client registers their device for presence tracking
@@ -128,6 +136,7 @@ public class NotesHub : Hub
         PresenceTracker.AddDevice(userId, Context.ConnectionId, deviceId, deviceName);
 
         var devices = PresenceTracker.GetUserDevices(userId);
+        h4.Info("Device registered", new { userId, deviceId, deviceName, connectionId = Context.ConnectionId, totalDevices = devices.Count });
 
         // Notify all user's devices about the new connection
         await Clients.Group($"user_{userId}").SendAsync("DeviceConnected", new
@@ -152,6 +161,7 @@ public class NotesHub : Hub
     {
         var userId = GetCurrentUserId();
         var devices = PresenceTracker.GetUserDevices(userId);
+        h4.Debug("GetPresence", new { userId, deviceCount = devices.Count });
         await Clients.Caller.SendAsync("PresenceUpdated", devices.Select(d => new
         {
             d.DeviceId,
@@ -181,47 +191,51 @@ public interface INotesHubService
     Task NotifyCategoryDeleted(int userId, Guid categoryId);
 }
 
-public class NotesHubService : INotesHubService
+public class NotesHubService(IHubContext<NotesHub> hubContext, IH4Logger h4) : INotesHubService
 {
-    private readonly IHubContext<NotesHub> _hubContext;
-
-    public NotesHubService(IHubContext<NotesHub> hubContext)
-    {
-        _hubContext = hubContext;
-    }
-
     public async Task NotifyNoteCreated(int userId, NoteResponseDto note)
     {
-        await _hubContext.Clients.Group($"user_{userId}").SendAsync("NoteCreated", note);
+        var devices = PresenceTracker.GetUserDevices(userId);
+        h4.Info("Broadcasting NoteCreated", new { userId, noteId = note.Id, deviceId = note.DeviceId, version = note.Version, connectedDevices = devices.Count, deviceIds = string.Join(",", devices.Select(d => d.DeviceId)) });
+        await hubContext.Clients.Group($"user_{userId}").SendAsync("NoteCreated", note);
     }
 
     public async Task NotifyNoteUpdated(int userId, NoteResponseDto note)
     {
-        await _hubContext.Clients.Group($"user_{userId}").SendAsync("NoteUpdated", note);
+        var devices = PresenceTracker.GetUserDevices(userId);
+        h4.Info("Broadcasting NoteUpdated", new { userId, noteId = note.Id, deviceId = note.DeviceId, version = note.Version, connectedDevices = devices.Count, deviceIds = string.Join(",", devices.Select(d => d.DeviceId)) });
+        await hubContext.Clients.Group($"user_{userId}").SendAsync("NoteUpdated", note);
     }
 
     public async Task NotifyNoteDeleted(int userId, Guid noteId)
     {
-        await _hubContext.Clients.Group($"user_{userId}").SendAsync("NoteDeleted", noteId);
+        var devices = PresenceTracker.GetUserDevices(userId);
+        h4.Info("Broadcasting NoteDeleted", new { userId, noteId, connectedDevices = devices.Count });
+        await hubContext.Clients.Group($"user_{userId}").SendAsync("NoteDeleted", noteId);
     }
 
     public async Task NotifyNoteStatusChanged(int userId, NoteResponseDto note)
     {
-        await _hubContext.Clients.Group($"user_{userId}").SendAsync("NoteStatusChanged", note);
+        var devices = PresenceTracker.GetUserDevices(userId);
+        h4.Info("Broadcasting NoteStatusChanged", new { userId, noteId = note.Id, status = note.Status.ToString(), connectedDevices = devices.Count });
+        await hubContext.Clients.Group($"user_{userId}").SendAsync("NoteStatusChanged", note);
     }
 
     public async Task NotifyCategoryCreated(int userId, CategoryResponseDto category)
     {
-        await _hubContext.Clients.Group($"user_{userId}").SendAsync("CategoryCreated", category);
+        h4.Info("Broadcasting CategoryCreated", new { userId, categoryId = category.Id });
+        await hubContext.Clients.Group($"user_{userId}").SendAsync("CategoryCreated", category);
     }
 
     public async Task NotifyCategoryUpdated(int userId, CategoryResponseDto category)
     {
-        await _hubContext.Clients.Group($"user_{userId}").SendAsync("CategoryUpdated", category);
+        h4.Info("Broadcasting CategoryUpdated", new { userId, categoryId = category.Id });
+        await hubContext.Clients.Group($"user_{userId}").SendAsync("CategoryUpdated", category);
     }
 
     public async Task NotifyCategoryDeleted(int userId, Guid categoryId)
     {
-        await _hubContext.Clients.Group($"user_{userId}").SendAsync("CategoryDeleted", categoryId);
+        h4.Info("Broadcasting CategoryDeleted", new { userId, categoryId });
+        await hubContext.Clients.Group($"user_{userId}").SendAsync("CategoryDeleted", categoryId);
     }
 }

@@ -2,6 +2,7 @@ using Backend.Data;
 using Backend.DTOs;
 using Backend.Hubs;
 using Backend.Models;
+using H4.Sdk;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,12 +17,14 @@ public class NotesController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly INotesHubService _hubService;
+    private readonly IH4Logger _h4;
     private const int MaxHistoryVersions = 10;
 
-    public NotesController(AppDbContext context, INotesHubService hubService)
+    public NotesController(AppDbContext context, INotesHubService hubService, IH4Logger h4)
     {
         _context = context;
         _hubService = hubService;
+        _h4 = h4;
     }
 
     private int GetCurrentUserId()
@@ -173,6 +176,7 @@ public class NotesController : ControllerBase
             UpdatedAt = note.UpdatedAt
         };
 
+        _h4.Info("Note created", new { userId, noteId = note.Id, deviceId = dto.DeviceId, version = note.Version, categoryId = note.CategoryId });
         await _hubService.NotifyNoteCreated(userId, response);
 
         return CreatedAtAction(nameof(GetNote), new { id = note.Id }, response);
@@ -246,6 +250,7 @@ public class NotesController : ControllerBase
             UpdatedAt = note.UpdatedAt
         };
 
+        _h4.Info("Note updated", new { userId, noteId = note.Id, deviceId = dto.DeviceId, version = note.Version, categoryId = note.CategoryId });
         await _hubService.NotifyNoteUpdated(userId, response);
 
         return Ok(response);
@@ -284,6 +289,7 @@ public class NotesController : ControllerBase
             UpdatedAt = note.UpdatedAt
         };
 
+        _h4.Info("Note archived", new { userId, noteId = note.Id, deviceId = note.DeviceId });
         await _hubService.NotifyNoteStatusChanged(userId, response);
 
         return Ok(response);
@@ -324,6 +330,7 @@ public class NotesController : ControllerBase
             UpdatedAt = note.UpdatedAt
         };
 
+        _h4.Info("Note restored", new { userId, noteId = note.Id, deviceId = note.DeviceId });
         await _hubService.NotifyNoteStatusChanged(userId, response);
 
         return Ok(response);
@@ -347,6 +354,7 @@ public class NotesController : ControllerBase
 
         await _context.SaveChangesAsync();
 
+        _h4.Info("Note trashed", new { userId, noteId = note.Id, deviceId = note.DeviceId });
         await _hubService.NotifyNoteDeleted(userId, id);
 
         return NoContent();
