@@ -55,6 +55,18 @@ public static class PresenceTracker
         return new List<DevicePresence>();
     }
 
+    public static List<string> GetConnectionIdsForDevice(int userId, string deviceId)
+    {
+        if (_userDevices.TryGetValue(userId, out var devices))
+        {
+            return devices.Values
+                .Where(d => d.DeviceId == deviceId)
+                .Select(d => d.ConnectionId)
+                .ToList();
+        }
+        return new List<string>();
+    }
+
     public static void UpdateLastSeen(int userId, string connectionId)
     {
         if (_userDevices.TryGetValue(userId, out var devices))
@@ -183,12 +195,13 @@ public class NotesHub(IH4Logger h4) : Hub
 }
 
 // Service to broadcast note changes from controllers
+// senderDeviceId is used to exclude the originating device from broadcasts
 public interface INotesHubService
 {
-    Task NotifyNoteCreated(int userId, NoteResponseDto note);
-    Task NotifyNoteUpdated(int userId, NoteResponseDto note);
-    Task NotifyNoteDeleted(int userId, Guid noteId);
-    Task NotifyNoteStatusChanged(int userId, NoteResponseDto note);
+    Task NotifyNoteCreated(int userId, NoteResponseDto note, string? senderDeviceId = null);
+    Task NotifyNoteUpdated(int userId, NoteResponseDto note, string? senderDeviceId = null);
+    Task NotifyNoteDeleted(int userId, Guid noteId, string? senderDeviceId = null);
+    Task NotifyNoteStatusChanged(int userId, NoteResponseDto note, string? senderDeviceId = null);
     Task NotifyCategoryCreated(int userId, CategoryResponseDto category);
     Task NotifyCategoryUpdated(int userId, CategoryResponseDto category);
     Task NotifyCategoryDeleted(int userId, Guid categoryId);
@@ -196,32 +209,46 @@ public interface INotesHubService
 
 public class NotesHubService(IHubContext<NotesHub> hubContext, IH4Logger h4) : INotesHubService
 {
-    public async Task NotifyNoteCreated(int userId, NoteResponseDto note)
+    private IClientProxy GetTargetClients(int userId, string? senderDeviceId)
     {
-        var devices = PresenceTracker.GetUserDevices(userId);
-        h4.Info("Broadcasting NoteCreated", new { userId, noteId = note.Id, deviceId = note.DeviceId, version = note.Version, connectedDevices = devices.Count, deviceIds = string.Join(",", devices.Select(d => d.DeviceId)) });
-        await hubContext.Clients.Group($"user_{userId}").SendAsync("NoteCreated", note);
+        var group = $"user_{userId}";
+        if (senderDeviceId != null)
+        {
+            var excludeIds = PresenceTracker.GetConnectionIdsForDevice(userId, senderDeviceId);
+            if (excludeIds.Count > 0)
+            {
+                return hubContext.Clients.GroupExcept(group, excludeIds);
+            }
+        }
+        return hubContext.Clients.Group(group);
     }
 
-    public async Task NotifyNoteUpdated(int userId, NoteResponseDto note)
+    public async Task NotifyNoteCreated(int userId, NoteResponseDto note, string? senderDeviceId = null)
     {
         var devices = PresenceTracker.GetUserDevices(userId);
-        h4.Info("Broadcasting NoteUpdated", new { userId, noteId = note.Id, deviceId = note.DeviceId, version = note.Version, connectedDevices = devices.Count, deviceIds = string.Join(",", devices.Select(d => d.DeviceId)) });
-        await hubContext.Clients.Group($"user_{userId}").SendAsync("NoteUpdated", note);
+        h4.Info("Broadcasting NoteCreated", new { userId, noteId = note.Id, deviceId = note.DeviceId, version = note.Version, connectedDevices = devices.Count, excludingSender = senderDeviceId, deviceIds = string.Join(",", devices.Select(d => d.DeviceId)) });
+        await GetTargetClients(userId, senderDeviceId).SendAsync("NoteCreated", note);
     }
 
-    public async Task NotifyNoteDeleted(int userId, Guid noteId)
+    public async Task NotifyNoteUpdated(int userId, NoteResponseDto note, string? senderDeviceId = null)
     {
         var devices = PresenceTracker.GetUserDevices(userId);
-        h4.Info("Broadcasting NoteDeleted", new { userId, noteId, connectedDevices = devices.Count });
-        await hubContext.Clients.Group($"user_{userId}").SendAsync("NoteDeleted", noteId);
+        h4.Info("Broadcasting NoteUpdated", new { userId, noteId = note.Id, deviceId = note.DeviceId, version = note.Version, connectedDevices = devices.Count, excludingSender = senderDeviceId, deviceIds = string.Join(",", devices.Select(d => d.DeviceId)) });
+        await GetTargetClients(userId, senderDeviceId).SendAsync("NoteUpdated", note);
     }
 
-    public async Task NotifyNoteStatusChanged(int userId, NoteResponseDto note)
+    public async Task NotifyNoteDeleted(int userId, Guid noteId, string? senderDeviceId = null)
     {
         var devices = PresenceTracker.GetUserDevices(userId);
-        h4.Info("Broadcasting NoteStatusChanged", new { userId, noteId = note.Id, status = note.Status.ToString(), connectedDevices = devices.Count });
-        await hubContext.Clients.Group($"user_{userId}").SendAsync("NoteStatusChanged", note);
+        h4.Info("Broadcasting NoteDeleted", new { userId, noteId, connectedDevices = devices.Count, excludingSender = senderDeviceId });
+        await GetTargetClients(userId, senderDeviceId).SendAsync("NoteDeleted", noteId);
+    }
+
+    public async Task NotifyNoteStatusChanged(int userId, NoteResponseDto note, string? senderDeviceId = null)
+    {
+        var devices = PresenceTracker.GetUserDevices(userId);
+        h4.Info("Broadcasting NoteStatusChanged", new { userId, noteId = note.Id, status = note.Status.ToString(), connectedDevices = devices.Count, excludingSender = senderDeviceId });
+        await GetTargetClients(userId, senderDeviceId).SendAsync("NoteStatusChanged", note);
     }
 
     public async Task NotifyCategoryCreated(int userId, CategoryResponseDto category)

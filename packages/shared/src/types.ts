@@ -71,6 +71,7 @@ export interface UpdateNoteDto {
   content: string;
   categoryId?: string;
   deviceId?: string;
+  baseVersion?: number;
 }
 
 export interface MoveNoteDto {

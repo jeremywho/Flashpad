@@ -35,10 +35,12 @@ export type SyncStatus = 'idle' | 'syncing' | 'offline' | 'error';
 
 export interface SyncManagerOptions {
   api: ApiClient;
+  deviceId: string;
   onSyncStatusChange?: (status: SyncStatus) => void;
   onPendingCountChange?: (count: number) => void;
   onDataRefresh?: () => void;
   onAuthError?: () => void;
+  onConflict?: (noteId: string, serverVersion: number) => void;
 }
 
 export class SyncManager {
@@ -47,17 +49,21 @@ export class SyncManager {
   private syncStatus: SyncStatus = 'idle';
   private syncInProgress: boolean = false;
   private authErrorDetected: boolean = false;
+  private deviceId: string = '';
   private onSyncStatusChange?: (status: SyncStatus) => void;
   private onPendingCountChange?: (count: number) => void;
   private onDataRefresh?: () => void;
   private onAuthError?: () => void;
+  private onConflict?: (noteId: string, serverVersion: number) => void;
 
   constructor(options: SyncManagerOptions) {
     this.api = options.api;
+    this.deviceId = options.deviceId;
     this.onSyncStatusChange = options.onSyncStatusChange;
     this.onPendingCountChange = options.onPendingCountChange;
     this.onDataRefresh = options.onDataRefresh;
     this.onAuthError = options.onAuthError;
+    this.onConflict = options.onConflict;
 
     // Set up online/offline listeners
     window.addEventListener('online', this.handleOnline);
@@ -369,11 +375,25 @@ export class SyncManager {
 
     if (this.isOnline && !id.startsWith('local_')) {
       try {
-        const serverNote = await this.api.updateNote(id, data);
+        const serverNote = await this.api.updateNote(id, { ...data, baseVersion: existingNote.version });
         await saveLocalNote(serverNote, false);
         h4.info('Note update synced to server', { noteId: id, serverVersion: serverNote.version });
         return serverNote;
       } catch (error) {
+        if (error instanceof HttpError && error.status === 409) {
+          h4.warning('Note update conflict detected', { noteId: id, localVersion: existingNote.version });
+          // Fetch latest from server and update local DB
+          try {
+            const latestNote = await this.api.getNote(id);
+            await saveLocalNote(latestNote, false);
+            this.onConflict?.(id, latestNote.version);
+            return latestNote;
+          } catch {
+            // If we can't fetch, return what we have
+            this.onConflict?.(id, existingNote.version);
+            return updatedNote;
+          }
+        }
         h4.error('Note update failed on server, queued', { noteId: id, error: (error as Error).message, baseVersion: existingNote.version });
         await addToSyncQueue({
           entityType: 'note',
@@ -414,7 +434,7 @@ export class SyncManager {
 
     if (this.isOnline && !id.startsWith('local_')) {
       try {
-        await this.api.archiveNote(id);
+        await this.api.archiveNote(id, this.deviceId);
         h4.info('Note archive synced to server', { noteId: id });
       } catch (error) {
         h4.error('Note archive failed on server, queued', { noteId: id, error: (error as Error).message });
@@ -451,7 +471,7 @@ export class SyncManager {
 
     if (this.isOnline && !id.startsWith('local_')) {
       try {
-        await this.api.restoreNote(id);
+        await this.api.restoreNote(id, this.deviceId);
         h4.info('Note restore synced to server', { noteId: id });
       } catch (error) {
         h4.error('Note restore failed on server, queued', { noteId: id, error: (error as Error).message });
@@ -488,7 +508,7 @@ export class SyncManager {
 
     if (this.isOnline && !id.startsWith('local_')) {
       try {
-        await this.api.trashNote(id);
+        await this.api.trashNote(id, this.deviceId);
         h4.info('Note trash synced to server', { noteId: id });
       } catch (error) {
         h4.error('Note trash failed on server, queued', { noteId: id, error: (error as Error).message });
@@ -520,7 +540,7 @@ export class SyncManager {
 
     if (this.isOnline && !id.startsWith('local_')) {
       try {
-        await this.api.deleteNotePermanently(id);
+        await this.api.deleteNotePermanently(id, this.deviceId);
         h4.info('Note permanent delete synced to server', { noteId: id });
       } catch (error) {
         h4.error('Note permanent delete failed on server, queued', { noteId: id, error: (error as Error).message });
@@ -546,35 +566,14 @@ export class SyncManager {
     }
   }
 
-  // Category operations with offline support
+  // Get categories from local DB — no API call, just reads local data with counts
   async getCategories(): Promise<Category[]> {
     const localCategories = await getLocalCategories();
     const counts = await getCategoryCounts();
-
-    // Add note counts to categories
-    const categoriesWithCounts = localCategories.map((cat) => ({
+    return localCategories.map((cat) => ({
       ...cat,
       noteCount: counts[cat.id] || 0,
     }));
-
-    // If online, also fetch from server in background
-    if (this.isOnline) {
-      h4.debug('Categories background fetch triggered', { localCount: localCategories.length, online: true });
-      this.api.getCategories()
-        .then(async (categories) => {
-          await bulkSaveCategories(categories);
-          h4.debug('Categories background fetch complete', { serverCount: categories.length });
-        })
-        .catch((error) => {
-          if (this.isAuthError(error)) {
-            this.handleAuthError();
-            return;
-          }
-          h4.error('Categories background fetch failed', { error: (error as Error).message });
-        });
-    }
-
-    return categoriesWithCounts;
   }
 
   async createCategory(data: CreateCategoryDto): Promise<Category> {

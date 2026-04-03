@@ -42,6 +42,7 @@ export default function QuickCaptureCode() {
         // Initialize SyncManager for offline support
         const syncManager = new SyncManager({
           api,
+          deviceId: localStorage.getItem('flashpad-device-id') || 'electron-quick-capture',
           onSyncStatusChange: () => {},
           onPendingCountChange: () => {},
         });

@@ -148,16 +148,21 @@ function Home() {
 
     const syncManager = new SyncManager({
       api,
+      deviceId,
       onSyncStatusChange: setSyncStatus,
       onPendingCountChange: setPendingCount,
       onDataRefresh: () => {
         h4.debug('Data refresh triggered by sync queue completion');
-        // Refresh data after sync completes
         fetchNotes();
-        fetchCategories('onDataRefresh');
+        fetchCategories();
         fetchInboxCount();
       },
       onAuthError: logout,
+      onConflict: (noteId, serverVersion) => {
+        h4.warning('Conflict resolved — refreshed to server version', { noteId, serverVersion });
+        toast.warning('Note was modified on another device — refreshed to latest version');
+        fetchNotes();
+      },
     });
 
     syncManagerRef.current = syncManager;
@@ -165,7 +170,7 @@ function Home() {
     // Perform initial sync
     syncManager.initialSync().then(() => {
       fetchNotes();
-      fetchCategories('initialSync');
+      fetchCategories();
       fetchInboxCount();
     });
 
@@ -219,11 +224,10 @@ function Home() {
     }
   }, [selectedView, searchQuery]);
 
-  const fetchCategories = useCallback(async (caller?: string) => {
+  // Always reads from local DB — no API call. Categories are synced during
+  // initial sync and kept in sync via SignalR events and CRUD operations.
+  const fetchCategories = useCallback(async () => {
     if (!syncManagerRef.current) return;
-
-    h4.debug('fetchCategories called', { caller: caller ?? 'unknown' });
-
     try {
       const cats = await syncManagerRef.current.getCategories();
       setCategories(cats);
@@ -251,7 +255,7 @@ function Home() {
 
   useEffect(() => {
     if (syncManagerRef.current) {
-      fetchCategories('useEffect:mount');
+      fetchCategories();
       fetchInboxCount();
     }
   }, [fetchCategories, fetchInboxCount]);
@@ -259,7 +263,7 @@ function Home() {
   useEffect(() => {
     const handleRefresh = () => {
       fetchNotes();
-      fetchCategories('ipc:refreshNotes');
+      fetchCategories();
       fetchInboxCount();
     };
 
@@ -275,7 +279,7 @@ function Home() {
       // Refresh notes when files change externally
       fetchNotes();
       fetchInboxCount();
-      fetchCategories('fileWatcher');
+      fetchCategories();
 
       // Sync any newly queued notes to the server
       syncManagerRef.current?.processSyncQueue();
@@ -352,7 +356,7 @@ function Home() {
           });
         }
         fetchInboxCount();
-        fetchCategories('signalR:NoteCreated');
+        fetchCategories();
       },
       onNoteUpdated: (note) => {
         // Move updated note to top if it belongs in current view, remove if not
@@ -364,7 +368,7 @@ function Home() {
           return filtered;
         });
         setSelectedNote((prev) => (prev?.id === note.id ? note : prev));
-        fetchCategories('signalR:NoteUpdated');
+        fetchCategories();
       },
       onNoteDeleted: (noteId) => {
         setNotes((prev) => prev.filter((n) => n.id !== noteId));
@@ -376,7 +380,7 @@ function Home() {
         setNotes((prev) => prev.filter((n) => n.id !== note.id));
         setSelectedNote((prev) => (prev?.id === note.id ? null : prev));
         fetchInboxCount();
-        fetchCategories('signalR:NoteStatusChanged');
+        fetchCategories();
       },
       onCategoryCreated: (category) => {
         setCategories((prev) => [...prev, category]);
@@ -465,7 +469,7 @@ function Home() {
         setSelectedNote(newNote);
         setIsNewNote(false);
         fetchInboxCount();
-        fetchCategories('handleSave:create');
+        fetchCategories();
       } else if (selectedNote) {
         const updatedNote = await syncManagerRef.current.updateNote(selectedNote.id, {
           content,
@@ -487,7 +491,7 @@ function Home() {
           setSelectedNote(updatedNote);
         }
         fetchInboxCount();
-        fetchCategories('handleSave:update');
+        fetchCategories();
       }
     } catch (error) {
       console.error('Failed to save note:', error);
@@ -503,7 +507,7 @@ function Home() {
       await syncManagerRef.current.archiveNote(selectedNote.id);
       setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
       setSelectedNote(null);
-      fetchCategories('handleArchive');
+      fetchCategories();
       toast.success('Note archived');
     } catch (error) {
       console.error('Failed to archive note:', error);
@@ -517,7 +521,7 @@ function Home() {
       await syncManagerRef.current.restoreNote(selectedNote.id);
       setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
       setSelectedNote(null);
-      fetchCategories('handleRestore');
+      fetchCategories();
       toast.success('Note restored');
     } catch (error) {
       console.error('Failed to restore note:', error);
@@ -531,7 +535,7 @@ function Home() {
       await syncManagerRef.current.trashNote(selectedNote.id);
       setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
       setSelectedNote(null);
-      fetchCategories('handleTrash');
+      fetchCategories();
       toast.success('Note moved to trash');
     } catch (error) {
       console.error('Failed to trash note:', error);
@@ -557,7 +561,7 @@ function Home() {
     if (!syncManagerRef.current) return;
     try {
       await syncManagerRef.current.createCategory(data);
-      fetchCategories('handleCreateCategory');
+      fetchCategories();
       toast.success('Category created');
     } catch (error) {
       console.error('Failed to create category:', error);
@@ -569,7 +573,7 @@ function Home() {
     if (!syncManagerRef.current) return;
     try {
       await syncManagerRef.current.updateCategory(id, { ...data, sortOrder: undefined });
-      fetchCategories('handleUpdateCategory');
+      fetchCategories();
       toast.success('Category updated');
     } catch (error) {
       console.error('Failed to update category:', error);
@@ -584,7 +588,7 @@ function Home() {
       if (selectedView === id) {
         setSelectedView('inbox');
       }
-      fetchCategories('handleDeleteCategory');
+      fetchCategories();
       fetchNotes();
       toast.success('Category deleted');
     } catch (error) {

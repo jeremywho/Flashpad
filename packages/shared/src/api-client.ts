@@ -166,26 +166,30 @@ export class ApiClient {
     });
   }
 
-  async archiveNote(id: string): Promise<Note> {
-    return this.request<Note>(`/api/notes/${id}/archive`, {
+  async archiveNote(id: string, deviceId?: string): Promise<Note> {
+    const query = deviceId ? `?deviceId=${encodeURIComponent(deviceId)}` : '';
+    return this.request<Note>(`/api/notes/${id}/archive${query}`, {
       method: 'POST',
     });
   }
 
-  async restoreNote(id: string): Promise<Note> {
-    return this.request<Note>(`/api/notes/${id}/restore`, {
+  async restoreNote(id: string, deviceId?: string): Promise<Note> {
+    const query = deviceId ? `?deviceId=${encodeURIComponent(deviceId)}` : '';
+    return this.request<Note>(`/api/notes/${id}/restore${query}`, {
       method: 'POST',
     });
   }
 
-  async trashNote(id: string): Promise<void> {
-    await this.request<void>(`/api/notes/${id}`, {
+  async trashNote(id: string, deviceId?: string): Promise<void> {
+    const query = deviceId ? `?deviceId=${encodeURIComponent(deviceId)}` : '';
+    await this.request<void>(`/api/notes/${id}${query}`, {
       method: 'DELETE',
     });
   }
 
-  async deleteNotePermanently(id: string): Promise<void> {
-    await this.request<void>(`/api/notes/${id}/permanent`, {
+  async deleteNotePermanently(id: string, deviceId?: string): Promise<void> {
+    const query = deviceId ? `?deviceId=${encodeURIComponent(deviceId)}` : '';
+    await this.request<void>(`/api/notes/${id}/permanent${query}`, {
       method: 'DELETE',
     });
   }
