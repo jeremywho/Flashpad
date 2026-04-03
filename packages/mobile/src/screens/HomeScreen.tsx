@@ -27,6 +27,7 @@ import { SyncManager, SyncStatus } from '../services/syncManager';
 import type { Note, Category, NoteStatus } from '@flashpad/shared';
 import { SignalRClient, SignalRManager, ConnectionState, h4 } from '@flashpad/shared';
 import { getApiUrl } from '../config';
+import { AsyncStorageH4Storage } from '../services/h4-storage';
 
 interface HomeScreenProps {
   navigation: any;
@@ -250,6 +251,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
       getToken: () => api.getToken(),
       source: 'mobile',
       deviceId,
+      storage: new AsyncStorageH4Storage(),
     });
 
     const appVersion = require('../../package.json').version;

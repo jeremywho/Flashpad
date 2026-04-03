@@ -1,19 +1,34 @@
 /**
  * Client-side H4 logger.
- * Buffers log entries and sends them in batches to /api/client-logs on the backend,
- * which forwards them to the H4 observability platform.
+ * Buffers log entries in memory and flushes to /api/client-logs on the backend.
+ * On flush failure (offline), persists entries via a storage adapter so they survive app restarts.
+ * On init, loads any persisted entries and attempts to send them.
+ *
+ * Storage adapters:
+ * - IndexedDB (default, auto-detected in browser/Electron environments)
+ * - Custom: pass a storage adapter via H4ClientOptions for other environments (e.g. AsyncStorage)
  */
 
 export interface H4ClientOptions {
   baseUrl: string;
   getToken: () => string | null;
-  source: string; // 'electron' | 'web'
+  source: string; // 'electron' | 'web' | 'mobile'
   deviceId: string;
   flushIntervalMs?: number;
   bufferSize?: number;
+  /** Custom storage adapter for log persistence. Falls back to IndexedDB, then in-memory. */
+  storage?: H4LogStorage;
 }
 
-interface LogEntry {
+/** Storage adapter interface for persisting logs across app restarts. */
+export interface H4LogStorage {
+  /** Save log entries to persistent storage. */
+  save(entries: LogEntry[]): Promise<void>;
+  /** Load all persisted entries and clear them from storage. */
+  loadAndClear(): Promise<LogEntry[]>;
+}
+
+export interface LogEntry {
   level: string;
   message: string;
   source: string;
@@ -22,19 +37,135 @@ interface LogEntry {
   metadata?: Record<string, unknown>;
 }
 
+// --- Built-in IndexedDB storage adapter ---
+
+const DB_NAME = 'h4-logs';
+const STORE_NAME = 'pending';
+const DB_VERSION = 1;
+
+class IndexedDBStorage implements H4LogStorage {
+  private db: IDBDatabase | null = null;
+
+  async init(): Promise<boolean> {
+    if (typeof indexedDB === 'undefined') return false;
+
+    return new Promise((resolve) => {
+      try {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+        request.onupgradeneeded = () => {
+          const db = request.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME, { autoIncrement: true });
+          }
+        };
+
+        request.onsuccess = () => {
+          this.db = request.result;
+          resolve(true);
+        };
+
+        request.onerror = () => resolve(false);
+      } catch {
+        resolve(false);
+      }
+    });
+  }
+
+  async save(entries: LogEntry[]): Promise<void> {
+    if (!this.db || entries.length === 0) return;
+
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db!.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        for (const entry of entries) {
+          store.add(entry);
+        }
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+      } catch {
+        resolve();
+      }
+    });
+  }
+
+  async loadAndClear(): Promise<LogEntry[]> {
+    if (!this.db) return [];
+
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db!.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const getAll = store.getAll();
+
+        tx.oncomplete = () => {
+          const entries = getAll.result as LogEntry[];
+          if (entries.length > 0) {
+            const clearTx = this.db!.transaction(STORE_NAME, 'readwrite');
+            clearTx.objectStore(STORE_NAME).clear();
+          }
+          resolve(entries);
+        };
+
+        tx.onerror = () => resolve([]);
+      } catch {
+        resolve([]);
+      }
+    });
+  }
+
+  close(): void {
+    if (this.db) {
+      this.db.close();
+      this.db = null;
+    }
+  }
+}
+
+// --- H4 Client Logger ---
+
 class H4ClientLogger {
   private options: H4ClientOptions | null = null;
   private buffer: LogEntry[] = [];
   private flushTimer: ReturnType<typeof setInterval> | null = null;
   private flushing = false;
+  private storage: H4LogStorage | null = null;
+  private idbStorage: IndexedDBStorage | null = null;
 
   init(options: H4ClientOptions): void {
     this.options = options;
     const interval = options.flushIntervalMs ?? 5000;
     if (this.flushTimer) clearInterval(this.flushTimer);
     this.flushTimer = setInterval(() => this.flush(), interval);
-    // Flush any logs buffered before init
-    this.flush();
+
+    // Set up storage adapter
+    if (options.storage) {
+      // Custom storage provided (e.g. AsyncStorage adapter)
+      this.storage = options.storage;
+      this.storage.loadAndClear().then((entries) => {
+        if (entries.length > 0) {
+          this.buffer.unshift(...entries);
+        }
+        this.flush();
+      });
+    } else {
+      // Try IndexedDB (available in Electron/web, not React Native)
+      this.idbStorage = new IndexedDBStorage();
+      this.idbStorage.init().then((available) => {
+        if (available) {
+          this.storage = this.idbStorage;
+          this.storage!.loadAndClear().then((entries) => {
+            if (entries.length > 0) {
+              this.buffer.unshift(...entries);
+            }
+            this.flush();
+          });
+        } else {
+          this.flush();
+        }
+      });
+    }
   }
 
   destroy(): void {
@@ -42,7 +173,16 @@ class H4ClientLogger {
       clearInterval(this.flushTimer);
       this.flushTimer = null;
     }
-    this.flush();
+    // Persist any remaining buffered logs before shutdown
+    if (this.storage && this.buffer.length > 0) {
+      this.storage.save(this.buffer);
+    }
+    this.buffer = [];
+    if (this.idbStorage) {
+      this.idbStorage.close();
+      this.idbStorage = null;
+    }
+    this.storage = null;
   }
 
   debug(message: string, metadata?: Record<string, unknown>): void {
@@ -88,8 +228,7 @@ class H4ClientLogger {
     try {
       const token = this.options.getToken();
       if (!token) {
-        // No token, put logs back
-        this.buffer.unshift(...batch);
+        await this.persistOrBuffer(batch);
         return;
       }
 
@@ -103,23 +242,28 @@ class H4ClientLogger {
       });
 
       if (!response.ok) {
-        // Non-retryable errors (auth, bad request) - drop the logs
         if (response.status === 401 || response.status === 400) {
           console.warn(`[h4-client] Dropping ${batch.length} logs: HTTP ${response.status}`);
           return;
         }
-        // Retryable - put them back
-        this.buffer.unshift(...batch);
+        await this.persistOrBuffer(batch);
       }
     } catch {
-      // Network error - put logs back for retry
-      this.buffer.unshift(...batch);
-      // Cap buffer to prevent unbounded growth while offline
-      if (this.buffer.length > 200) {
-        this.buffer = this.buffer.slice(-200);
-      }
+      await this.persistOrBuffer(batch);
     } finally {
       this.flushing = false;
+    }
+  }
+
+  private async persistOrBuffer(entries: LogEntry[]): Promise<void> {
+    if (this.storage) {
+      await this.storage.save(entries);
+    } else {
+      // No storage available — keep in memory with cap
+      this.buffer.unshift(...entries);
+      if (this.buffer.length > 500) {
+        this.buffer = this.buffer.slice(-500);
+      }
     }
   }
 }
