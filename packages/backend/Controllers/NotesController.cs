@@ -92,6 +92,8 @@ public class NotesController : ControllerBase
             })
             .ToListAsync();
 
+        _h4.Info("Notes listed", new { userId, status = status?.ToString(), categoryId, search, page, pageSize, totalCount, returnedCount = notes.Count });
+
         return Ok(new NoteListResponseDto
         {
             Notes = notes,
@@ -112,8 +114,11 @@ public class NotesController : ControllerBase
 
         if (note == null)
         {
+            _h4.Warning("Note not found", new { userId, noteId = id });
             return NotFound(new { message = "Note not found" });
         }
+
+        _h4.Debug("Note fetched", new { userId, noteId = id, version = note.Version, deviceId = note.DeviceId });
 
         return Ok(new NoteResponseDto
         {
@@ -176,7 +181,7 @@ public class NotesController : ControllerBase
             UpdatedAt = note.UpdatedAt
         };
 
-        _h4.Info("Note created", new { userId, noteId = note.Id, deviceId = dto.DeviceId, version = note.Version, categoryId = note.CategoryId });
+        _h4.Info("Note created", new { userId, noteId = note.Id, deviceId = dto.DeviceId, version = note.Version, categoryId = note.CategoryId, preview = note.Content?[..Math.Min(note.Content?.Length ?? 0, 80)] });
         await _hubService.NotifyNoteCreated(userId, response);
 
         return CreatedAtAction(nameof(GetNote), new { id = note.Id }, response);
@@ -250,7 +255,7 @@ public class NotesController : ControllerBase
             UpdatedAt = note.UpdatedAt
         };
 
-        _h4.Info("Note updated", new { userId, noteId = note.Id, deviceId = dto.DeviceId, version = note.Version, categoryId = note.CategoryId });
+        _h4.Info("Note updated", new { userId, noteId = note.Id, deviceId = dto.DeviceId, version = note.Version, categoryId = note.CategoryId, preview = note.Content?[..Math.Min(note.Content?.Length ?? 0, 80)] });
         await _hubService.NotifyNoteUpdated(userId, response);
 
         return Ok(response);

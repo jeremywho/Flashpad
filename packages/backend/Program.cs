@@ -118,6 +118,7 @@ app.UseStaticFiles();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<Backend.Middleware.H4RequestLoggingMiddleware>();
 app.UseH4Tracing();
 
 app.MapControllers();
