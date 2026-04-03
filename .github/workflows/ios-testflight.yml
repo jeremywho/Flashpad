@@ -39,7 +39,7 @@ jobs:
 
       - name: Install CocoaPods
         working-directory: packages/mobile/ios
-        run: bundle exec pod install
+        run: pod install
 
       - name: Decode signing certificate
         working-directory: packages/mobile
@@ -67,7 +67,7 @@ jobs:
           APP_PROFILE_PATH: /tmp/app.mobileprovision
           WIDGET_PROFILE_PATH: /tmp/widget.mobileprovision
           APP_PROFILE_NAME: ${{ secrets.IOS_APP_PROFILE_NAME || 'Flashpad App Store iOS' }}
-          WIDGET_PROFILE_NAME: ${{ secrets.IOS_WIDGET_PROFILE_NAME || 'Flashpad Widget App Store' }}
+          WIDGET_PROFILE_NAME: ${{ secrets.IOS_WIDGET_PROFILE_NAME || 'Flashpad Widget App Store iOS' }}
         run: bundle exec fastlane beta
 
       - name: Commit build number bump
