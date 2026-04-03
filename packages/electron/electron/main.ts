@@ -70,6 +70,12 @@ function stopFileWatcher(): void {
 // Auto-updater configuration
 autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
+autoUpdater.logger = {
+  info: (msg: unknown) => console.log('[updater]', msg),
+  warn: (msg: unknown) => console.warn('[updater]', msg),
+  error: (msg: unknown) => console.error('[updater]', msg),
+  debug: (msg: unknown) => console.log('[updater:debug]', msg),
+};
 
 function createTray() {
   // Load the app icon for the system tray
@@ -350,15 +356,43 @@ function registerGlobalShortcut() {
 function checkForUpdates() {
   autoUpdater.checkForUpdatesAndNotify();
 
-  autoUpdater.on('update-available', () => {
-    console.log('Update available');
+  autoUpdater.on('checking-for-update', () => {
+    console.log('[updater] Checking for update...');
   });
 
-  autoUpdater.on('update-downloaded', () => {
-    console.log('Update downloaded');
+  autoUpdater.on('update-available', (info) => {
+    console.log('[updater] Update available:', info.version);
+  });
+
+  autoUpdater.on('update-not-available', (info) => {
+    console.log('[updater] No update available. Current version is up to date:', info.version);
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    console.log(`[updater] Download progress: ${Math.round(progress.percent)}%`);
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('[updater] Error:', err.message);
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log('[updater] Update downloaded:', info.version);
     if (mainWindow) {
       mainWindow.webContents.send('update-downloaded');
     }
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'Update Ready',
+      message: `Version ${info.version} has been downloaded.`,
+      detail: 'Restart now to apply the update?',
+      buttons: ['Restart', 'Later'],
+      defaultId: 0,
+    }).then(({ response }) => {
+      if (response === 0) {
+        autoUpdater.quitAndInstall();
+      }
+    });
   });
 }
 
@@ -394,6 +428,10 @@ ipcMain.handle('get-app-version', () => {
 
 ipcMain.handle('check-for-updates', () => {
   autoUpdater.checkForUpdatesAndNotify();
+});
+
+ipcMain.handle('install-update', () => {
+  autoUpdater.quitAndInstall();
 });
 
 // Quick capture IPC handlers
