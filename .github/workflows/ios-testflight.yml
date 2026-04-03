@@ -1,0 +1,82 @@
+name: iOS TestFlight Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'ios-v*.*.*'
+
+jobs:
+  deploy:
+    runs-on: macos-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: packages/mobile
+
+      - name: Install all dependencies
+        run: npm ci
+
+      - name: Build shared package
+        working-directory: packages/shared
+        run: npm run build
+
+      - name: Install CocoaPods
+        working-directory: packages/mobile/ios
+        run: bundle exec pod install
+
+      - name: Decode signing certificate
+        working-directory: packages/mobile
+        env:
+          IOS_CERTIFICATE_P12: ${{ secrets.IOS_CERTIFICATE_P12 }}
+        run: |
+          echo "$IOS_CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
+
+      - name: Decode provisioning profiles
+        env:
+          IOS_PROVISIONING_PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+          IOS_WIDGET_PROVISIONING_PROFILE: ${{ secrets.IOS_WIDGET_PROVISIONING_PROFILE }}
+        run: |
+          echo "$IOS_PROVISIONING_PROFILE" | base64 --decode > /tmp/app.mobileprovision
+          echo "$IOS_WIDGET_PROVISIONING_PROFILE" | base64 --decode > /tmp/widget.mobileprovision
+
+      - name: Deploy to TestFlight
+        working-directory: packages/mobile
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          CERTIFICATE_PATH: /tmp/certificate.p12
+          APP_PROFILE_PATH: /tmp/app.mobileprovision
+          WIDGET_PROFILE_PATH: /tmp/widget.mobileprovision
+          APP_PROFILE_NAME: ${{ secrets.IOS_APP_PROFILE_NAME || 'Flashpad App Store iOS' }}
+          WIDGET_PROFILE_NAME: ${{ secrets.IOS_WIDGET_PROFILE_NAME || 'Flashpad Widget App Store' }}
+        run: bundle exec fastlane beta
+
+      - name: Commit build number bump
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add packages/mobile/ios/mobile.xcodeproj/project.pbxproj
+          git commit -m "chore: bump iOS build number [skip ci]" || echo "No changes to commit"
+          git push origin HEAD:master

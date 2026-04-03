@@ -1,0 +1,91 @@
+# Fastfile for Flashpad iOS
+
+default_platform(:ios)
+
+platform :ios do
+
+  desc "Deploy a new beta build to TestFlight"
+  lane :beta do
+    setup_ci if ENV['CI']
+
+    # Install signing certificate and provisioning profiles
+    install_signing if ENV['CI']
+
+    # Increment build number
+    increment_build_number(
+      xcodeproj: "./ios/mobile.xcodeproj"
+    )
+
+    build_number = get_build_number(xcodeproj: "./ios/mobile.xcodeproj")
+    version_number = get_version_number(
+      xcodeproj: "./ios/mobile.xcodeproj",
+      target: "mobile"
+    )
+
+    # Build the app
+    build_app(
+      workspace: "./ios/mobile.xcworkspace",
+      scheme: "mobile-release",
+      export_method: "app-store",
+      export_options: {
+        provisioningProfiles: {
+          "cc.flashpad.mobile" => ENV['APP_PROFILE_NAME'] || "Flashpad App Store iOS",
+          "cc.flashpad.mobile.widget" => ENV['WIDGET_PROFILE_NAME'] || "Flashpad Widget App Store"
+        }
+      }
+    )
+
+    # Upload to TestFlight
+    upload_to_testflight(
+      apple_id: ENV['APPLE_ID'],
+      skip_waiting_for_build_processing: true,
+      distribute_external: false,
+      notify_external_testers: false,
+      changelog: "Build #{version_number} (#{build_number})"
+    )
+  end
+
+  desc "Build the app without uploading"
+  lane :build_only do
+    setup_ci if ENV['CI']
+    install_signing if ENV['CI']
+
+    build_app(
+      workspace: "./ios/mobile.xcworkspace",
+      scheme: "mobile-release",
+      export_method: "app-store",
+      export_options: {
+        provisioningProfiles: {
+          "cc.flashpad.mobile" => ENV['APP_PROFILE_NAME'] || "Flashpad App Store iOS",
+          "cc.flashpad.mobile.widget" => ENV['WIDGET_PROFILE_NAME'] || "Flashpad Widget App Store"
+        }
+      }
+    )
+  end
+
+  desc "Bump build number"
+  lane :bump do
+    increment_build_number(xcodeproj: "./ios/mobile.xcodeproj")
+    build_number = get_build_number(xcodeproj: "./ios/mobile.xcodeproj")
+    version_number = get_version_number(
+      xcodeproj: "./ios/mobile.xcodeproj",
+      target: "mobile"
+    )
+    puts "Bumped to version #{version_number} (#{build_number})"
+  end
+
+  private_lane :install_signing do
+    # Install the distribution certificate from base64 env var
+    import_certificate(
+      certificate_path: ENV['CERTIFICATE_PATH'],
+      certificate_password: ENV['IOS_CERTIFICATE_PASSWORD'],
+      keychain_name: ENV['MATCH_KEYCHAIN_NAME'] || "fastlane_tmp_keychain",
+      keychain_password: ""
+    )
+
+    # Install provisioning profiles
+    install_provisioning_profile(path: ENV['APP_PROFILE_PATH'])
+    install_provisioning_profile(path: ENV['WIDGET_PROFILE_PATH'])
+  end
+
+end
