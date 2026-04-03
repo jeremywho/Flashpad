@@ -12,6 +12,7 @@ import {
   Modal,
   Pressable,
   Alert,
+  Platform,
 } from 'react-native';
 import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 import Reanimated, {
@@ -24,7 +25,7 @@ import { colors } from '../theme/colors';
 import { fonts } from '../theme/fonts';
 import { SyncManager, SyncStatus } from '../services/syncManager';
 import type { Note, Category, NoteStatus } from '@flashpad/shared';
-import { SignalRClient, SignalRManager, ConnectionState } from '@flashpad/shared';
+import { SignalRClient, SignalRManager, ConnectionState, h4 } from '@flashpad/shared';
 import { getApiUrl } from '../config';
 
 interface HomeScreenProps {
@@ -237,8 +238,29 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     fetchNotesRef.current = fetchNotes;
   }, [fetchNotes]);
 
-  // Initialize SyncManager
+  // Initialize H4 logging and SyncManager
   useEffect(() => {
+    const apiUrl = getApiUrl();
+
+    // Generate a stable device ID
+    const deviceId = `mobile-${Platform.OS}`;
+
+    h4.init({
+      baseUrl: apiUrl,
+      getToken: () => api.getToken(),
+      source: 'mobile',
+      deviceId,
+    });
+
+    const appVersion = require('../../package.json').version;
+    h4.info('App initializing', {
+      deviceId,
+      apiUrl,
+      platform: Platform.OS,
+      osVersion: Platform.Version,
+      appVersion,
+    });
+
     const syncManager = new SyncManager({
       api,
       onSyncStatusChange: setSyncStatus,
@@ -261,6 +283,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     return () => {
       syncManager.destroy();
       syncManagerRef.current = null;
+      h4.destroy();
     };
   }, [api, fetchCategories]);
 

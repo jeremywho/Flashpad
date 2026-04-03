@@ -144,7 +144,16 @@ function Home() {
       bufferSize: 20,
     });
 
-    h4.info('App initializing', { deviceId, apiUrl: API_URL, online: navigator.onLine });
+    window.electron.app.getVersion().then((appVersion) => {
+      h4.info('App initializing', {
+        deviceId,
+        apiUrl: API_URL,
+        online: navigator.onLine,
+        appVersion,
+        platform: navigator.platform,
+        userAgent: navigator.userAgent,
+      });
+    });
 
     const syncManager = new SyncManager({
       api,
