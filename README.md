@@ -221,6 +221,62 @@ npm run build:mobile:android
 npm run build:mobile:ios
 ```
 
+## Observability (H4)
+
+Flashpad's backend is instrumented with [H4](https://github.com/jeremywho/H4), our self-hosted observability platform. Logs, traces, and SignalR events are shipped to H4 for debugging sync issues and monitoring production behavior.
+
+**Dashboard:** https://h4.gg
+
+### What's Logged
+
+| Category | Events | Key Metadata |
+|----------|--------|-------------|
+| **HTTP requests** | Every API call (GET, POST, PUT, DELETE) | method, path, statusCode, durationMs, userId, query params |
+| **Note operations** | Create, update, archive, restore, trash | userId, noteId, deviceId, version, categoryId, content preview |
+| **Note queries** | List and fetch operations | userId, filters, totalCount, returnedCount |
+| **SignalR lifecycle** | Connect, disconnect, device register | userId, connectionId, deviceId, deviceName, totalDevices |
+| **SignalR broadcasts** | NoteCreated, NoteUpdated, NoteDeleted, NoteStatusChanged | userId, noteId, version, connectedDevices count, all connected deviceIds |
+| **Request tracing** | Auto-trace per HTTP request with span timing | method, path, statusCode, durationMs |
+
+### Debugging Sync Issues
+
+When notes aren't syncing between clients, check H4 for:
+
+1. **Are both clients connected?** Filter for `SignalR connected` — each client should show a connection with its deviceId
+2. **Did the device register?** Look for `Device registered` with `totalDevices=2` (or however many clients are open). If you see `SignalR disconnected (no device registration)`, a client connected but never registered — it won't appear in presence tracking
+3. **Was the broadcast sent?** After a note create/update, look for `Broadcasting NoteCreated/Updated` — the `connectedDevices` count tells you how many clients were in the SignalR group at broadcast time, and `deviceIds` lists exactly which ones
+4. **Did the API call succeed?** Check for the HTTP request log (`POST /api/notes → 201`) with the userId and response timing
+5. **Is there a disconnect pattern?** Look for `SignalR disconnected` entries — frequent disconnects with reconnects suggest network instability
+
+### Configuration
+
+The H4 SDK is configured in `packages/backend/appsettings.json` (dev) and `appsettings.Production.json` (prod):
+
+```json
+{
+  "H4": {
+    "Endpoint": "https://h4.gg",
+    "ApiKey": "<project-api-key>"
+  }
+}
+```
+
+The integration is in three places:
+- `Program.cs` — `AddH4()` service registration + `UseH4Tracing()` and `H4RequestLoggingMiddleware` in the middleware pipeline
+- `Controllers/NotesController.cs` — explicit logging on note CRUD operations via `IH4Logger`
+- `Hubs/NotesHub.cs` — SignalR lifecycle and broadcast logging via `IH4Logger`
+
+### Deploying Backend with H4
+
+```bash
+cd packages/backend
+dotnet publish -c Release -o publish
+scp -r publish/* jeremy@flashpad.cc:/var/www/flashpad/api/
+ssh jeremy@flashpad.cc "sudo systemctl restart flashpad-api"
+```
+
+Make sure `appsettings.Production.json` on the server has the `H4` section with the API key.
+
 ## Roadmap
 
 See [FLASHPAD-PLAN.md](FLASHPAD-PLAN.md) for the detailed implementation plan.
