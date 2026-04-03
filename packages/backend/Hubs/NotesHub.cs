@@ -84,7 +84,8 @@ public class NotesHub(IH4Logger h4) : Hub
     {
         var userId = GetCurrentUserId();
         await Groups.AddToGroupAsync(Context.ConnectionId, $"user_{userId}");
-        h4.Info("SignalR connected", new { userId, connectionId = Context.ConnectionId });
+        var existingDevices = PresenceTracker.GetUserDevices(userId);
+        h4.Info("SignalR connected", new { userId, connectionId = Context.ConnectionId, existingDeviceCount = existingDevices.Count, existingDeviceIds = string.Join(",", existingDevices.Select(d => d.DeviceId)) });
         await base.OnConnectedAsync();
     }
 
@@ -176,6 +177,8 @@ public class NotesHub(IH4Logger h4) : Hub
     {
         var userId = GetCurrentUserId();
         PresenceTracker.UpdateLastSeen(userId, Context.ConnectionId);
+        var devices = PresenceTracker.GetUserDevices(userId);
+        h4.Debug("Heartbeat", new { userId, connectionId = Context.ConnectionId, totalDevices = devices.Count, deviceIds = string.Join(",", devices.Select(d => d.DeviceId)) });
     }
 }
 

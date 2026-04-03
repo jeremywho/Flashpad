@@ -2,6 +2,7 @@ using Backend.Data;
 using Backend.DTOs;
 using Backend.Hubs;
 using Backend.Models;
+using H4.Sdk;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,11 +17,13 @@ public class CategoriesController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly INotesHubService _hubService;
+    private readonly IH4Logger _h4;
 
-    public CategoriesController(AppDbContext context, INotesHubService hubService)
+    public CategoriesController(AppDbContext context, INotesHubService hubService, IH4Logger h4)
     {
         _context = context;
         _hubService = hubService;
+        _h4 = h4;
     }
 
     private int GetCurrentUserId()
@@ -54,6 +57,8 @@ public class CategoriesController : ControllerBase
             })
             .ToListAsync();
 
+        _h4.Info("Categories listed", new { userId, count = categories.Count });
+
         return Ok(categories);
     }
 
@@ -79,8 +84,11 @@ public class CategoriesController : ControllerBase
 
         if (category == null)
         {
+            _h4.Warning("Category not found", new { userId, categoryId = id });
             return NotFound(new { message = "Category not found" });
         }
+
+        _h4.Debug("Category fetched", new { userId, categoryId = id, name = category.Name, noteCount = category.NoteCount });
 
         return Ok(category);
     }
@@ -128,6 +136,7 @@ public class CategoriesController : ControllerBase
             UpdatedAt = category.UpdatedAt
         };
 
+        _h4.Info("Category created", new { userId, categoryId = category.Id, name = category.Name, color = category.Color, sortOrder = category.SortOrder });
         await _hubService.NotifyCategoryCreated(userId, response);
 
         return CreatedAtAction(nameof(GetCategory), new { id = category.Id }, response);
@@ -180,6 +189,7 @@ public class CategoriesController : ControllerBase
             UpdatedAt = category.UpdatedAt
         };
 
+        _h4.Info("Category updated", new { userId, categoryId = category.Id, name = category.Name, color = category.Color, noteCount });
         await _hubService.NotifyCategoryUpdated(userId, response);
 
         return Ok(response);
@@ -202,6 +212,7 @@ public class CategoriesController : ControllerBase
         _context.Categories.Remove(category);
         await _context.SaveChangesAsync();
 
+        _h4.Info("Category deleted", new { userId, categoryId = id, name = category.Name });
         await _hubService.NotifyCategoryDeleted(userId, id);
 
         return NoContent();
@@ -245,6 +256,8 @@ public class CategoriesController : ControllerBase
                 UpdatedAt = c.UpdatedAt
             })
             .ToListAsync();
+
+        _h4.Info("Categories reordered", new { userId, count = result.Count });
 
         return Ok(result);
     }

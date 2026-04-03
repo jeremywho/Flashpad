@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../AuthContext';
-import { Note, Category, NoteStatus, CreateCategoryDto, SignalRClient, SignalRManager, ConnectionState, DevicePresence } from '@shared/index';
+import { Note, Category, NoteStatus, CreateCategoryDto, SignalRClient, SignalRManager, ConnectionState, DevicePresence, h4 } from '@shared/index';
 import Sidebar from '../components/Sidebar';
 import NotesList from '../components/NotesList';
 import NoteEditor from '../components/NoteEditor';
@@ -126,16 +126,35 @@ function Home() {
     fetchPendingNoteIds();
   }, [pendingCount, fetchPendingNoteIds]);
 
-  // Initialize SyncManager
+  // Initialize H4 client-side logger and SyncManager
   useEffect(() => {
+    // Generate a stable device ID (persisted in localStorage)
+    let deviceId = localStorage.getItem('flashpad-device-id');
+    if (!deviceId) {
+      deviceId = `electron-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem('flashpad-device-id', deviceId);
+    }
+
+    h4.init({
+      baseUrl: API_URL,
+      getToken: () => api.getToken(),
+      source: 'electron',
+      deviceId,
+      flushIntervalMs: 5000,
+      bufferSize: 20,
+    });
+
+    h4.info('App initializing', { deviceId, apiUrl: API_URL, online: navigator.onLine });
+
     const syncManager = new SyncManager({
       api,
       onSyncStatusChange: setSyncStatus,
       onPendingCountChange: setPendingCount,
       onDataRefresh: () => {
+        h4.debug('Data refresh triggered by sync queue completion');
         // Refresh data after sync completes
         fetchNotes();
-        fetchCategories();
+        fetchCategories('onDataRefresh');
         fetchInboxCount();
       },
       onAuthError: logout,
@@ -146,13 +165,14 @@ function Home() {
     // Perform initial sync
     syncManager.initialSync().then(() => {
       fetchNotes();
-      fetchCategories();
+      fetchCategories('initialSync');
       fetchInboxCount();
     });
 
     return () => {
       syncManager.destroy();
       syncManagerRef.current = null;
+      h4.destroy();
     };
   }, [api, logout]);
 
@@ -199,8 +219,10 @@ function Home() {
     }
   }, [selectedView, searchQuery]);
 
-  const fetchCategories = useCallback(async () => {
+  const fetchCategories = useCallback(async (caller?: string) => {
     if (!syncManagerRef.current) return;
+
+    h4.debug('fetchCategories called', { caller: caller ?? 'unknown' });
 
     try {
       const cats = await syncManagerRef.current.getCategories();
@@ -229,7 +251,7 @@ function Home() {
 
   useEffect(() => {
     if (syncManagerRef.current) {
-      fetchCategories();
+      fetchCategories('useEffect:mount');
       fetchInboxCount();
     }
   }, [fetchCategories, fetchInboxCount]);
@@ -237,7 +259,7 @@ function Home() {
   useEffect(() => {
     const handleRefresh = () => {
       fetchNotes();
-      fetchCategories();
+      fetchCategories('ipc:refreshNotes');
       fetchInboxCount();
     };
 
@@ -253,7 +275,7 @@ function Home() {
       // Refresh notes when files change externally
       fetchNotes();
       fetchInboxCount();
-      fetchCategories();
+      fetchCategories('fileWatcher');
 
       // Sync any newly queued notes to the server
       syncManagerRef.current?.processSyncQueue();
@@ -330,7 +352,7 @@ function Home() {
           });
         }
         fetchInboxCount();
-        fetchCategories();
+        fetchCategories('signalR:NoteCreated');
       },
       onNoteUpdated: (note) => {
         // Move updated note to top if it belongs in current view, remove if not
@@ -342,7 +364,7 @@ function Home() {
           return filtered;
         });
         setSelectedNote((prev) => (prev?.id === note.id ? note : prev));
-        fetchCategories();
+        fetchCategories('signalR:NoteUpdated');
       },
       onNoteDeleted: (noteId) => {
         setNotes((prev) => prev.filter((n) => n.id !== noteId));
@@ -354,7 +376,7 @@ function Home() {
         setNotes((prev) => prev.filter((n) => n.id !== note.id));
         setSelectedNote((prev) => (prev?.id === note.id ? null : prev));
         fetchInboxCount();
-        fetchCategories();
+        fetchCategories('signalR:NoteStatusChanged');
       },
       onCategoryCreated: (category) => {
         setCategories((prev) => [...prev, category]);
@@ -443,7 +465,7 @@ function Home() {
         setSelectedNote(newNote);
         setIsNewNote(false);
         fetchInboxCount();
-        fetchCategories();
+        fetchCategories('handleSave:create');
       } else if (selectedNote) {
         const updatedNote = await syncManagerRef.current.updateNote(selectedNote.id, {
           content,
@@ -465,7 +487,7 @@ function Home() {
           setSelectedNote(updatedNote);
         }
         fetchInboxCount();
-        fetchCategories();
+        fetchCategories('handleSave:update');
       }
     } catch (error) {
       console.error('Failed to save note:', error);
@@ -481,7 +503,7 @@ function Home() {
       await syncManagerRef.current.archiveNote(selectedNote.id);
       setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
       setSelectedNote(null);
-      fetchCategories();
+      fetchCategories('handleArchive');
       toast.success('Note archived');
     } catch (error) {
       console.error('Failed to archive note:', error);
@@ -495,7 +517,7 @@ function Home() {
       await syncManagerRef.current.restoreNote(selectedNote.id);
       setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
       setSelectedNote(null);
-      fetchCategories();
+      fetchCategories('handleRestore');
       toast.success('Note restored');
     } catch (error) {
       console.error('Failed to restore note:', error);
@@ -509,7 +531,7 @@ function Home() {
       await syncManagerRef.current.trashNote(selectedNote.id);
       setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
       setSelectedNote(null);
-      fetchCategories();
+      fetchCategories('handleTrash');
       toast.success('Note moved to trash');
     } catch (error) {
       console.error('Failed to trash note:', error);
@@ -535,7 +557,7 @@ function Home() {
     if (!syncManagerRef.current) return;
     try {
       await syncManagerRef.current.createCategory(data);
-      fetchCategories();
+      fetchCategories('handleCreateCategory');
       toast.success('Category created');
     } catch (error) {
       console.error('Failed to create category:', error);
@@ -547,7 +569,7 @@ function Home() {
     if (!syncManagerRef.current) return;
     try {
       await syncManagerRef.current.updateCategory(id, { ...data, sortOrder: undefined });
-      fetchCategories();
+      fetchCategories('handleUpdateCategory');
       toast.success('Category updated');
     } catch (error) {
       console.error('Failed to update category:', error);
@@ -562,7 +584,7 @@ function Home() {
       if (selectedView === id) {
         setSelectedView('inbox');
       }
-      fetchCategories();
+      fetchCategories('handleDeleteCategory');
       fetchNotes();
       toast.success('Category deleted');
     } catch (error) {

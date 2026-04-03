@@ -72,45 +72,17 @@ autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
 
 function createTray() {
-  // Create a tray icon with the app's accent color (indigo)
-  const size = 16;
-  const bytesPerPixel = 4; // RGBA
-  const buffer = Buffer.alloc(size * size * bytesPerPixel);
+  // Load the app icon for the system tray
+  const iconPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'icon.png')
+    : path.join(__dirname, '..', 'resources', 'icon.png');
 
-  // Create a rounded square with Flashpad's indigo color (#6366f1)
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const i = (y * size + x) * bytesPerPixel;
+  let icon = nativeImage.createFromPath(iconPath);
 
-      // Create rounded corners effect
-      const cornerRadius = 3;
-      const isCorner = (
-        (x < cornerRadius && y < cornerRadius && (cornerRadius - x) + (cornerRadius - y) > cornerRadius) ||
-        (x >= size - cornerRadius && y < cornerRadius && (x - (size - cornerRadius - 1)) + (cornerRadius - y) > cornerRadius) ||
-        (x < cornerRadius && y >= size - cornerRadius && (cornerRadius - x) + (y - (size - cornerRadius - 1)) > cornerRadius) ||
-        (x >= size - cornerRadius && y >= size - cornerRadius && (x - (size - cornerRadius - 1)) + (y - (size - cornerRadius - 1)) > cornerRadius)
-      );
+  // Resize for tray: 16x16 on Windows/Linux, 18x18 on macOS (rendered at 2x for Retina)
+  const traySize = process.platform === 'darwin' ? 18 : 16;
+  icon = icon.resize({ width: traySize, height: traySize });
 
-      if (isCorner) {
-        // Transparent corner
-        buffer[i] = 0;
-        buffer[i + 1] = 0;
-        buffer[i + 2] = 0;
-        buffer[i + 3] = 0;
-      } else {
-        // Indigo color (#6366f1)
-        buffer[i] = 99;   // R
-        buffer[i + 1] = 102; // G
-        buffer[i + 2] = 241; // B
-        buffer[i + 3] = 255; // A
-      }
-    }
-  }
-
-  const icon = nativeImage.createFromBitmap(buffer, {
-    width: size,
-    height: size,
-  });
   tray = new Tray(icon);
 
   const version = app.getVersion();

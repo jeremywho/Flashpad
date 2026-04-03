@@ -8,6 +8,7 @@ import {
   UpdateCategoryDto,
   ApiClient,
   HttpError,
+  h4,
 } from '@shared/index';
 import {
   getLocalNotes,
@@ -72,6 +73,7 @@ export class SyncManager {
   }
 
   private handleOnline = async (): Promise<void> => {
+    h4.info('Network status: online', { previousStatus: this.syncStatus });
     this.isOnline = true;
     this.updateSyncStatus('idle');
     // Process any pending operations
@@ -79,6 +81,7 @@ export class SyncManager {
   };
 
   private handleOffline = (): void => {
+    h4.warning('Network status: offline', { previousStatus: this.syncStatus });
     this.isOnline = false;
     this.updateSyncStatus('offline');
   };
@@ -115,12 +118,13 @@ export class SyncManager {
   // Initial data sync - fetch from server and populate local DB
   async initialSync(): Promise<void> {
     if (!this.isOnline) {
-      console.log('Offline - skipping initial sync');
+      h4.warning('Initial sync skipped: offline');
       return;
     }
 
     try {
       this.updateSyncStatus('syncing');
+      h4.info('Initial sync starting');
 
       // Fetch all notes and categories from server
       const [notesResponse, categories] = await Promise.all([
@@ -132,13 +136,25 @@ export class SyncManager {
       await bulkSaveNotes(notesResponse.notes);
       await bulkSaveCategories(categories);
 
+      const pendingCount = await getSyncQueueCount();
+      h4.info('Initial sync complete', {
+        serverNoteCount: notesResponse.notes.length,
+        serverTotalCount: notesResponse.totalCount,
+        categoryCount: categories.length,
+        pendingQueueSize: pendingCount,
+        notesByStatus: {
+          inbox: notesResponse.notes.filter(n => n.status === NoteStatus.Inbox).length,
+          archived: notesResponse.notes.filter(n => n.status === NoteStatus.Archived).length,
+          trash: notesResponse.notes.filter(n => n.status === NoteStatus.Trash).length,
+        },
+      });
+
       this.updateSyncStatus('idle');
-      console.log('Initial sync complete');
 
       // Process any pending outbound changes (e.g. externally created notes)
       await this.processSyncQueue();
     } catch (error) {
-      console.error('Initial sync failed:', error);
+      h4.error('Initial sync failed', { error: (error as Error).message });
       if (this.isAuthError(error)) {
         this.handleAuthError();
         return;
@@ -156,6 +172,12 @@ export class SyncManager {
 
     try {
       const queue = await getSyncQueue();
+      if (queue.length > 0) {
+        h4.info('Processing sync queue', {
+          queueSize: queue.length,
+          operations: queue.map(i => `${i.operation}:${i.entityType}:${i.entityId}`).join(', '),
+        });
+      }
 
       for (const item of queue) {
         try {
@@ -216,20 +238,22 @@ export class SyncManager {
           }
 
           // Remove from queue on success
+          h4.info('Sync queue item completed', { itemId: item.id, operation: item.operation, entityType: item.entityType, entityId: item.entityId });
           await removeSyncQueueItem(item.id);
           await this.updatePendingCount();
         } catch (error) {
           if (this.isAuthError(error)) {
+            h4.error('Sync queue auth error, pausing', { itemId: item.id });
             // Leave items in queue so they sync after re-login
             this.handleAuthError();
             return;
           }
-          console.error(`Failed to sync item ${item.id}:`, error);
+          h4.error('Sync queue item failed', { itemId: item.id, operation: item.operation, entityType: item.entityType, entityId: item.entityId, error: (error as Error).message, retryCount: item.retryCount });
           await updateSyncQueueItemError(item.id, (error as Error).message);
 
           // If we've retried too many times, skip this item
           if (item.retryCount >= 3) {
-            console.warn(`Giving up on sync item ${item.id} after 3 retries`);
+            h4.error('Sync queue item abandoned after 3 retries', { itemId: item.id, operation: item.operation, entityType: item.entityType, entityId: item.entityId });
             await removeSyncQueueItem(item.id);
           }
         }
@@ -238,7 +262,7 @@ export class SyncManager {
       this.updateSyncStatus('idle');
       this.onDataRefresh?.();
     } catch (error) {
-      console.error('Sync queue processing failed:', error);
+      h4.error('Sync queue processing failed', { error: (error as Error).message });
       this.updateSyncStatus('error');
     } finally {
       this.syncInProgress = false;
@@ -255,13 +279,14 @@ export class SyncManager {
       this.api.getNotes({ ...params, pageSize: 1000 })
         .then(async (response) => {
           await bulkSaveNotes(response.notes);
+          h4.debug('Background notes refresh', { status: params.status, categoryId: params.categoryId, localCount: localNotes.length, serverCount: response.notes.length, serverTotal: response.totalCount });
         })
         .catch((error) => {
           if (this.isAuthError(error)) {
             this.handleAuthError();
             return;
           }
-          console.error(error);
+          h4.error('Background notes refresh failed', { error: (error as Error).message });
         });
     }
 
@@ -285,6 +310,7 @@ export class SyncManager {
 
     // Save locally first
     await saveLocalNote(localNote, true);
+    h4.info('Note created locally', { tempId, categoryId: data.categoryId, deviceId: data.deviceId, online: this.isOnline });
 
     if (this.isOnline) {
       try {
@@ -293,9 +319,10 @@ export class SyncManager {
         // Update local with server data
         await deleteLocalNote(tempId);
         await saveLocalNote(serverNote, false);
+        h4.info('Note synced to server', { tempId, serverId: serverNote.id, version: serverNote.version });
         return serverNote;
       } catch (error) {
-        console.error('Failed to create note on server, queuing:', error);
+        h4.error('Note create failed on server, queued', { tempId, error: (error as Error).message });
         await addToSyncQueue({
           entityType: 'note',
           entityId: tempId,
@@ -308,7 +335,7 @@ export class SyncManager {
         return localNote;
       }
     } else {
-      // Queue for later sync
+      h4.info('Note queued for sync (offline)', { tempId });
       await addToSyncQueue({
         entityType: 'note',
         entityId: tempId,
@@ -324,6 +351,7 @@ export class SyncManager {
   async updateNote(id: string, data: UpdateNoteDto): Promise<Note> {
     const existingNote = await getLocalNote(id);
     if (!existingNote) {
+      h4.error('Note update failed: not found locally', { noteId: id });
       throw new Error('Note not found');
     }
 
@@ -337,14 +365,16 @@ export class SyncManager {
 
     // Save locally first
     await saveLocalNote(updatedNote, existingNote.id.startsWith('local_'));
+    h4.info('Note updated locally', { noteId: id, localVersion: updatedNote.version, previousVersion: existingNote.version, categoryId: data.categoryId, online: this.isOnline });
 
     if (this.isOnline && !id.startsWith('local_')) {
       try {
         const serverNote = await this.api.updateNote(id, data);
         await saveLocalNote(serverNote, false);
+        h4.info('Note update synced to server', { noteId: id, serverVersion: serverNote.version });
         return serverNote;
       } catch (error) {
-        console.error('Failed to update note on server, queuing:', error);
+        h4.error('Note update failed on server, queued', { noteId: id, error: (error as Error).message, baseVersion: existingNote.version });
         await addToSyncQueue({
           entityType: 'note',
           entityId: id,
@@ -359,6 +389,7 @@ export class SyncManager {
     } else {
       // Queue for later sync (only if not a local-only note)
       if (!id.startsWith('local_')) {
+        h4.info('Note update queued for sync', { noteId: id, offline: !this.isOnline });
         await addToSyncQueue({
           entityType: 'note',
           entityId: id,
@@ -379,12 +410,14 @@ export class SyncManager {
       note.updatedAt = new Date().toISOString();
       await saveLocalNote(note, id.startsWith('local_'));
     }
+    h4.info('Note archived locally', { noteId: id, online: this.isOnline });
 
     if (this.isOnline && !id.startsWith('local_')) {
       try {
         await this.api.archiveNote(id);
+        h4.info('Note archive synced to server', { noteId: id });
       } catch (error) {
-        console.error('Failed to archive note on server, queuing:', error);
+        h4.error('Note archive failed on server, queued', { noteId: id, error: (error as Error).message });
         await addToSyncQueue({
           entityType: 'note',
           entityId: id,
@@ -414,12 +447,14 @@ export class SyncManager {
       note.updatedAt = new Date().toISOString();
       await saveLocalNote(note, id.startsWith('local_'));
     }
+    h4.info('Note restored locally', { noteId: id, online: this.isOnline });
 
     if (this.isOnline && !id.startsWith('local_')) {
       try {
         await this.api.restoreNote(id);
+        h4.info('Note restore synced to server', { noteId: id });
       } catch (error) {
-        console.error('Failed to restore note on server, queuing:', error);
+        h4.error('Note restore failed on server, queued', { noteId: id, error: (error as Error).message });
         await addToSyncQueue({
           entityType: 'note',
           entityId: id,
@@ -449,12 +484,14 @@ export class SyncManager {
       note.updatedAt = new Date().toISOString();
       await saveLocalNote(note, id.startsWith('local_'));
     }
+    h4.info('Note trashed locally', { noteId: id, online: this.isOnline });
 
     if (this.isOnline && !id.startsWith('local_')) {
       try {
         await this.api.trashNote(id);
+        h4.info('Note trash synced to server', { noteId: id });
       } catch (error) {
-        console.error('Failed to trash note on server, queuing:', error);
+        h4.error('Note trash failed on server, queued', { noteId: id, error: (error as Error).message });
         await addToSyncQueue({
           entityType: 'note',
           entityId: id,
@@ -479,12 +516,14 @@ export class SyncManager {
 
   async deleteNotePermanently(id: string): Promise<void> {
     await deleteLocalNote(id);
+    h4.info('Note permanently deleted locally', { noteId: id, online: this.isOnline });
 
     if (this.isOnline && !id.startsWith('local_')) {
       try {
         await this.api.deleteNotePermanently(id);
+        h4.info('Note permanent delete synced to server', { noteId: id });
       } catch (error) {
-        console.error('Failed to delete note on server, queuing:', error);
+        h4.error('Note permanent delete failed on server, queued', { noteId: id, error: (error as Error).message });
         await addToSyncQueue({
           entityType: 'note',
           entityId: id,
@@ -520,16 +559,18 @@ export class SyncManager {
 
     // If online, also fetch from server in background
     if (this.isOnline) {
+      h4.debug('Categories background fetch triggered', { localCount: localCategories.length, online: true });
       this.api.getCategories()
         .then(async (categories) => {
           await bulkSaveCategories(categories);
+          h4.debug('Categories background fetch complete', { serverCount: categories.length });
         })
         .catch((error) => {
           if (this.isAuthError(error)) {
             this.handleAuthError();
             return;
           }
-          console.error(error);
+          h4.error('Categories background fetch failed', { error: (error as Error).message });
         });
     }
 

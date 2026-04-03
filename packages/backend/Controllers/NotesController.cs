@@ -381,6 +381,7 @@ public class NotesController : ControllerBase
         _context.Notes.Remove(note);
         await _context.SaveChangesAsync();
 
+        _h4.Info("Note permanently deleted", new { userId, noteId = note.Id, deviceId = note.DeviceId });
         await _hubService.NotifyNoteDeleted(userId, id);
 
         return NoContent();
@@ -399,6 +400,8 @@ public class NotesController : ControllerBase
 
         _context.Notes.RemoveRange(trashedNotes);
         await _context.SaveChangesAsync();
+
+        _h4.Info("Trash emptied", new { userId, deletedCount = trashedNotes.Count, noteIds = string.Join(",", noteIds) });
 
         foreach (var noteId in noteIds)
         {
@@ -432,6 +435,7 @@ public class NotesController : ControllerBase
             }
         }
 
+        var previousCategoryId = note.CategoryId;
         note.CategoryId = dto.CategoryId;
         note.UpdatedAt = DateTime.UtcNow;
 
@@ -453,6 +457,7 @@ public class NotesController : ControllerBase
             UpdatedAt = note.UpdatedAt
         };
 
+        _h4.Info("Note moved", new { userId, noteId = note.Id, fromCategoryId = previousCategoryId, toCategoryId = dto.CategoryId, deviceId = note.DeviceId });
         await _hubService.NotifyNoteUpdated(userId, response);
 
         return Ok(response);

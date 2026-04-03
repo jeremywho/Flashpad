@@ -1,6 +1,6 @@
 {
   "name": "@flashpad/electron",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "description": "Flashpad desktop app - Quick note capture for Windows and Mac",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -64,6 +64,12 @@
       "output": "release",
       "buildResources": "resources"
     },
+    "extraResources": [
+      {
+        "from": "resources/icon.png",
+        "to": "icon.png"
+      }
+    ],
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "resources/icon.icns",
