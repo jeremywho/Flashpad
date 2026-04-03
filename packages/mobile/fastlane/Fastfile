@@ -30,7 +30,7 @@ platform :ios do
       export_options: {
         provisioningProfiles: {
           "cc.flashpad.mobile" => ENV['APP_PROFILE_NAME'] || "Flashpad App Store iOS",
-          "cc.flashpad.mobile.widget" => ENV['WIDGET_PROFILE_NAME'] || "Flashpad Widget App Store"
+          "cc.flashpad.mobile.widget" => ENV['WIDGET_PROFILE_NAME'] || "Flashpad Widget App Store iOS"
         }
       }
     )
@@ -57,7 +57,7 @@ platform :ios do
       export_options: {
         provisioningProfiles: {
           "cc.flashpad.mobile" => ENV['APP_PROFILE_NAME'] || "Flashpad App Store iOS",
-          "cc.flashpad.mobile.widget" => ENV['WIDGET_PROFILE_NAME'] || "Flashpad Widget App Store"
+          "cc.flashpad.mobile.widget" => ENV['WIDGET_PROFILE_NAME'] || "Flashpad Widget App Store iOS"
         }
       }
     )
@@ -86,6 +86,30 @@ platform :ios do
     # Install provisioning profiles
     install_provisioning_profile(path: ENV['APP_PROFILE_PATH'])
     install_provisioning_profile(path: ENV['WIDGET_PROFILE_PATH'])
+
+    # Switch from automatic to manual signing for CI
+    app_profile_name = ENV['APP_PROFILE_NAME'] || "Flashpad App Store iOS"
+    widget_profile_name = ENV['WIDGET_PROFILE_NAME'] || "Flashpad Widget App Store iOS"
+
+    update_code_signing_settings(
+      path: "./ios/mobile.xcodeproj",
+      use_automatic_signing: false,
+      team_id: ENV['APPLE_TEAM_ID'],
+      code_sign_identity: "Apple Distribution",
+      targets: ["mobile"],
+      profile_name: app_profile_name,
+      bundle_identifier: "cc.flashpad.mobile"
+    )
+
+    update_code_signing_settings(
+      path: "./ios/mobile.xcodeproj",
+      use_automatic_signing: false,
+      team_id: ENV['APPLE_TEAM_ID'],
+      code_sign_identity: "Apple Distribution",
+      targets: ["FlashpadWidgetExtension"],
+      profile_name: widget_profile_name,
+      bundle_identifier: "cc.flashpad.mobile.widget"
+    )
   end
 
 end
