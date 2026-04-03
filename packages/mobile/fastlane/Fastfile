@@ -37,7 +37,6 @@ platform :ios do
 
     # Upload to TestFlight
     upload_to_testflight(
-      apple_id: ENV['APPLE_ID'],
       skip_waiting_for_build_processing: true,
       distribute_external: false,
       notify_external_testers: false,
