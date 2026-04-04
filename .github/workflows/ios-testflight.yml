@@ -36,12 +36,9 @@ jobs:
       - name: Install all dependencies
         run: npm ci
 
-      - name: Verify React Native version
+      - name: Install mobile-specific React Native version
         working-directory: packages/mobile
-        run: |
-          echo "Local RN:" && cat node_modules/react-native/package.json 2>/dev/null | grep '"version"' || echo "No local RN"
-          echo "Root RN:" && cat ../../node_modules/react-native/package.json 2>/dev/null | grep '"version"' || echo "No root RN"
-          echo "Local React:" && cat node_modules/react/package.json 2>/dev/null | grep '"version"' || echo "No local React"
+        run: npm install react-native@0.85.0-rc.7 react@19.2.3 --no-save
 
       - name: Build shared package
         working-directory: packages/shared
