@@ -56,13 +56,18 @@ jobs:
           echo "$IOS_PROVISIONING_PROFILE" | base64 --decode > /tmp/app.mobileprovision
           echo "$IOS_WIDGET_PROVISIONING_PROFILE" | base64 --decode > /tmp/widget.mobileprovision
 
+      - name: Write App Store Connect API key
+        env:
+          APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+        run: echo "$APP_STORE_CONNECT_KEY_P8" > /tmp/AuthKey.p8
+
       - name: Deploy to TestFlight
         working-directory: packages/mobile
         env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          FASTLANE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_PATH: /tmp/AuthKey.p8
           IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
           CERTIFICATE_PATH: /tmp/certificate.p12
           APP_PROFILE_PATH: /tmp/app.mobileprovision
