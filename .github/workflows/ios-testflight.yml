@@ -36,6 +36,13 @@ jobs:
       - name: Install all dependencies
         run: npm ci
 
+      - name: Verify React Native version
+        working-directory: packages/mobile
+        run: |
+          echo "Local RN:" && cat node_modules/react-native/package.json 2>/dev/null | grep '"version"' || echo "No local RN"
+          echo "Root RN:" && cat ../../node_modules/react-native/package.json 2>/dev/null | grep '"version"' || echo "No root RN"
+          echo "Local React:" && cat node_modules/react/package.json 2>/dev/null | grep '"version"' || echo "No local React"
+
       - name: Build shared package
         working-directory: packages/shared
         run: npm run build
@@ -78,6 +85,13 @@ jobs:
           APP_PROFILE_NAME: ${{ secrets.IOS_APP_PROFILE_NAME || 'Flashpad App Store iOS' }}
           WIDGET_PROFILE_NAME: ${{ secrets.IOS_WIDGET_PROFILE_NAME || 'Flashpad Widget App Store iOS' }}
         run: bundle exec fastlane beta
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: packages/mobile/build_logs/
 
       - name: Commit build number bump
         if: success()
