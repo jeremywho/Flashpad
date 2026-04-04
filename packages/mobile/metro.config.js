@@ -1,8 +1,12 @@
 const path = require('path');
 const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
-
 const projectRoot = __dirname;
 const monorepoRoot = path.resolve(projectRoot, '../..');
+
+// Escape special regex chars in path
+const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const rootRN = new RegExp(`${escapeRegExp(monorepoRoot)}/node_modules/react-native/.*`);
+const rootReact = new RegExp(`${escapeRegExp(monorepoRoot)}/node_modules/react/.*`);
 
 /**
  * Metro configuration
@@ -17,10 +21,12 @@ const config = {
       path.resolve(projectRoot, 'node_modules'),
       path.resolve(monorepoRoot, 'node_modules'),
     ],
+    // Block the root react-native (0.84) to prevent duplicate modules with local (0.85)
+    blockList: [rootRN, rootReact],
     // Ensure single instances of these packages
     extraNodeModules: {
-      'react': path.resolve(monorepoRoot, 'node_modules/react'),
-      'react-native': path.resolve(monorepoRoot, 'node_modules/react-native'),
+      'react': path.resolve(projectRoot, 'node_modules/react'),
+      'react-native': path.resolve(projectRoot, 'node_modules/react-native'),
     },
   },
   transformer: {

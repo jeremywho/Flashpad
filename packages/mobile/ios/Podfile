@@ -35,14 +35,22 @@ target 'mobile' do
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
         config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
-        
+
         # Optimize Swift compilation
         if target.respond_to?(:product_type) and target.product_type == "com.apple.product-type.bundle"
           config.build_settings['CODE_SIGN_IDENTITY'] = ''
         end
-        
-        # Enable bitcode for better optimization (if needed)
-        # config.build_settings['ENABLE_BITCODE'] = 'YES'
+      end
+    end
+
+    # Xcode 26's -dead_strip removes ObjC classes only referenced via
+    # NSClassFromString. Disable it for the main app target.
+    installer.pods_project.targets.each do |target|
+      if target.name == 'Pods-mobile'
+        target.build_configurations.each do |config|
+          ldflags = config.build_settings['OTHER_LDFLAGS'] || '$(inherited)'
+          config.build_settings['OTHER_LDFLAGS'] = "#{ldflags} -Wl,-no_dead_strip"
+        end
       end
     end
   end
