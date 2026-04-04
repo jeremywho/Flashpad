@@ -36,6 +36,7 @@ platform :ios do
       workspace: "./ios/mobile.xcworkspace",
       scheme: "mobile-release",
       export_method: "app-store",
+      disable_xcpretty: true,
       export_options: {
         provisioningProfiles: {
           "cc.flashpad.mobile" => ENV['APP_PROFILE_NAME'] || "Flashpad App Store iOS",
