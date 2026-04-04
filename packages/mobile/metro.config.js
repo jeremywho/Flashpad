@@ -1,12 +1,29 @@
 const path = require('path');
+const fs = require('fs');
 const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
 const projectRoot = __dirname;
 const monorepoRoot = path.resolve(projectRoot, '../..');
 
-// Escape special regex chars in path
+// Block root react/react-native only if local copies exist (avoids breaking CI
+// where npm hoists everything to root)
 const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const rootRN = new RegExp(`${escapeRegExp(monorepoRoot)}/node_modules/react-native/.*`);
-const rootReact = new RegExp(`${escapeRegExp(monorepoRoot)}/node_modules/react/.*`);
+const blockList = [];
+const hasLocalRN = fs.existsSync(path.resolve(projectRoot, 'node_modules/react-native'));
+const hasLocalReact = fs.existsSync(path.resolve(projectRoot, 'node_modules/react'));
+if (hasLocalRN) {
+  blockList.push(new RegExp(`${escapeRegExp(monorepoRoot)}/node_modules/react-native/.*`));
+}
+if (hasLocalReact) {
+  blockList.push(new RegExp(`${escapeRegExp(monorepoRoot)}/node_modules/react/.*`));
+}
+
+// Resolve react/react-native from local if available, otherwise root
+const rnPath = hasLocalRN
+  ? path.resolve(projectRoot, 'node_modules/react-native')
+  : path.resolve(monorepoRoot, 'node_modules/react-native');
+const reactPath = hasLocalReact
+  ? path.resolve(projectRoot, 'node_modules/react')
+  : path.resolve(monorepoRoot, 'node_modules/react');
 
 /**
  * Metro configuration
@@ -21,12 +38,10 @@ const config = {
       path.resolve(projectRoot, 'node_modules'),
       path.resolve(monorepoRoot, 'node_modules'),
     ],
-    // Block the root react-native (0.84) to prevent duplicate modules with local (0.85)
-    blockList: [rootRN, rootReact],
-    // Ensure single instances of these packages
+    blockList,
     extraNodeModules: {
-      'react': path.resolve(projectRoot, 'node_modules/react'),
-      'react-native': path.resolve(projectRoot, 'node_modules/react-native'),
+      'react': reactPath,
+      'react-native': rnPath,
     },
   },
   transformer: {
