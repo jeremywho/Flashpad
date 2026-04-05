@@ -12,7 +12,8 @@ import {
   FlatList,
   Pressable,
 } from 'react-native';
-import { Archive, Inbox, RotateCcw, Trash2, ChevronDown } from 'lucide-react-native';
+import Markdown from 'react-native-marked';
+import { Archive, Inbox, RotateCcw, Trash2, ChevronDown, Eye, Pencil } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/colors';
 import { fonts } from '../theme/fonts';
@@ -41,6 +42,7 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
   const [hasChanges, setHasChanges] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
   const textInputRef = useRef<TextInput>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const syncManagerRef = useRef<SyncManager | null>(null);
@@ -347,36 +349,73 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
         </View>
       )}
 
-      {/* Category Picker Row */}
-      <TouchableOpacity
-        style={styles.categoryRow}
-        onPress={() => setShowCategoryPicker(true)}
-      >
-        {selectedCategory && (
-          <View
-            style={[
-              styles.categoryDot,
-              { backgroundColor: selectedCategory.color },
-            ]}
-          />
-        )}
-        <Text style={selectedCategory ? styles.categoryName : styles.categoryNameMuted}>
-          {selectedCategory ? selectedCategory.name : 'Inbox'}
-        </Text>
-        <ChevronDown size={14} strokeWidth={1.75} color={colors.textMuted} />
-      </TouchableOpacity>
+      {/* Category Picker Row + Edit/Preview Toggle */}
+      <View style={styles.toolbarRow}>
+        <TouchableOpacity
+          style={styles.categoryRow}
+          onPress={() => setShowCategoryPicker(true)}
+        >
+          {selectedCategory && (
+            <View
+              style={[
+                styles.categoryDot,
+                { backgroundColor: selectedCategory.color },
+              ]}
+            />
+          )}
+          <Text style={selectedCategory ? styles.categoryName : styles.categoryNameMuted}>
+            {selectedCategory ? selectedCategory.name : 'Inbox'}
+          </Text>
+          <ChevronDown size={14} strokeWidth={1.75} color={colors.textMuted} />
+        </TouchableOpacity>
 
-      <TextInput
-        ref={textInputRef}
-        style={styles.editor}
-        value={content}
-        onChangeText={handleContentChange}
-        placeholder="Start typing your note..."
-        placeholderTextColor={colors.textMuted}
-        multiline
-        textAlignVertical="top"
-        autoFocus={isNew}
-      />
+        <View style={styles.modeTabs}>
+          <TouchableOpacity
+            style={[styles.modeTab, !previewMode && styles.modeTabActive]}
+            onPress={() => setPreviewMode(false)}
+          >
+            <Pencil size={14} strokeWidth={1.75} color={!previewMode ? colors.accent : colors.textMuted} />
+            <Text style={[styles.modeTabText, !previewMode && styles.modeTabTextActive]}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modeTab, previewMode && styles.modeTabActive]}
+            onPress={() => setPreviewMode(true)}
+          >
+            <Eye size={14} strokeWidth={1.75} color={previewMode ? colors.accent : colors.textMuted} />
+            <Text style={[styles.modeTabText, previewMode && styles.modeTabTextActive]}>Preview</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {previewMode ? (
+        content.trim() ? (
+          <Markdown
+            value={content}
+            theme={markdownTheme}
+            styles={markdownStyles}
+            flatListProps={{
+              style: styles.previewContainer,
+              contentContainerStyle: styles.previewContent,
+            }}
+          />
+        ) : (
+          <View style={[styles.previewContainer, styles.previewContent]}>
+            <Text style={styles.previewPlaceholder}>Nothing to preview</Text>
+          </View>
+        )
+      ) : (
+        <TextInput
+          ref={textInputRef}
+          style={styles.editor}
+          value={content}
+          onChangeText={handleContentChange}
+          placeholder="Start typing your note..."
+          placeholderTextColor={colors.textMuted}
+          multiline
+          textAlignVertical="top"
+          autoFocus={isNew}
+        />
+      )}
 
       {/* Editor footer bar */}
       {!isNew && (
@@ -444,6 +483,100 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
     </KeyboardAvoidingView>
   );
 }
+
+const markdownTheme = {
+  colors: {
+    code: colors.surfaceElevated,
+    link: colors.accent,
+    text: colors.text,
+    border: colors.border,
+  },
+  spacing: {
+    xs: 2,
+    s: 4,
+    m: 8,
+    l: 16,
+  },
+};
+
+const markdownStyles = {
+  text: {
+    fontSize: 18,
+    lineHeight: 30,
+    fontFamily: fonts.regular,
+    color: colors.text,
+  },
+  h1: {
+    color: colors.text,
+    fontSize: 28,
+    fontFamily: fonts.semiBold,
+  },
+  h2: {
+    color: colors.text,
+    fontSize: 24,
+    fontFamily: fonts.semiBold,
+  },
+  h3: {
+    color: colors.text,
+    fontSize: 20,
+    fontFamily: fonts.medium,
+  },
+  h4: {
+    color: colors.text,
+    fontSize: 18,
+    fontFamily: fonts.medium,
+  },
+  link: {
+    color: colors.accent,
+  },
+  strong: {
+    color: colors.text,
+    fontFamily: fonts.semiBold,
+  },
+  blockquote: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.accent,
+    paddingLeft: 12,
+    marginVertical: 8,
+  },
+  codespan: {
+    backgroundColor: colors.surfaceElevated,
+    color: colors.text,
+    fontFamily: fonts.mono,
+    fontSize: 14,
+  },
+  code: {
+    backgroundColor: colors.surfaceElevated,
+    padding: 12,
+    borderRadius: 6,
+    marginVertical: 8,
+  },
+  table: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginVertical: 8,
+  },
+  tableRow: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  tableCell: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 6,
+  },
+  hr: {
+    backgroundColor: colors.border,
+    height: 1,
+    marginVertical: 12,
+  },
+  list: {
+    marginVertical: 4,
+  },
+  li: {
+    marginVertical: 2,
+  },
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -535,15 +668,58 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#404040',
   },
-  // Category picker row
-  categoryRow: {
+  // Toolbar row
+  toolbarRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 10,
     backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  modeTabs: {
+    flexDirection: 'row',
+    gap: 2,
+    backgroundColor: colors.background,
+    borderRadius: 6,
+    padding: 2,
+  },
+  modeTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 4,
+  },
+  modeTabActive: {
+    backgroundColor: colors.surfaceElevated,
+  },
+  modeTabText: {
+    fontSize: 13,
+    fontFamily: fonts.medium,
+    color: colors.textMuted,
+  },
+  modeTabTextActive: {
+    color: colors.accent,
+  },
+  previewContainer: {
+    flex: 1,
+    padding: 24,
+  },
+  previewContent: {
+    paddingBottom: 40,
+  },
+  previewPlaceholder: {
+    color: colors.textMuted,
+    fontSize: 16,
+    fontStyle: 'italic',
   },
   categoryDot: {
     width: 10,
