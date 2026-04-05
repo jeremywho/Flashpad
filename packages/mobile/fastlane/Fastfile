@@ -48,10 +48,10 @@ platform :ios do
     # Upload to TestFlight
     upload_to_testflight(
       skip_waiting_for_build_processing: true,
-      wait_processing_timeout_duration: 0,
       distribute_external: false,
       notify_external_testers: false,
-      changelog: "Build #{version_number} (#{build_number})"
+      changelog: "Build #{version_number} (#{build_number})",
+      wait_processing_timeout_duration: 1
     )
   end
 
