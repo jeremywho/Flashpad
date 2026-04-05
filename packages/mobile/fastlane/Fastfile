@@ -49,9 +49,7 @@ platform :ios do
     upload_to_testflight(
       skip_waiting_for_build_processing: true,
       distribute_external: false,
-      notify_external_testers: false,
-      changelog: "Build #{version_number} (#{build_number})",
-      wait_processing_timeout_duration: 1
+      notify_external_testers: false
     )
   end
 
