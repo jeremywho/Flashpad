@@ -255,12 +255,14 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     });
 
     const appVersion = require('../../package.json').version;
+    h4.setGlobalMetadata({
+      appVersion,
+      platform: Platform.OS,
+      osVersion: Platform.Version,
+    });
     h4.info('App initializing', {
       deviceId,
       apiUrl,
-      platform: Platform.OS,
-      osVersion: Platform.Version,
-      appVersion,
     });
 
     const syncManager = new SyncManager({

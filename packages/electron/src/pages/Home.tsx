@@ -149,13 +149,15 @@ function Home() {
     });
 
     window.electron.app.getVersion().then((appVersion) => {
+      h4.setGlobalMetadata({
+        appVersion,
+        platform: navigator.platform,
+        userAgent: navigator.userAgent,
+      });
       h4.info('App initializing', {
         deviceId,
         apiUrl: API_URL,
         online: navigator.onLine,
-        appVersion,
-        platform: navigator.platform,
-        userAgent: navigator.userAgent,
       });
     });
 

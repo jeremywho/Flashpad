@@ -18,6 +18,8 @@ export interface H4ClientOptions {
   bufferSize?: number;
   /** Custom storage adapter for log persistence. Falls back to IndexedDB, then in-memory. */
   storage?: H4LogStorage;
+  /** Metadata merged into every log entry (e.g. OS, app version, platform). */
+  globalMetadata?: Record<string, unknown>;
 }
 
 /** Storage adapter interface for persisting logs across app restarts. */
@@ -201,6 +203,12 @@ class H4ClientLogger {
     this.log('Error', message, metadata);
   }
 
+  setGlobalMetadata(metadata: Record<string, unknown>): void {
+    if (this.options) {
+      this.options.globalMetadata = { ...this.options.globalMetadata, ...metadata };
+    }
+  }
+
   private log(level: string, message: string, metadata?: Record<string, unknown>): void {
     const entry: LogEntry = {
       level,
@@ -208,7 +216,7 @@ class H4ClientLogger {
       source: this.options?.source ?? 'unknown',
       deviceId: this.options?.deviceId ?? 'unknown',
       timestamp: new Date().toISOString(),
-      metadata,
+      metadata: { ...this.options?.globalMetadata, ...metadata },
     };
     this.buffer.push(entry);
 
