@@ -33,10 +33,7 @@ jobs:
           cache: 'npm'
 
       - name: Install all dependencies
-        run: npm ci
-
-      - name: Fix platform-specific optional deps (npm ci bug #4828)
-        run: npm install --no-save
+        run: npm ci --legacy-peer-deps
 
       - name: Install electron package dependencies
         working-directory: packages/electron
