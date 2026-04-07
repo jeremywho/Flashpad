@@ -48,6 +48,7 @@ export class SyncManager {
   private isOnline: boolean = navigator.onLine;
   private syncStatus: SyncStatus = 'idle';
   private syncInProgress: boolean = false;
+  private needsResync: boolean = false;
   private authErrorDetected: boolean = false;
   private deviceId: string = '';
   private onSyncStatusChange?: (status: SyncStatus) => void;
@@ -169,100 +170,113 @@ export class SyncManager {
     }
   }
 
-  // Process pending sync queue
+  // Process pending sync queue (self-draining: if called while busy, will
+  // re-run after the current pass finishes so no queued items are stranded)
   async processSyncQueue(): Promise<void> {
-    if (!this.isOnline || this.syncInProgress || this.authErrorDetected) return;
+    if (!this.isOnline || this.authErrorDetected) return;
+
+    if (this.syncInProgress) {
+      this.needsResync = true;
+      return;
+    }
 
     this.syncInProgress = true;
     this.updateSyncStatus('syncing');
 
     try {
-      const queue = await getSyncQueue();
-      if (queue.length > 0) {
+      // Drain loop: keep processing until the queue is empty or we're blocked
+      let queue = await getSyncQueue();
+      while (queue.length > 0) {
         h4.info('Processing sync queue', {
           queueSize: queue.length,
           operations: queue.map(i => `${i.operation}:${i.entityType}:${i.entityId}`).join(', '),
         });
-      }
 
-      for (const item of queue) {
-        try {
-          const payload = JSON.parse(item.payload);
+        for (const item of queue) {
+          try {
+            const payload = JSON.parse(item.payload);
 
-          switch (item.operation) {
-            case SyncOperation.Create:
-              if (item.entityType === 'note') {
-                const newNote = await this.api.createNote(payload as CreateNoteDto);
-                // Update local note with server ID
-                const localNote = await getLocalNote(item.entityId);
-                if (localNote) {
-                  await deleteLocalNote(item.entityId);
-                  await saveLocalNote(newNote, false);
+            switch (item.operation) {
+              case SyncOperation.Create:
+                if (item.entityType === 'note') {
+                  const newNote = await this.api.createNote(payload as CreateNoteDto);
+                  // Update local note with server ID
+                  const localNote = await getLocalNote(item.entityId);
+                  if (localNote) {
+                    await deleteLocalNote(item.entityId);
+                    await saveLocalNote(newNote, false);
+                  }
+                } else if (item.entityType === 'category') {
+                  const newCategory = await this.api.createCategory(payload as CreateCategoryDto);
+                  await deleteLocalCategory(item.entityId);
+                  await saveLocalCategory(newCategory, false);
                 }
-              } else if (item.entityType === 'category') {
-                const newCategory = await this.api.createCategory(payload as CreateCategoryDto);
-                await deleteLocalCategory(item.entityId);
-                await saveLocalCategory(newCategory, false);
-              }
-              break;
+                break;
 
-            case SyncOperation.Update:
-              if (item.entityType === 'note') {
-                const updatedNote = await this.api.updateNote(item.entityId, payload as UpdateNoteDto);
-                await saveLocalNote(updatedNote, false);
-              } else if (item.entityType === 'category') {
-                const updatedCategory = await this.api.updateCategory(item.entityId, payload as UpdateCategoryDto);
-                await saveLocalCategory(updatedCategory, false);
-              }
-              break;
+              case SyncOperation.Update:
+                if (item.entityType === 'note') {
+                  const updatedNote = await this.api.updateNote(item.entityId, payload as UpdateNoteDto);
+                  await saveLocalNote(updatedNote, false);
+                } else if (item.entityType === 'category') {
+                  const updatedCategory = await this.api.updateCategory(item.entityId, payload as UpdateCategoryDto);
+                  await saveLocalCategory(updatedCategory, false);
+                }
+                break;
 
-            case SyncOperation.Delete:
-              if (item.entityType === 'note') {
-                await this.api.deleteNotePermanently(item.entityId);
-                await deleteLocalNote(item.entityId);
-              } else if (item.entityType === 'category') {
-                await this.api.deleteCategory(item.entityId);
-                await deleteLocalCategory(item.entityId);
-              }
-              break;
+              case SyncOperation.Delete:
+                if (item.entityType === 'note') {
+                  await this.api.deleteNotePermanently(item.entityId);
+                  await deleteLocalNote(item.entityId);
+                } else if (item.entityType === 'category') {
+                  await this.api.deleteCategory(item.entityId);
+                  await deleteLocalCategory(item.entityId);
+                }
+                break;
 
-            case SyncOperation.Archive:
-              await this.api.archiveNote(item.entityId);
-              break;
+              case SyncOperation.Archive:
+                await this.api.archiveNote(item.entityId);
+                break;
 
-            case SyncOperation.Restore:
-              await this.api.restoreNote(item.entityId);
-              break;
+              case SyncOperation.Restore:
+                await this.api.restoreNote(item.entityId);
+                break;
 
-            case SyncOperation.Trash:
-              await this.api.trashNote(item.entityId);
-              break;
+              case SyncOperation.Trash:
+                await this.api.trashNote(item.entityId);
+                break;
 
-            case SyncOperation.Move:
-              await this.api.moveNote(item.entityId, payload);
-              break;
-          }
+              case SyncOperation.Move:
+                await this.api.moveNote(item.entityId, payload);
+                break;
+            }
 
-          // Remove from queue on success
-          h4.info('Sync queue item completed', { itemId: item.id, operation: item.operation, entityType: item.entityType, entityId: item.entityId });
-          await removeSyncQueueItem(item.id);
-          await this.updatePendingCount();
-        } catch (error) {
-          if (this.isAuthError(error)) {
-            h4.error('Sync queue auth error, pausing', { itemId: item.id });
-            // Leave items in queue so they sync after re-login
-            this.handleAuthError();
-            return;
-          }
-          h4.error('Sync queue item failed', { itemId: item.id, operation: item.operation, entityType: item.entityType, entityId: item.entityId, error: (error as Error).message, retryCount: item.retryCount });
-          await updateSyncQueueItemError(item.id, (error as Error).message);
-
-          // If we've retried too many times, skip this item
-          if (item.retryCount >= 3) {
-            h4.error('Sync queue item abandoned after 3 retries', { itemId: item.id, operation: item.operation, entityType: item.entityType, entityId: item.entityId });
+            // Remove from queue on success
+            h4.info('Sync queue item completed', { itemId: item.id, operation: item.operation, entityType: item.entityType, entityId: item.entityId });
             await removeSyncQueueItem(item.id);
+            await this.updatePendingCount();
+          } catch (error) {
+            if (this.isAuthError(error)) {
+              h4.error('Sync queue auth error, pausing', { itemId: item.id });
+              // Leave items in queue so they sync after re-login
+              this.handleAuthError();
+              return;
+            }
+            h4.error('Sync queue item failed', { itemId: item.id, operation: item.operation, entityType: item.entityType, entityId: item.entityId, error: (error as Error).message, retryCount: item.retryCount });
+            await updateSyncQueueItemError(item.id, (error as Error).message);
+
+            if (item.retryCount >= 3) {
+              h4.error('Sync queue item abandoned after 3 retries', { itemId: item.id, operation: item.operation, entityType: item.entityType, entityId: item.entityId });
+              await removeSyncQueueItem(item.id);
+            }
           }
         }
+
+        // Clear the flag before re-reading — any new call during the next
+        // getSyncQueue() will set it again if needed.
+        this.needsResync = false;
+
+        // Re-read queue to pick up items added during this pass
+        queue = await getSyncQueue();
       }
 
       this.updateSyncStatus('idle');
@@ -272,6 +286,12 @@ export class SyncManager {
       this.updateSyncStatus('error');
     } finally {
       this.syncInProgress = false;
+      // If someone called processSyncQueue() while we were in the finally
+      // block or between the last queue check and here, drain again.
+      if (this.needsResync) {
+        this.needsResync = false;
+        this.processSyncQueue();
+      }
     }
   }
 

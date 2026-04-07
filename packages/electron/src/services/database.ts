@@ -578,12 +578,12 @@ export async function reloadNoteFromFile(id: string): Promise<Note | null> {
     serverId: parsed.metadata.serverId,
   };
 
-  const isNew = !notesCache.has(note.id);
+  const existing = notesCache.get(note.id);
+  const isNew = !existing;
   notesCache.set(note.id, note);
 
-  // Externally created note with frontmatter (e.g. dropped by another program)
-  // that hasn't been synced yet — queue it for server sync
   if (isNew && note.isLocal && !note.serverId) {
+    // Externally created note with frontmatter that hasn't been synced yet
     await addToSyncQueue({
       entityType: 'note',
       entityId: note.id,
@@ -594,6 +594,30 @@ export async function reloadNoteFromFile(id: string): Promise<Note | null> {
       }),
       baseVersion: null,
     });
+  } else if (!isNew && note.serverId) {
+    // Existing synced note edited externally — queue an update if content
+    // or category changed
+    const contentChanged = existing.content !== note.content;
+    const categoryChanged = existing.categoryId !== note.categoryId;
+
+    if (contentChanged || categoryChanged) {
+      // Update the local file's updatedAt timestamp
+      note.updatedAt = new Date().toISOString();
+      note.version = existing.version + 1;
+      notesCache.set(note.id, note);
+      await writeNoteFile(note);
+
+      await addToSyncQueue({
+        entityType: 'note',
+        entityId: note.serverId,
+        operation: SyncOperation.Update,
+        payload: JSON.stringify({
+          content: note.content,
+          categoryId: note.categoryId,
+        }),
+        baseVersion: existing.version,
+      });
+    }
   }
 
   return localNoteToNote(note);

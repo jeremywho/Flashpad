@@ -48,11 +48,15 @@ function Home() {
   const signalRRef = useRef<SignalRClient | null>(null);
   const syncManagerRef = useRef<SyncManager | null>(null);
   const selectedViewRef = useRef(selectedView);
+  const selectedNoteRef = useRef(selectedNote);
 
-  // Keep ref in sync with state for use in SignalR callbacks
+  // Keep refs in sync with state for use in callbacks
   useEffect(() => {
     selectedViewRef.current = selectedView;
   }, [selectedView]);
+  useEffect(() => {
+    selectedNoteRef.current = selectedNote;
+  }, [selectedNote]);
 
   // Handle resize drag
   useEffect(() => {
@@ -294,7 +298,8 @@ function Home() {
       syncManagerRef.current?.processSyncQueue();
 
       // If the currently selected note was deleted, clear selection
-      if (event === 'noteDeleted' && selectedNote?.id === noteId) {
+      // (uses ref to avoid re-creating the file watcher on every note selection)
+      if (event === 'noteDeleted' && selectedNoteRef.current?.id === noteId) {
         setSelectedNote(null);
       }
     };
@@ -303,12 +308,19 @@ function Home() {
       console.error('Failed to start file watcher:', err);
     });
 
+    // Periodically process the sync queue as a safety net for any items
+    // that were missed (e.g. added while processSyncQueue was already running)
+    const syncInterval = setInterval(() => {
+      syncManagerRef.current?.processSyncQueue();
+    }, 30_000);
+
     return () => {
+      clearInterval(syncInterval);
       stopFileWatcher().catch((err) => {
         console.error('Failed to stop file watcher:', err);
       });
     };
-  }, [fetchNotes, fetchInboxCount, fetchCategories, selectedNote?.id]);
+  }, [fetchNotes, fetchInboxCount, fetchCategories]);
 
   // SignalR real-time sync - uses singleton to survive React re-renders
   useEffect(() => {
