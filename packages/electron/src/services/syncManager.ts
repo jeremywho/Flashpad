@@ -186,6 +186,7 @@ export class SyncManager {
     try {
       // Drain loop: keep processing until the queue is empty or we're blocked
       let queue = await getSyncQueue();
+      const hadItems = queue.length > 0;
       while (queue.length > 0) {
         h4.info('Processing sync queue', {
           queueSize: queue.length,
@@ -280,7 +281,11 @@ export class SyncManager {
       }
 
       this.updateSyncStatus('idle');
-      this.onDataRefresh?.();
+      // Only trigger a data refresh if we actually synced something —
+      // otherwise idle polling generates constant API traffic for nothing
+      if (hadItems) {
+        this.onDataRefresh?.();
+      }
     } catch (error) {
       h4.error('Sync queue processing failed', { error: (error as Error).message });
       this.updateSyncStatus('error');
