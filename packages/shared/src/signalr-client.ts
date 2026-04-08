@@ -28,6 +28,7 @@ export interface SignalRClientOptions {
   onDeviceConnected?: (device: DevicePresence) => void;
   onDeviceDisconnected?: (device: DevicePresence) => void;
   onAuthError?: () => void;
+  onReconnected?: () => void;
 }
 
 export class SignalRClient {
@@ -197,6 +198,9 @@ export class SignalRClient {
       if (this.options.deviceId && this.options.deviceName) {
         this.registerDevice(this.options.deviceId, this.options.deviceName);
       }
+
+      // Notify consumer to catch up on events missed during disconnection
+      this.options.onReconnected?.();
     });
 
     this.connection.onclose((error) => {

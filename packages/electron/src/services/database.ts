@@ -288,7 +288,12 @@ export async function deleteLocalNote(id: string): Promise<void> {
   await initDatabase();
 
   notesCache.delete(id);
-  await window.electron.fs.deleteNote(id);
+  writingNotes.add(id);
+  try {
+    await window.electron.fs.deleteNote(id);
+  } finally {
+    setTimeout(() => writingNotes.delete(id), 500);
+  }
 }
 
 export async function bulkSaveNotes(notes: Note[]): Promise<void> {
@@ -664,7 +669,19 @@ async function ingestPlainMarkdown(originalFileId: string, content: string): Pro
 }
 
 export async function handleFileDeleted(id: string): Promise<void> {
+  const existing = notesCache.get(id);
   notesCache.delete(id);
+
+  // If the deleted note was synced to the server, queue a server-side delete
+  if (existing?.serverId) {
+    await addToSyncQueue({
+      entityType: 'note',
+      entityId: existing.serverId,
+      operation: SyncOperation.Delete,
+      payload: '{}',
+      baseVersion: existing.version,
+    });
+  }
 }
 
 // Force reload all data (useful after changing data directory)

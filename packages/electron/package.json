@@ -11,7 +11,11 @@
     "build:ci": "tsc && vite build",
     "preview": "vite preview",
     "electron:dev": "vite",
-    "electron:prod": "vite --mode production"
+    "electron:prod": "vite --mode production",
+    "test": "jest --config jest.config.ts",
+    "test:watch": "jest --config jest.config.ts --watch",
+    "test:e2e": "node e2e/run-all.mjs",
+    "test:e2e:headed": "playwright test --config playwright.config.ts --headed"
   },
   "keywords": [
     "flashpad",
@@ -40,6 +44,8 @@
     "sql.js": "^1.13.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "@types/jest": "^30.0.0",
     "@types/node": "^25.0.3",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
@@ -47,7 +53,9 @@
     "concurrently": "^9.1.2",
     "electron": "40.6.1",
     "electron-builder": "^26.0.12",
+    "jest": "^30.3.0",
     "png-to-ico": "^3.0.1",
+    "ts-jest": "^29.4.9",
     "typescript": "^5.8.3",
     "vite": "^7.3.0",
     "vite-plugin-electron": "^0.29.0",

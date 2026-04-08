@@ -41,6 +41,7 @@ export interface SyncManagerOptions {
   onDataRefresh?: () => void;
   onAuthError?: () => void;
   onConflict?: (noteId: string, serverVersion: number) => void;
+  onSyncItemFailed?: (item: import('./database').SyncQueueItem) => void;
 }
 
 export class SyncManager {
@@ -56,6 +57,7 @@ export class SyncManager {
   private onDataRefresh?: () => void;
   private onAuthError?: () => void;
   private onConflict?: (noteId: string, serverVersion: number) => void;
+  private onSyncItemFailed?: (item: import('./database').SyncQueueItem) => void;
 
   constructor(options: SyncManagerOptions) {
     this.api = options.api;
@@ -65,6 +67,7 @@ export class SyncManager {
     this.onDataRefresh = options.onDataRefresh;
     this.onAuthError = options.onAuthError;
     this.onConflict = options.onConflict;
+    this.onSyncItemFailed = options.onSyncItemFailed;
 
     // Set up online/offline listeners
     window.addEventListener('online', this.handleOnline);
@@ -133,26 +136,37 @@ export class SyncManager {
       this.updateSyncStatus('syncing');
       h4.info('Initial sync starting');
 
-      // Fetch all notes and categories from server
-      const [notesResponse, categories] = await Promise.all([
-        this.api.getNotes({ pageSize: 1000 }),
+      // Fetch first page of notes and all categories in parallel
+      const [firstPage, categories] = await Promise.all([
+        this.api.getNotes({ pageSize: 1000, page: 1 }),
         this.api.getCategories(),
       ]);
 
+      let allNotes = firstPage.notes;
+
+      // Paginate remaining notes if needed
+      let page = 2;
+      while (allNotes.length < firstPage.totalCount) {
+        const nextPage = await this.api.getNotes({ pageSize: 1000, page });
+        allNotes = allNotes.concat(nextPage.notes);
+        page++;
+      }
+
       // Save to local DB
-      await bulkSaveNotes(notesResponse.notes);
+      await bulkSaveNotes(allNotes);
       await bulkSaveCategories(categories);
 
       const pendingCount = await getSyncQueueCount();
       h4.info('Initial sync complete', {
-        serverNoteCount: notesResponse.notes.length,
-        serverTotalCount: notesResponse.totalCount,
+        serverNoteCount: allNotes.length,
+        serverTotalCount: firstPage.totalCount,
         categoryCount: categories.length,
         pendingQueueSize: pendingCount,
+        pages: page - 1,
         notesByStatus: {
-          inbox: notesResponse.notes.filter(n => n.status === NoteStatus.Inbox).length,
-          archived: notesResponse.notes.filter(n => n.status === NoteStatus.Archived).length,
-          trash: notesResponse.notes.filter(n => n.status === NoteStatus.Trash).length,
+          inbox: allNotes.filter(n => n.status === NoteStatus.Inbox).length,
+          archived: allNotes.filter(n => n.status === NoteStatus.Archived).length,
+          trash: allNotes.filter(n => n.status === NoteStatus.Trash).length,
         },
       });
 
@@ -267,6 +281,7 @@ export class SyncManager {
 
             if (item.retryCount >= 3) {
               h4.error('Sync queue item abandoned after 3 retries', { itemId: item.id, operation: item.operation, entityType: item.entityType, entityId: item.entityId });
+              this.onSyncItemFailed?.(item);
               await removeSyncQueueItem(item.id);
             }
           }
@@ -311,6 +326,8 @@ export class SyncManager {
         .then(async (response) => {
           await bulkSaveNotes(response.notes);
           h4.debug('Background notes refresh', { status: params.status, categoryId: params.categoryId, localCount: localNotes.length, serverCount: response.notes.length, serverTotal: response.totalCount });
+          // Trigger UI refresh so newly fetched server data is displayed
+          this.onDataRefresh?.();
         })
         .catch((error) => {
           if (this.isAuthError(error)) {

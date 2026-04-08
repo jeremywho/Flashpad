@@ -8,6 +8,7 @@ import CategoryManager from '../components/CategoryManager';
 import { useToast } from '../components/Toast';
 import { SyncManager, SyncStatus } from '../services/syncManager';
 import { startFileWatcher, stopFileWatcher } from '../services/file-watcher';
+import { saveLocalNote, deleteLocalNote, saveLocalCategory, deleteLocalCategory } from '../services/database';
 
 type ViewType = 'inbox' | 'archive' | 'trash' | string;
 
@@ -178,6 +179,16 @@ function Home() {
         toast.warning('Note was modified on another device — refreshed to latest version');
         fetchNotes();
       },
+      onSyncItemFailed: (item) => {
+        const op = item.operation.toLowerCase();
+        toast.error(`Failed to sync ${item.entityType} ${op} after 3 attempts`);
+        h4.error('Sync item permanently failed', {
+          entityType: item.entityType,
+          entityId: item.entityId,
+          operation: item.operation,
+          lastError: item.lastError,
+        });
+      },
     });
 
     syncManagerRef.current = syncManager;
@@ -314,7 +325,7 @@ function Home() {
     // that were missed (e.g. added while processSyncQueue was already running)
     const syncInterval = setInterval(() => {
       syncManagerRef.current?.processSyncQueue();
-    }, 30_000);
+    }, 300_000);
 
     return () => {
       clearInterval(syncInterval);
@@ -370,8 +381,8 @@ function Home() {
         console.log('Device disconnected:', device.deviceName);
       },
       onAuthError: logout,
-      onNoteCreated: (note) => {
-        // Only add if it matches current view
+      onNoteCreated: async (note) => {
+        await saveLocalNote(note, false);
         if (shouldShowInView(note)) {
           setNotes((prev) => {
             if (prev.some((n) => n.id === note.id)) return prev;
@@ -381,8 +392,8 @@ function Home() {
         fetchInboxCount();
         fetchCategories();
       },
-      onNoteUpdated: (note) => {
-        // Move updated note to top if it belongs in current view, remove if not
+      onNoteUpdated: async (note) => {
+        await saveLocalNote(note, false);
         setNotes((prev) => {
           const filtered = prev.filter((n) => n.id !== note.id);
           if (shouldShowInView(note)) {
@@ -393,27 +404,39 @@ function Home() {
         setSelectedNote((prev) => (prev?.id === note.id ? note : prev));
         fetchCategories();
       },
-      onNoteDeleted: (noteId) => {
+      onNoteDeleted: async (noteId) => {
+        await deleteLocalNote(noteId);
         setNotes((prev) => prev.filter((n) => n.id !== noteId));
         setSelectedNote((prev) => (prev?.id === noteId ? null : prev));
         fetchInboxCount();
       },
-      onNoteStatusChanged: (note) => {
-        // Remove from current view if status changed
+      onNoteStatusChanged: async (note) => {
+        await saveLocalNote(note, false);
         setNotes((prev) => prev.filter((n) => n.id !== note.id));
         setSelectedNote((prev) => (prev?.id === note.id ? null : prev));
         fetchInboxCount();
         fetchCategories();
       },
-      onCategoryCreated: (category) => {
+      onCategoryCreated: async (category) => {
+        await saveLocalCategory(category, false);
         setCategories((prev) => [...prev, category]);
       },
-      onCategoryUpdated: (category) => {
+      onCategoryUpdated: async (category) => {
+        await saveLocalCategory(category, false);
         setCategories((prev) => prev.map((c) => (c.id === category.id ? category : c)));
       },
-      onCategoryDeleted: (categoryId) => {
+      onCategoryDeleted: async (categoryId) => {
+        await deleteLocalCategory(categoryId);
         setCategories((prev) => prev.filter((c) => c.id !== categoryId));
         setSelectedView((currentView) => currentView === categoryId ? 'inbox' : currentView);
+      },
+      onReconnected: () => {
+        h4.info('SignalR reconnected — triggering catch-up sync');
+        syncManagerRef.current?.initialSync().then(() => {
+          fetchNotes();
+          fetchCategories();
+          fetchInboxCount();
+        });
       },
     });
 

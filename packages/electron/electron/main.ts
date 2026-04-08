@@ -16,6 +16,10 @@ let isQuitting = false;
 let watcher: ReturnType<typeof chokidar.watch> | null = null;
 
 function getDataDir(): string {
+  // Environment variable override for E2E testing (isolated data directories)
+  const envOverride = process.env.FLASHPAD_DATA_DIR?.trim();
+  if (envOverride) return path.resolve(envOverride);
+
   const customDir = settingsStore.store.dataDirectory;
   return customDir || path.join(app.getPath('userData'), 'data');
 }
@@ -47,16 +51,25 @@ function startFileWatcher(): void {
     });
   };
 
-  watcher = chokidar.watch(path.join(notesDir, '*.md'), {
+  // Watch the directory (not a glob) — chokidar v5 has issues with glob
+  // patterns on macOS FSEvents. Filter to .md files in the event handlers.
+  watcher = chokidar.watch(notesDir, {
     ignoreInitial: true,
     awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
     usePolling: false,
+    depth: 0,
   });
 
+  const notifyIfMd = (type: 'add' | 'change' | 'unlink', filePath: string) => {
+    if (filePath.endsWith('.md')) {
+      notify(type, filePath);
+    }
+  };
+
   watcher
-    .on('add', (filePath: string) => notify('add', filePath))
-    .on('change', (filePath: string) => notify('change', filePath))
-    .on('unlink', (filePath: string) => notify('unlink', filePath))
+    .on('add', (filePath: string) => notifyIfMd('add', filePath))
+    .on('change', (filePath: string) => notifyIfMd('change', filePath))
+    .on('unlink', (filePath: string) => notifyIfMd('unlink', filePath))
     .on('error', (error: unknown) => console.error('File watcher error:', error));
 }
 
