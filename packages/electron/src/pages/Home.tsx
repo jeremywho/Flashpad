@@ -505,7 +505,7 @@ function Home() {
         const newNote = await syncManagerRef.current.createNote({
           content,
           categoryId,
-          deviceId: 'electron-desktop',
+          deviceId: localStorage.getItem('flashpad-device-id') || 'electron-desktop',
         });
         // Use deduplication to avoid race condition with SignalR broadcast
         setNotes((prev) => {
@@ -520,7 +520,7 @@ function Home() {
         const updatedNote = await syncManagerRef.current.updateNote(selectedNote.id, {
           content,
           categoryId,
-          deviceId: 'electron-desktop',
+          deviceId: localStorage.getItem('flashpad-device-id') || 'electron-desktop',
         });
         // Move to top if still in current view, remove if not (e.g., assigned category while in inbox)
         setNotes((prev) => {

@@ -81,7 +81,7 @@ export default function QuickCaptureCode() {
       // Use SyncManager which handles offline queuing
       await syncManagerRef.current.createNote({
         content,
-        deviceId: 'electron-desktop',
+        deviceId: localStorage.getItem('flashpad-device-id') || 'electron-desktop',
       });
       await window.electron.quickCapture.notifyNoteCreated();
       setCode('');
