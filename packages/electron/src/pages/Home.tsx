@@ -471,6 +471,7 @@ function Home() {
   };
 
   const handleViewChange = (view: ViewType) => {
+    if (view === selectedView) return;
     setSelectedView(view);
     setSelectedNote(null);
     setIsNewNote(false);
