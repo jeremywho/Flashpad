@@ -16,7 +16,7 @@ export function createMockStore(): MockNoteStore {
 }
 
 export function createMockElectron(store: MockNoteStore) {
-  const fileChangedCallbacks: Array<(event: { type: string; filename: string }) => void> = [];
+  const fileChangedCallbacks: Array<(event: { type: string; filename: string; filePath: string }) => void> = [];
 
   return {
     onUpdateDownloaded: jest.fn(),
