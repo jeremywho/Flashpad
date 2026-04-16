@@ -44,33 +44,40 @@ function startFileWatcher(): void {
     fsSync.mkdirSync(notesDir, { recursive: true });
   }
 
-  const notify = (type: 'add' | 'change' | 'unlink', filePath: string) => {
-    const filename = path.basename(filePath);
-    BrowserWindow.getAllWindows().forEach((win) => {
-      win.webContents.send('fs:file-changed', { type, filename });
-    });
-  };
-
-  // Watch the directory (not a glob) — chokidar v5 has issues with glob
-  // patterns on macOS FSEvents. Filter to .md files in the event handlers.
+  // Recursive FSEvents is more reliable than depth:0 for writes from external
+  // processes on macOS. Filter to .md files in the event handlers.
   watcher = chokidar.watch(notesDir, {
     ignoreInitial: true,
     awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
     usePolling: false,
-    depth: 0,
   });
 
   const notifyIfMd = (type: 'add' | 'change' | 'unlink', filePath: string) => {
-    if (filePath.endsWith('.md')) {
-      notify(type, filePath);
-    }
+    const filename = path.basename(filePath);
+    const isMd = filePath.endsWith('.md');
+    console.log('[watcher]', type, filePath, isMd ? '→ forwarded' : '(ignored, not .md)');
+    if (!isMd) return;
+    BrowserWindow.getAllWindows().forEach((win) => {
+      win.webContents.send('fs:file-changed', { type, filename, filePath });
+    });
   };
 
   watcher
     .on('add', (filePath: string) => notifyIfMd('add', filePath))
     .on('change', (filePath: string) => notifyIfMd('change', filePath))
     .on('unlink', (filePath: string) => notifyIfMd('unlink', filePath))
-    .on('error', (error: unknown) => console.error('File watcher error:', error));
+    .on('ready', () => {
+      console.log('[watcher] ready, watching', notesDir);
+      BrowserWindow.getAllWindows().forEach((win) => {
+        win.webContents.send('fs:watcher-ready', { notesDir });
+      });
+    })
+    .on('error', (error: unknown) => {
+      console.error('[watcher] error:', error);
+      BrowserWindow.getAllWindows().forEach((win) => {
+        win.webContents.send('fs:watcher-error', { error: String(error) });
+      });
+    });
 }
 
 function stopFileWatcher(): void {

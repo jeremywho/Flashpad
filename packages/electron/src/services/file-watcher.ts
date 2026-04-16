@@ -1,3 +1,4 @@
+import { h4 } from '@shared/index';
 import { FileChangeEvent } from '../types/electron';
 import {
   isWritingNote,
@@ -21,11 +22,16 @@ export async function startFileWatcher(
 
   callback = onFileChange;
 
-  // Set up the IPC listener
   window.electron.fs.onFileChanged(handleFileChange);
+  window.electron.fs.onWatcherReady(({ notesDir }) => {
+    h4.info('File watcher ready', { notesDir });
+  });
+  window.electron.fs.onWatcherError(({ error }) => {
+    h4.error('File watcher error', { error });
+  });
 
-  // Start the watcher in the main process
   await window.electron.fs.watchStart();
+  h4.info('File watcher started');
 
   isWatching = true;
 }
@@ -36,11 +42,9 @@ export async function startFileWatcher(
 export async function stopFileWatcher(): Promise<void> {
   if (!isWatching) return;
 
-  // Stop the watcher in the main process
   await window.electron.fs.watchStop();
-
-  // Remove the IPC listener
   window.electron.fs.removeFileChangedListener();
+  window.electron.fs.removeWatcherLifecycleListeners();
 
   callback = null;
   isWatching = false;
@@ -52,24 +56,18 @@ export async function stopFileWatcher(): Promise<void> {
 async function handleFileChange(event: FileChangeEvent): Promise<void> {
   if (!callback) return;
 
-  const { type, filename } = event;
-
-  // Extract note ID from filename (e.g., "abc123.md" -> "abc123")
-  if (!filename.endsWith('.md')) return;
-
+  const { type, filename, filePath } = event;
   const noteId = filename.replace(/\.md$/, '');
+  const ownWrite = isWritingNote(noteId);
 
-  // Ignore our own writes
-  if (isWritingNote(noteId)) {
-    return;
-  }
+  h4.info('File watcher event', { type, filename, filePath, ownWrite });
+
+  if (ownWrite) return;
 
   if (type === 'unlink') {
-    // File was deleted
     await handleFileDeleted(noteId);
     callback('noteDeleted', noteId);
   } else if (type === 'add' || type === 'change') {
-    // File was added or changed - reload it
     const note = await reloadNoteFromFile(noteId);
     if (note) {
       callback('noteUpdated', noteId);

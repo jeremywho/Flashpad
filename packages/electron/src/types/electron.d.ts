@@ -11,6 +11,15 @@ export interface AppSettings {
 export interface FileChangeEvent {
   type: 'add' | 'change' | 'unlink';
   filename: string;
+  filePath: string;
+}
+
+export interface WatcherReadyEvent {
+  notesDir: string;
+}
+
+export interface WatcherErrorEvent {
+  error: string;
 }
 
 export interface ElectronFsAPI {
@@ -35,6 +44,9 @@ export interface ElectronFsAPI {
   watchStop: () => Promise<void>;
   onFileChanged: (callback: (event: FileChangeEvent) => void) => void;
   removeFileChangedListener: () => void;
+  onWatcherReady: (callback: (event: WatcherReadyEvent) => void) => void;
+  onWatcherError: (callback: (event: WatcherErrorEvent) => void) => void;
+  removeWatcherLifecycleListeners: () => void;
 }
 
 export interface ElectronAPI {

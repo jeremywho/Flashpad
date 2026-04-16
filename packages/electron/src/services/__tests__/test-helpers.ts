@@ -65,17 +65,20 @@ export function createMockElectron(store: MockNoteStore) {
       selectDirectory: jest.fn().mockResolvedValue(null),
       watchStart: jest.fn().mockResolvedValue(undefined),
       watchStop: jest.fn().mockResolvedValue(undefined),
-      onFileChanged: jest.fn((cb: (event: { type: string; filename: string }) => void) => {
+      onFileChanged: jest.fn((cb: (event: { type: string; filename: string; filePath: string }) => void) => {
         fileChangedCallbacks.push(cb);
       }),
       removeFileChangedListener: jest.fn(() => {
         fileChangedCallbacks.length = 0;
       }),
+      onWatcherReady: jest.fn(),
+      onWatcherError: jest.fn(),
+      removeWatcherLifecycleListeners: jest.fn(),
     },
     // Test helper: simulate a file change event from chokidar
     _simulateFileChange: (type: 'add' | 'change' | 'unlink', filename: string) => {
       for (const cb of fileChangedCallbacks) {
-        cb({ type, filename });
+        cb({ type, filename, filePath: `/tmp/test-data/notes/${filename}` });
       }
     },
   };

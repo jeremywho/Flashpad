@@ -13,6 +13,15 @@ export interface AppSettings {
 export interface FileChangeEvent {
   type: 'add' | 'change' | 'unlink';
   filename: string;
+  filePath: string;
+}
+
+export interface WatcherReadyEvent {
+  notesDir: string;
+}
+
+export interface WatcherErrorEvent {
+  error: string;
 }
 
 contextBridge.exposeInMainWorld('electron', {
@@ -75,6 +84,16 @@ contextBridge.exposeInMainWorld('electron', {
     },
     removeFileChangedListener: (): void => {
       ipcRenderer.removeAllListeners('fs:file-changed');
+    },
+    onWatcherReady: (callback: (event: WatcherReadyEvent) => void): void => {
+      ipcRenderer.on('fs:watcher-ready', (_event, data: WatcherReadyEvent) => callback(data));
+    },
+    onWatcherError: (callback: (event: WatcherErrorEvent) => void): void => {
+      ipcRenderer.on('fs:watcher-error', (_event, data: WatcherErrorEvent) => callback(data));
+    },
+    removeWatcherLifecycleListeners: (): void => {
+      ipcRenderer.removeAllListeners('fs:watcher-ready');
+      ipcRenderer.removeAllListeners('fs:watcher-error');
     },
   },
 });
