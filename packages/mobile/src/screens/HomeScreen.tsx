@@ -28,6 +28,7 @@ import type { Note, Category, NoteStatus } from '@flashpad/shared';
 import { SignalRClient, SignalRManager, ConnectionState, h4 } from '@flashpad/shared';
 import { getApiUrl } from '../config';
 import { AsyncStorageH4Storage } from '../services/h4-storage';
+import { getOrCreateMobileDeviceId } from '../services/deviceId';
 
 interface HomeScreenProps {
   navigation: any;
@@ -164,6 +165,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedNoteIds, setSelectedNoteIds] = useState<Set<string>>(new Set());
   const [showBatchCategoryPicker, setShowBatchCategoryPicker] = useState(false);
+  const [deviceId, setDeviceId] = useState<string | null>(null);
   const syncManagerRef = useRef<SyncManager | null>(null);
   const signalRRef = useRef<SignalRClient | null>(null);
   const fetchNotesRef = useRef<((tab?: TabType, categoryId?: string | null) => Promise<void>) | undefined>(undefined);
@@ -239,12 +241,31 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     fetchNotesRef.current = fetchNotes;
   }, [fetchNotes]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    getOrCreateMobileDeviceId()
+      .then((resolvedDeviceId) => {
+        if (!cancelled) {
+          setDeviceId(resolvedDeviceId);
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to initialize mobile device ID:', error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Initialize H4 logging and SyncManager
   useEffect(() => {
-    const apiUrl = getApiUrl();
+    if (!deviceId) {
+      return;
+    }
 
-    // Generate a stable device ID
-    const deviceId = `mobile-${Platform.OS}`;
+    const apiUrl = getApiUrl();
 
     h4.init({
       baseUrl: apiUrl,
@@ -267,6 +288,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
 
     const syncManager = new SyncManager({
       api,
+      deviceId,
       onSyncStatusChange: setSyncStatus,
       onPendingCountChange: setPendingCount,
       onDataRefresh: () => {
@@ -278,7 +300,6 @@ function HomeScreen({ navigation }: HomeScreenProps) {
 
     syncManagerRef.current = syncManager;
 
-    // Perform initial sync
     syncManager.initialSync().then(() => {
       fetchNotesRef.current?.();
       fetchCategories();
@@ -289,7 +310,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
       syncManagerRef.current = null;
       h4.destroy();
     };
-  }, [api, fetchCategories]);
+  }, [api, deviceId, fetchCategories]);
 
   useEffect(() => {
     if (syncManagerRef.current) {
@@ -340,7 +361,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
   // SignalR real-time sync - uses singleton to survive React re-renders
   useEffect(() => {
     const token = api.getToken();
-    if (!token) return;
+    if (!token || !deviceId) return;
 
     const signalRUrl = getApiUrl();
 
@@ -371,6 +392,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     const client = SignalRManager.getInstance({
       baseUrl: signalRUrl,
       getToken: () => api.getToken(),
+      deviceId,
       deviceName: 'Mobile App',
       onConnectionStateChange: setConnectionState,
       onNoteCreated: (note) => {
@@ -430,7 +452,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
       appStateSubscription.remove();
       // Don't stop - singleton persists. Connection stopped via SignalRManager.clear() on logout
     };
-  }, [api, fetchCategories]);
+  }, [api, deviceId, fetchCategories]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -672,6 +694,16 @@ function HomeScreen({ navigation }: HomeScreenProps) {
         <View style={styles.syncBadge}>
           <View style={[styles.syncDot, styles.syncDotSyncing]} />
           <Text style={styles.syncText}>Syncing...</Text>
+        </View>
+      );
+    }
+    if (syncStatus === 'error') {
+      return (
+        <View style={styles.syncBadge}>
+          <View style={[styles.syncDot, styles.syncDotError]} />
+          <Text style={styles.syncText}>
+            {pendingCount > 0 ? `${pendingCount} retry needed` : 'Retry needed'}
+          </Text>
         </View>
       );
     }
@@ -1137,6 +1169,9 @@ const styles = StyleSheet.create({
   },
   syncDotPending: {
     backgroundColor: '#f59e0b',
+  },
+  syncDotError: {
+    backgroundColor: '#ef4444',
   },
   syncDotOffline: {
     backgroundColor: '#ef4444',

@@ -40,7 +40,7 @@ function RegisterScreen({ navigation }: any) {
         password,
         fullName: fullName || undefined,
       });
-      await login(response.token, response.user);
+      await login(response.accessToken, response.refreshToken, response.user);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {

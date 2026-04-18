@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -17,10 +17,11 @@ import { LogOut } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { fonts } from '../theme/fonts';
-import { isUsingProduction, setUseProduction, getApiUrl } from '../config';
+import type { ApiEnvironment } from '../config';
+import { getApiEnvironment, getApiUrl } from '../config';
 
 function AccountScreen() {
-  const { user, api, logout } = useAuth();
+  const { user, api, logout, switchEnvironment } = useAuth();
   const { theme, themeMode, setThemeMode } = useTheme();
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
@@ -28,17 +29,65 @@ function AccountScreen() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  const [useProduction, setUseProductionState] = useState(isUsingProduction());
+  const [useProduction, setUseProductionState] = useState(getApiEnvironment() === 'production');
+  const [isSwitchingEnvironment, setIsSwitchingEnvironment] = useState(false);
+  const isMountedRef = useRef(true);
 
-  const handleApiToggle = async (value: boolean) => {
-    setUseProductionState(value);
-    await setUseProduction(value);
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const performEnvironmentSwitch = async (nextEnvironment: ApiEnvironment) => {
+    setIsSwitchingEnvironment(true);
+
+    try {
+      await switchEnvironment(nextEnvironment);
+      RNRestart.restart();
+    } catch (switchError) {
+      console.error('Failed to switch environment:', switchError);
+      if (isMountedRef.current) {
+        setUseProductionState(getApiEnvironment() === 'production');
+      }
+      Alert.alert(
+        'Environment Switch Failed',
+        'Failed to switch API environments safely. The app stays on the current environment.'
+      );
+    } finally {
+      if (isMountedRef.current) {
+        setIsSwitchingEnvironment(false);
+      }
+    }
+  };
+
+  const handleApiToggle = (value: boolean) => {
+    if (isSwitchingEnvironment) {
+      return;
+    }
+
+    const nextEnvironment: ApiEnvironment = value ? 'production' : 'local';
+    const currentEnvironment = getApiEnvironment();
+
+    if (nextEnvironment === currentEnvironment) {
+      return;
+    }
+
+    const currentLabel = currentEnvironment === 'production' ? 'Production' : 'Local Dev';
+    const nextLabel = nextEnvironment === 'production' ? 'Production' : 'Local Dev';
+
     Alert.alert(
-      'Restart Required',
-      `API changed to ${value ? 'Production' : 'Local Dev'}. The app needs to restart for changes to take effect.`,
+      'Switch API Environment',
+      `Switch from ${currentLabel} to ${nextLabel}? This signs you out and restarts the app so each environment keeps separate local data.`,
       [
-        { text: 'Later', style: 'cancel' },
-        { text: 'Restart Now', onPress: () => RNRestart.restart() },
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Switch & Restart',
+          style: 'destructive',
+          onPress: () => {
+            void performEnvironmentSwitch(nextEnvironment);
+          },
+        },
       ]
     );
   };
@@ -333,12 +382,13 @@ function AccountScreen() {
             <Switch
               value={useProduction}
               onValueChange={handleApiToggle}
+              disabled={isSwitchingEnvironment}
               trackColor={{ false: theme.border, true: theme.accent }}
               thumbColor={useProduction ? '#fff' : '#f4f3f4'}
             />
           </View>
           <Text style={styles.developerHint}>
-            Current: {getApiUrl()}
+            Current: {useProduction ? 'Production' : 'Local Dev'} ({getApiUrl()})
           </Text>
         </View>
 

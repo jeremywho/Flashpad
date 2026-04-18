@@ -34,6 +34,7 @@ mobile/
 - Android SDK (API 34+)
 - JDK 17+
 - Android Emulator or physical device
+- In this npm-workspaces repo, Gradle resolves `@react-native/gradle-plugin` from the workspace root `node_modules` first and falls back to the package-local install if needed.
 
 ## Setup
 
@@ -95,7 +96,16 @@ To find your computer's IP:
 
 ### Android
 
-#### Debug APK
+Release builds require a private keystore supplied through Gradle properties or environment variables:
+
+- `FLASHPAD_RELEASE_STORE_FILE`
+- `FLASHPAD_RELEASE_STORE_PASSWORD`
+- `FLASHPAD_RELEASE_KEY_ALIAS`
+- `FLASHPAD_RELEASE_KEY_PASSWORD`
+
+You can pass them either with `-P` or as environment variables when invoking Gradle. The app build fails closed if a `release` task is requested without these values, and it refuses the public debug keystore and debug signing credentials.
+
+#### Release APK
 ```bash
 cd android
 ./gradlew assembleRelease

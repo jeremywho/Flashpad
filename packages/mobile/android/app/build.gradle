@@ -11,11 +11,11 @@ react {
     //   The root of your project, i.e. where "package.json" lives. Default is '../..'
     // root = file("../../")
     //   The folder where the react-native NPM package is. Default is ../../node_modules/react-native
-    // reactNativeDir = file("../../node_modules/react-native")
+    reactNativeDir = file("../../../../node_modules/react-native")
     //   The folder where the react-native Codegen package is. Default is ../../node_modules/@react-native/codegen
-    // codegenDir = file("../../node_modules/@react-native/codegen")
+    codegenDir = file("../../../../node_modules/@react-native/codegen")
     //   The cli.js file which is the React Native CLI entrypoint. Default is ../../node_modules/react-native/cli.js
-    // cliFile = file("../../node_modules/react-native/cli.js")
+    cliFile = file("../../../../node_modules/react-native/cli.js")
 
     /* Variants */
     //   The list of variants to that are debuggable. For those we're going to
@@ -71,6 +71,43 @@ def enableProguardInReleaseBuilds = true
  * this variant is about 6MiB larger per architecture than default.
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
+def releaseSigningTaskRequested = gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }
+def readSigningValue = { String key ->
+    def value = project.findProperty(key)
+    if (value == null || value.toString().trim().isEmpty()) {
+        value = System.getenv(key)
+    }
+    return value?.toString()?.trim()
+}
+def releaseSigningInputs = [
+    storeFilePath: readSigningValue('FLASHPAD_RELEASE_STORE_FILE'),
+    storePassword: readSigningValue('FLASHPAD_RELEASE_STORE_PASSWORD'),
+    keyAlias: readSigningValue('FLASHPAD_RELEASE_KEY_ALIAS'),
+    keyPassword: readSigningValue('FLASHPAD_RELEASE_KEY_PASSWORD')
+]
+def missingReleaseSigningInputs = releaseSigningInputs.findAll { !it.value }.keySet().toList()
+def releaseSigningConfigured = missingReleaseSigningInputs.isEmpty()
+def debugKeystoreFile = file('debug.keystore').canonicalFile
+def releaseKeystoreFile = releaseSigningInputs.storeFilePath ? file(releaseSigningInputs.storeFilePath).canonicalFile : null
+def releaseSigningIsDebugKeystore =
+    releaseSigningConfigured &&
+    (releaseKeystoreFile == debugKeystoreFile ||
+     releaseSigningInputs.storePassword == 'android' ||
+     releaseSigningInputs.keyAlias == 'androiddebugkey' ||
+     releaseSigningInputs.keyPassword == 'android')
+
+if (releaseSigningTaskRequested && !releaseSigningConfigured) {
+    throw new GradleException(
+        'Release signing requires FLASHPAD_RELEASE_STORE_FILE, FLASHPAD_RELEASE_STORE_PASSWORD, ' +
+        'FLASHPAD_RELEASE_KEY_ALIAS, and FLASHPAD_RELEASE_KEY_PASSWORD supplied via -P or environment variables.'
+    )
+}
+
+if (releaseSigningIsDebugKeystore) {
+    throw new GradleException(
+        'Release signing must not use the public debug keystore or debug signing credentials.'
+    )
+}
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -92,15 +129,27 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        if (releaseSigningConfigured) {
+            release {
+                storeFile file(releaseSigningInputs.storeFilePath)
+                storePassword releaseSigningInputs.storePassword
+                keyAlias releaseSigningInputs.keyAlias
+                keyPassword releaseSigningInputs.keyPassword
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            if (releaseSigningConfigured) {
+                signingConfig signingConfigs.release
+            } else if (releaseSigningTaskRequested) {
+                throw new GradleException(
+                    'Release signing credentials are missing. Provide FLASHPAD_RELEASE_* values via -P or environment variables.'
+                )
+            }
             minifyEnabled enableProguardInReleaseBuilds
             shrinkResources enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"

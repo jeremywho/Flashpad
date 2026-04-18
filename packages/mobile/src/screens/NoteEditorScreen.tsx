@@ -20,6 +20,7 @@ import { fonts } from '../theme/fonts';
 import { SyncManager } from '../services/syncManager';
 import { getLocalNote } from '../services/database';
 import type { Note, Category, NoteStatus } from '@flashpad/shared';
+import { getOrCreateMobileDeviceId } from '../services/deviceId';
 
 interface NoteEditorScreenProps {
   navigation: any;
@@ -43,6 +44,7 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
   const [isOffline, setIsOffline] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
+  const [conflictMessage, setConflictMessage] = useState<string | null>(null);
   const textInputRef = useRef<TextInput>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const syncManagerRef = useRef<SyncManager | null>(null);
@@ -64,19 +66,43 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
 
   // Initialize SyncManager
   useEffect(() => {
-    const syncManager = new SyncManager({
-      api,
-      onSyncStatusChange: (status) => {
-        setIsOffline(status === 'offline');
-      },
-    });
-    syncManagerRef.current = syncManager;
+    let cancelled = false;
+    let syncManager: SyncManager | null = null;
+
+    getOrCreateMobileDeviceId()
+      .then((deviceId) => {
+        if (cancelled) {
+          return;
+        }
+
+        syncManager = new SyncManager({
+          api,
+          deviceId,
+          onSyncStatusChange: (status) => {
+            setIsOffline(status === 'offline');
+          },
+          onConflict: (conflictedNoteId, serverVersion) => {
+            if (conflictedNoteId === noteId) {
+              setConflictMessage(`This note changed on another device. Latest version v${serverVersion} was loaded.`);
+            }
+          },
+        });
+        syncManagerRef.current = syncManager;
+      })
+      .catch((error) => {
+        console.error('Failed to initialize note editor device ID:', error);
+      });
 
     return () => {
-      syncManager.destroy();
+      cancelled = true;
+      syncManager?.destroy();
       syncManagerRef.current = null;
     };
-  }, [api]);
+  }, [api, noteId]);
+
+  useEffect(() => {
+    setConflictMessage(null);
+  }, [noteId]);
 
   const fetchNote = useCallback(async () => {
     if (!noteId) {
@@ -137,28 +163,32 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
     if (!content.trim() || !syncManagerRef.current) return;
 
     setIsSaving(true);
+    setConflictMessage(null);
     try {
       if (isNew) {
         const newNote = await syncManagerRef.current.createNote({
           content: content.trim(),
           categoryId: selectedCategoryId,
-          deviceId: 'mobile',
         });
         // Only update state if still mounted
         if (isMountedRef.current) {
           setNote(newNote);
+          setContent(newNote.content);
+          setSelectedCategoryId(newNote.categoryId);
           setHasChanges(false);
+          setConflictMessage(null);
           navigation.setParams({ noteId: newNote.id, isNew: false });
         }
       } else if (noteId) {
         const updatedNote = await syncManagerRef.current.updateNote(noteId, {
           content: content.trim(),
           categoryId: selectedCategoryId,
-          deviceId: 'mobile',
         });
         // Only update state if still mounted
         if (isMountedRef.current) {
           setNote(updatedNote);
+          setContent(updatedNote.content);
+          setSelectedCategoryId(updatedNote.categoryId);
           setHasChanges(false);
         }
       }
@@ -196,11 +226,17 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
     setShowCategoryPicker(false);
 
     // Save immediately if editing existing note
-    if (!isNew && noteId && syncManagerRef.current) {
+    if (!isNew && noteId && note && syncManagerRef.current) {
       setIsSaving(true);
       try {
-        const updatedNote = await syncManagerRef.current.moveNoteToCategory(noteId, categoryId);
+        const updatedNote = await syncManagerRef.current.updateNote(noteId, {
+          content,
+          categoryId,
+        });
         setNote(updatedNote);
+        setContent(updatedNote.content);
+        setSelectedCategoryId(updatedNote.categoryId);
+        setHasChanges(false);
       } catch (error) {
         console.error('Failed to update category:', error);
       } finally {
@@ -346,6 +382,12 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
           <Text style={styles.localNoteBannerText}>
             This note hasn't been synced yet
           </Text>
+        </View>
+      )}
+
+      {conflictMessage && (
+        <View style={styles.conflictBanner}>
+          <Text style={styles.conflictBannerText}>{conflictMessage}</Text>
         </View>
       )}
 
@@ -602,6 +644,18 @@ const styles = StyleSheet.create({
   },
   localNoteBannerText: {
     color: '#f59e0b',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  conflictBanner: {
+    backgroundColor: 'rgba(239, 68, 68, 0.14)',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(239, 68, 68, 0.24)',
+  },
+  conflictBannerText: {
+    color: colors.danger,
     fontSize: 13,
     textAlign: 'center',
   },

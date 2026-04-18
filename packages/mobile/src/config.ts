@@ -1,8 +1,16 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+export type ApiEnvironment = 'production' | 'local';
+
 const PRODUCTION_API_URL = 'https://api.flashpad.cc';
-const CONFIG_KEY = '@flashpad_use_production';
+const CONFIG_KEY = '@flashpad_api_environment';
+const LEGACY_CONFIG_KEY = '@flashpad_use_production';
+const STORAGE_NAMESPACE_PREFIX = '@flashpad';
+
+const isDevBuild = typeof __DEV__ === 'boolean' ? __DEV__ : true;
+
+const listeners = new Set<(environment: ApiEnvironment) => void>();
 
 // Local development URLs vary by platform
 const getLocalApiUrl = () => {
@@ -16,15 +24,22 @@ const getLocalApiUrl = () => {
 
 // Runtime configuration state
 // Default to production for Release builds, local for Debug
-let _useProduction = !__DEV__;
+let _environment: ApiEnvironment = isDevBuild ? 'local' : 'production';
 let _initialized = false;
 
 export const initConfig = async (): Promise<void> => {
   try {
-    const stored = await AsyncStorage.getItem(CONFIG_KEY);
-    // Only override if explicitly set, otherwise use default based on build type
-    if (stored !== null) {
-      _useProduction = stored === 'true';
+    const storedEnvironment = await AsyncStorage.getItem(CONFIG_KEY);
+
+    if (isApiEnvironment(storedEnvironment)) {
+      _environment = storedEnvironment;
+    } else {
+      const legacyStored = await AsyncStorage.getItem(LEGACY_CONFIG_KEY);
+      if (legacyStored !== null) {
+        _environment = legacyStored === 'true' ? 'production' : 'local';
+        await AsyncStorage.setItem(CONFIG_KEY, _environment);
+        await AsyncStorage.removeItem(LEGACY_CONFIG_KEY);
+      }
     }
     _initialized = true;
   } catch {
@@ -33,20 +48,57 @@ export const initConfig = async (): Promise<void> => {
   }
 };
 
+function isApiEnvironment(value: string | null): value is ApiEnvironment {
+  return value === 'production' || value === 'local';
+}
+
+function notifyListeners(environment: ApiEnvironment): void {
+  listeners.forEach((listener) => listener(environment));
+}
+
+export const getApiEnvironment = (): ApiEnvironment => {
+  return _environment;
+};
+
 export const getApiUrl = (): string => {
   if (!_initialized) {
     console.warn('Config not initialized, using default (local dev)');
   }
-  return _useProduction ? PRODUCTION_API_URL : getLocalApiUrl();
+  return _environment === 'production' ? PRODUCTION_API_URL : getLocalApiUrl();
 };
 
 export const isUsingProduction = (): boolean => {
-  return _useProduction;
+  return _environment === 'production';
+};
+
+export const subscribeToConfigChanges = (
+  listener: (environment: ApiEnvironment) => void
+): (() => void) => {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+};
+
+export const getNamespacedStorageKey = (
+  storageKey: string,
+  environment: ApiEnvironment = _environment
+): string => {
+  return `${STORAGE_NAMESPACE_PREFIX}:${environment}:${storageKey}`;
+};
+
+export const setApiEnvironment = async (environment: ApiEnvironment): Promise<void> => {
+  const previousEnvironment = _environment;
+  await AsyncStorage.setItem(CONFIG_KEY, environment);
+  _environment = environment;
+
+  if (previousEnvironment !== environment) {
+    notifyListeners(environment);
+  }
 };
 
 export const setUseProduction = async (value: boolean): Promise<void> => {
-  _useProduction = value;
-  await AsyncStorage.setItem(CONFIG_KEY, value.toString());
+  await setApiEnvironment(value ? 'production' : 'local');
 };
 
 // For backwards compatibility
@@ -57,6 +109,9 @@ export const config = {
     return getApiUrl();
   },
   get isProduction() {
-    return _useProduction;
+    return _environment === 'production';
+  },
+  get environment() {
+    return _environment;
   },
 };

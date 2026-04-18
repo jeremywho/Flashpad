@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { H4LogStorage, LogEntry } from '@flashpad/shared';
+import { getNamespacedStorageKey } from '../config';
 
-const STORAGE_KEY = '@h4_pending_logs';
+const STORAGE_KEY = 'h4_pending_logs';
 
 /**
  * AsyncStorage-backed log persistence for React Native.
@@ -14,7 +15,7 @@ export class AsyncStorageH4Storage implements H4LogStorage {
       const merged = [...existing, ...entries];
       // Cap at 500 entries to prevent storage bloat
       const capped = merged.length > 500 ? merged.slice(-500) : merged;
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(capped));
+      await AsyncStorage.setItem(getNamespacedStorageKey(STORAGE_KEY), JSON.stringify(capped));
     } catch {
       // Silent failure — better to lose logs than crash the app
     }
@@ -24,7 +25,7 @@ export class AsyncStorageH4Storage implements H4LogStorage {
     try {
       const entries = await this.load();
       if (entries.length > 0) {
-        await AsyncStorage.removeItem(STORAGE_KEY);
+        await AsyncStorage.removeItem(getNamespacedStorageKey(STORAGE_KEY));
       }
       return entries;
     } catch {
@@ -34,7 +35,7 @@ export class AsyncStorageH4Storage implements H4LogStorage {
 
   private async load(): Promise<LogEntry[]> {
     try {
-      const raw = await AsyncStorage.getItem(STORAGE_KEY);
+      const raw = await AsyncStorage.getItem(getNamespacedStorageKey(STORAGE_KEY));
       return raw ? JSON.parse(raw) : [];
     } catch {
       return [];

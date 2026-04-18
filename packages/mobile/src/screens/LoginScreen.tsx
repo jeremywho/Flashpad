@@ -33,7 +33,7 @@ function LoginScreen({ navigation }: any) {
 
     try {
       const response = await api.login({ username, password });
-      await login(response.token, response.user);
+      await login(response.accessToken, response.refreshToken, response.user);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {

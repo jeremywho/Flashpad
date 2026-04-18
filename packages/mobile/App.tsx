@@ -6,7 +6,7 @@ import { AuthProvider } from './src/contexts/AuthContext';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import { ToastProvider } from './src/components/Toast';
 import AppNavigator from './src/navigation/AppNavigator';
-import { initConfig } from './src/config';
+import { getApiEnvironment, initConfig, subscribeToConfigChanges } from './src/config';
 
 const AppContent = React.memo(function AppContent() {
   const { isDark } = useTheme();
@@ -25,11 +25,29 @@ const AppContent = React.memo(function AppContent() {
 
 function App() {
   const [configReady, setConfigReady] = useState(false);
+  const [environment, setEnvironment] = useState(getApiEnvironment());
 
   useEffect(() => {
+    let isMounted = true;
+
     initConfig().then(() => {
+      if (!isMounted) {
+        return;
+      }
+
+      setEnvironment(getApiEnvironment());
       setConfigReady(true);
       BootSplash.hide({ fade: true });
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    return subscribeToConfigChanges((nextEnvironment) => {
+      setEnvironment(nextEnvironment);
     });
   }, []);
 
@@ -44,7 +62,7 @@ function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <AppContent />
+        <AppContent key={environment} />
       </ThemeProvider>
     </SafeAreaProvider>
   );

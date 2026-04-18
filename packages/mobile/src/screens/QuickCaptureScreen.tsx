@@ -14,6 +14,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/colors';
 import { fonts } from '../theme/fonts';
 import { SyncManager } from '../services/syncManager';
+import { getOrCreateMobileDeviceId } from '../services/deviceId';
 
 interface QuickCaptureScreenProps {
   navigation: any;
@@ -35,16 +36,32 @@ function QuickCaptureScreen({ navigation }: QuickCaptureScreenProps) {
     }, 100);
 
     // Initialize SyncManager
-    const syncManager = new SyncManager({
-      api,
-      onSyncStatusChange: (status) => {
-        setIsOffline(status === 'offline');
-      },
-    });
-    syncManagerRef.current = syncManager;
+    let cancelled = false;
+    let syncManager: SyncManager | null = null;
+
+    getOrCreateMobileDeviceId()
+      .then((deviceId) => {
+        if (cancelled) {
+          return;
+        }
+
+        syncManager = new SyncManager({
+          api,
+          deviceId,
+          onSyncStatusChange: (status) => {
+            setIsOffline(status === 'offline');
+          },
+        });
+        syncManagerRef.current = syncManager;
+      })
+      .catch((error) => {
+        console.error('Failed to initialize quick capture device ID:', error);
+      });
 
     return () => {
-      syncManager.destroy();
+      cancelled = true;
+      syncManager?.destroy();
+      syncManagerRef.current = null;
     };
   }, [api]);
 
@@ -95,7 +112,6 @@ function QuickCaptureScreen({ navigation }: QuickCaptureScreenProps) {
     try {
       await syncManagerRef.current.createNote({
         content: content.trim(),
-        deviceId: 'mobile-quick-capture',
       });
       setContent('');
       // Navigate back to home after saving
