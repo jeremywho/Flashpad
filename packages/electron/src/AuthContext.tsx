@@ -53,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const response = await api.refreshToken(currentRefreshToken);
         refreshTokenRef.current = response.refreshToken;
+        void window.electron.auth.setRefreshToken(response.refreshToken).catch(() => undefined);
         setUser(response.user);
         scheduleRefresh(onLogout);
       } catch {
@@ -70,19 +71,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     api.logout();
     void window.electron.auth.setSessionActive(false);
+    void window.electron.auth.clearRefreshToken().catch(() => undefined);
     SignalRManager.clear();
     setUser(null);
   }, [clearRefreshTimer]);
 
   useEffect(() => {
-    void window.electron.auth.setSessionActive(false);
-    setIsLoading(false);
-    return clearRefreshTimer;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const storedRefreshToken = await window.electron.auth.getRefreshToken();
+        if (cancelled) return;
+
+        if (storedRefreshToken) {
+          try {
+            const response = await api.refreshToken(storedRefreshToken);
+            if (cancelled) return;
+            refreshTokenRef.current = response.refreshToken;
+            void window.electron.auth.setRefreshToken(response.refreshToken).catch(() => undefined);
+            setUser(response.user);
+            void window.electron.auth.setSessionActive(true);
+            scheduleRefresh(logout);
+          } catch {
+            await window.electron.auth.clearRefreshToken().catch(() => undefined);
+            if (!cancelled) void window.electron.auth.setSessionActive(false);
+          }
+        } else {
+          void window.electron.auth.setSessionActive(false);
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      clearRefreshTimer();
+    };
   }, [scheduleRefresh, logout, clearRefreshTimer]);
 
   const login = (accessToken: string, refreshToken: string, userData: User) => {
     refreshTokenRef.current = refreshToken;
     api.setToken(accessToken);
+    void window.electron.auth.setRefreshToken(refreshToken).catch(() => undefined);
     void window.electron.auth.setSessionActive(true);
     setUser(userData);
     scheduleRefresh(logout);

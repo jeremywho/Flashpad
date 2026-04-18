@@ -34,6 +34,9 @@ export function createMockElectron(store: MockNoteStore) {
     },
     auth: {
       setSessionActive: jest.fn().mockResolvedValue(undefined),
+      getRefreshToken: jest.fn().mockResolvedValue(null),
+      setRefreshToken: jest.fn().mockResolvedValue(undefined),
+      clearRefreshToken: jest.fn().mockResolvedValue(undefined),
     },
     quickCapture: {
       close: jest.fn().mockResolvedValue(undefined),

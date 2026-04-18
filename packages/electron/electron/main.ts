@@ -7,6 +7,7 @@ import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import { settingsStore, AppSettings } from './settings';
 import { checkForUpdates as requestUpdateCheck } from '../src/services/updater-listeners';
+import { getStoredRefreshToken, storeRefreshToken, clearStoredRefreshToken } from './authStore';
 
 let mainWindow: BrowserWindow | null = null;
 let quickCaptureWindow: BrowserWindow | null = null;
@@ -688,6 +689,21 @@ ipcMain.handle('close-quick-capture-code', () => {
 
 ipcMain.handle('auth:set-session-active', (_event, isActive: boolean) => {
   quickCaptureSessionActive = isActive;
+});
+
+ipcMain.handle('auth:get-refresh-token', async () => {
+  return getStoredRefreshToken();
+});
+
+ipcMain.handle('auth:set-refresh-token', async (_event, token: unknown) => {
+  if (typeof token !== 'string' || token.length === 0) {
+    throw new Error('Invalid refresh token');
+  }
+  await storeRefreshToken(token);
+});
+
+ipcMain.handle('auth:clear-refresh-token', async () => {
+  await clearStoredRefreshToken();
 });
 
 ipcMain.handle('note-created-from-quick-capture', () => {

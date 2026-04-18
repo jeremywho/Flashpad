@@ -66,6 +66,9 @@ export interface ElectronAPI {
   };
   auth: {
     setSessionActive: (isActive: boolean) => Promise<void>;
+    getRefreshToken: () => Promise<string | null>;
+    setRefreshToken: (token: string) => Promise<void>;
+    clearRefreshToken: () => Promise<void>;
   };
   quickCapture: {
     close: () => Promise<void>;
