@@ -24,7 +24,7 @@ function Register() {
         password,
         fullName: fullName || undefined,
       });
-      login(response.token, response.user);
+      login(response.accessToken, response.refreshToken, response.user);
       navigate('/app');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');

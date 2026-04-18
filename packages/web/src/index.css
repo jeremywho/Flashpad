@@ -626,6 +626,14 @@ button:disabled {
   gap: 12px;
 }
 
+.note-editor-conflict-banner {
+  padding: 10px 20px;
+  border-bottom: 1px solid rgba(245, 158, 11, 0.28);
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  font-size: 13px;
+}
+
 .note-editor-category-selector {
   position: relative;
   display: flex;

@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../AuthContext';
-import { Note, Category, NoteStatus, CreateCategoryDto, SignalRClient, SignalRManager, ConnectionState } from '@shared/index';
+import { Note, Category, NoteStatus, CreateCategoryDto, SignalRClient, SignalRManager, ConnectionState, HttpError } from '@shared/index';
 import Sidebar from '../components/Sidebar';
 import NotesList from '../components/NotesList';
 import NoteEditor from '../components/NoteEditor';
 import CategoryManager from '../components/CategoryManager';
+import { getOrCreateWebDeviceId } from '../services/deviceId';
 
 type ViewType = 'inbox' | 'archive' | 'trash' | string;
 
@@ -37,9 +38,16 @@ function Home() {
     return localStorage.getItem('flashpad-focus-mode') === 'true';
   });
   const [newNoteInitialCategoryId, setNewNoteInitialCategoryId] = useState<string | undefined>();
+  const [conflictMessage, setConflictMessage] = useState<string | null>(null);
+  const [editorResetToken, setEditorResetToken] = useState(0);
   const signalRRef = useRef<SignalRClient | null>(null);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectedViewRef = useRef(selectedView);
+
+  const isConflictError = (error: unknown): error is HttpError => {
+    return (error instanceof HttpError && error.status === 409)
+      || (typeof error === 'object' && error !== null && 'status' in error && (error as { status?: number }).status === 409);
+  };
 
   // Keep ref in sync with state for use in SignalR callbacks
   useEffect(() => {
@@ -187,12 +195,7 @@ function Home() {
       return note.status === NoteStatus.Inbox && note.categoryId === view;
     };
 
-    // Generate a stable device ID (persisted in localStorage)
-    let deviceId = localStorage.getItem('flashpad-device-id');
-    if (!deviceId) {
-      deviceId = `web-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      localStorage.setItem('flashpad-device-id', deviceId);
-    }
+    const deviceId = getOrCreateWebDeviceId();
 
     // Get or create singleton client - callbacks are updated on each call
     const client = SignalRManager.getInstance({
@@ -288,18 +291,21 @@ function Home() {
   const handleNoteSelect = (note: Note) => {
     setSelectedNote(note);
     setIsNewNote(false);
+    setConflictMessage(null);
   };
 
   const handleNewNote = () => {
     setSelectedNote(null);
     setIsNewNote(true);
     setNewNoteInitialCategoryId(undefined);
+    setConflictMessage(null);
   };
 
   const handleNewNoteInCategory = (categoryId: string) => {
     setSelectedNote(null);
     setIsNewNote(true);
     setNewNoteInitialCategoryId(categoryId);
+    setConflictMessage(null);
     // Switch to the category view
     setSelectedView(categoryId);
   };
@@ -307,11 +313,12 @@ function Home() {
   const handleSave = async (content: string, categoryId?: string) => {
     setIsSaving(true);
     try {
+      const deviceId = getOrCreateWebDeviceId();
       if (isNewNote) {
         const newNote = await api.createNote({
           content,
           categoryId,
-          deviceId: 'web-browser',
+          deviceId,
         });
         // Use deduplication to avoid race condition with SignalR broadcast
         setNotes((prev) => {
@@ -320,13 +327,15 @@ function Home() {
         });
         setSelectedNote(newNote);
         setIsNewNote(false);
+        setConflictMessage(null);
         fetchInboxCount();
         fetchCategories();
       } else if (selectedNote) {
         const updatedNote = await api.updateNote(selectedNote.id, {
           content,
           categoryId,
-          deviceId: 'web-browser',
+          deviceId,
+          baseVersion: selectedNote.version,
         });
         // Move to top if still in current view, remove if not (e.g., assigned category while in inbox)
         setNotes((prev) => {
@@ -342,10 +351,35 @@ function Home() {
         } else {
           setSelectedNote(updatedNote);
         }
+        setConflictMessage(null);
         fetchInboxCount();
         fetchCategories();
       }
     } catch (error) {
+      if (isConflictError(error) && selectedNote) {
+        try {
+          const latestNote = await api.getNote(selectedNote.id);
+          setNotes((prev) => {
+            const filtered = prev.filter((n) => n.id !== latestNote.id);
+            if (shouldShowNoteInCurrentView(latestNote)) {
+              return [latestNote, ...filtered];
+            }
+            return filtered;
+          });
+          setSelectedNote(latestNote);
+          setConflictMessage('This note changed on another device. Latest version loaded.');
+          setEditorResetToken((current) => current + 1);
+          showToast('Note changed on another device. Refreshed to the latest version.');
+          fetchInboxCount();
+          fetchCategories();
+          return;
+        } catch (refreshError) {
+          console.error('Failed to refresh note after conflict:', refreshError);
+          setConflictMessage('This note changed on another device. Reopen it to load the latest version.');
+          showToast('Note changed on another device. Reopen it to load the latest version.');
+          return;
+        }
+      }
       console.error('Failed to save note:', error);
     } finally {
       setIsSaving(false);
@@ -355,9 +389,10 @@ function Home() {
   const handleArchive = async () => {
     if (!selectedNote) return;
     try {
-      await api.archiveNote(selectedNote.id);
+      await api.archiveNote(selectedNote.id, getOrCreateWebDeviceId());
       setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
       setSelectedNote(null);
+      setConflictMessage(null);
       fetchCategories();
     } catch (error) {
       console.error('Failed to archive note:', error);
@@ -367,9 +402,10 @@ function Home() {
   const handleRestore = async () => {
     if (!selectedNote) return;
     try {
-      await api.restoreNote(selectedNote.id);
+      await api.restoreNote(selectedNote.id, getOrCreateWebDeviceId());
       setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
       setSelectedNote(null);
+      setConflictMessage(null);
       fetchCategories();
     } catch (error) {
       console.error('Failed to restore note:', error);
@@ -379,9 +415,10 @@ function Home() {
   const handleTrash = async () => {
     if (!selectedNote) return;
     try {
-      await api.trashNote(selectedNote.id);
+      await api.trashNote(selectedNote.id, getOrCreateWebDeviceId());
       setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
       setSelectedNote(null);
+      setConflictMessage(null);
       fetchCategories();
     } catch (error) {
       console.error('Failed to trash note:', error);
@@ -392,9 +429,10 @@ function Home() {
     if (!selectedNote) return;
     if (!confirm('Are you sure you want to permanently delete this note?')) return;
     try {
-      await api.deleteNotePermanently(selectedNote.id);
+      await api.deleteNotePermanently(selectedNote.id, getOrCreateWebDeviceId());
       setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
       setSelectedNote(null);
+      setConflictMessage(null);
     } catch (error) {
       console.error('Failed to delete note:', error);
     }
@@ -472,6 +510,8 @@ function Home() {
         isFocusMode={isFocusMode}
         onToggleFocusMode={toggleFocusMode}
         connectionState={connectionState}
+        conflictMessage={conflictMessage}
+        resetToken={editorResetToken}
       />
       {showCategoryManager && (
         <CategoryManager

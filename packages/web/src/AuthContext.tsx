@@ -7,7 +7,7 @@ interface AuthContextType {
   api: ApiClient;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (token: string, user: User) => void;
+  login: (accessToken: string, refreshToken: string, user: User) => void;
   logout: () => void;
 }
 
@@ -15,6 +15,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const api = new ApiClient(API_URL);
+const REFRESH_TOKEN_STORAGE_KEY = 'refreshToken';
 
 const REFRESH_BUFFER_MS = 24 * 60 * 60 * 1000; // 1 day before expiry
 
@@ -22,6 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshTokenRef = useRef<string | null>(null);
 
   const clearRefreshTimer = useCallback(() => {
     if (refreshTimerRef.current) {
@@ -45,8 +47,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const delay = Math.max(timeUntilExpiry - REFRESH_BUFFER_MS, 0);
     refreshTimerRef.current = setTimeout(async () => {
       try {
-        const response = await api.refreshToken();
-        localStorage.setItem('token', response.token);
+        const currentRefreshToken = refreshTokenRef.current;
+        if (!currentRefreshToken) {
+          onLogout();
+          return;
+        }
+
+        const response = await api.refreshToken(currentRefreshToken);
+        refreshTokenRef.current = response.refreshToken;
+        localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, response.refreshToken);
         setUser(response.user);
         scheduleRefresh(onLogout);
       } catch {
@@ -57,24 +66,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     clearRefreshTimer();
-    localStorage.removeItem('token');
+    const refreshToken = refreshTokenRef.current;
+    refreshTokenRef.current = null;
+    localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
+    if (refreshToken) {
+      void api.logoutSession(refreshToken).catch(() => undefined);
+    }
     api.logout();
     SignalRManager.clear();
     setUser(null);
   }, [clearRefreshTimer]);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      api.setToken(token);
+    const refreshToken = localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
+    if (refreshToken) {
+      refreshTokenRef.current = refreshToken;
       api
-        .getCurrentUser()
+        .refreshToken(refreshToken)
         .then((userData) => {
-          setUser(userData);
+          refreshTokenRef.current = userData.refreshToken;
+          localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, userData.refreshToken);
+          setUser(userData.user);
           scheduleRefresh(logout);
         })
         .catch(() => {
-          localStorage.removeItem('token');
+          refreshTokenRef.current = null;
+          localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
           api.setToken(null);
         })
         .finally(() => setIsLoading(false));
@@ -84,9 +101,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return clearRefreshTimer;
   }, [scheduleRefresh, logout, clearRefreshTimer]);
 
-  const login = (token: string, userData: User) => {
-    localStorage.setItem('token', token);
-    api.setToken(token);
+  const login = (accessToken: string, refreshToken: string, userData: User) => {
+    refreshTokenRef.current = refreshToken;
+    localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, refreshToken);
+    api.setToken(accessToken);
     setUser(userData);
     scheduleRefresh(logout);
   };

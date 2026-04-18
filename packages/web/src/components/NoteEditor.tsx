@@ -94,6 +94,8 @@ interface NoteEditorProps {
   isFocusMode?: boolean;
   onToggleFocusMode?: () => void;
   connectionState?: string;
+  conflictMessage?: string | null;
+  resetToken?: number;
 }
 
 export default function NoteEditor({
@@ -111,6 +113,8 @@ export default function NoteEditor({
   isFocusMode,
   onToggleFocusMode,
   connectionState,
+  conflictMessage,
+  resetToken = 0,
 }: NoteEditorProps) {
   const showSavingIndicator = useDebouncedSavingIndicator(isSaving);
   const [content, setContent] = useState(note?.content || '');
@@ -126,6 +130,7 @@ export default function NoteEditor({
   const lastSavedContentRef = useRef<string>(note?.content || '');
   // Track the note ID to detect when the user switches to a different note.
   const prevNoteIdRef = useRef<string | undefined>(note?.id);
+  const prevResetTokenRef = useRef(resetToken);
 
   // Reset content when switching to a different note (note ID changed).
   useEffect(() => {
@@ -140,6 +145,16 @@ export default function NoteEditor({
   useEffect(() => {
     setSelectedCategoryId(note?.categoryId ?? initialCategoryId);
   }, [note?.id, note?.categoryId, initialCategoryId]);
+
+  useEffect(() => {
+    if (resetToken === prevResetTokenRef.current) return;
+
+    setContent(note?.content || '');
+    setSelectedCategoryId(note?.categoryId ?? initialCategoryId);
+    lastSavedContentRef.current = note?.content || '';
+    prevNoteIdRef.current = note?.id;
+    prevResetTokenRef.current = resetToken;
+  }, [initialCategoryId, note?.categoryId, note?.content, note?.id, resetToken]);
 
   // Handle external content changes (e.g., edits from another device via SignalR)
   // without disrupting cursor position during the user's own auto-saves.
@@ -448,6 +463,10 @@ export default function NoteEditor({
           )}
         </div>
       </div>
+
+      {conflictMessage && (
+        <div className="note-editor-conflict-banner">{conflictMessage}</div>
+      )}
 
       <textarea
         ref={textareaRef}
