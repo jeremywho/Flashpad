@@ -69,6 +69,7 @@ export interface ElectronAPI {
     getRefreshToken: () => Promise<string | null>;
     setRefreshToken: (token: string) => Promise<void>;
     clearRefreshToken: () => Promise<void>;
+    isEncryptionAvailable: () => Promise<boolean>;
   };
   quickCapture: {
     close: () => Promise<void>;

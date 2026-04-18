@@ -53,7 +53,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const response = await api.refreshToken(currentRefreshToken);
         refreshTokenRef.current = response.refreshToken;
-        void window.electron.auth.setRefreshToken(response.refreshToken).catch(() => undefined);
+        void window.electron.auth.setRefreshToken(response.refreshToken).catch((err) => {
+          console.warn('[auth] setRefreshToken failed:', err);
+        });
         setUser(response.user);
         scheduleRefresh(onLogout);
       } catch {
@@ -81,7 +83,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     (async () => {
       try {
+        const encAvailable = await window.electron.auth.isEncryptionAvailable();
+        console.info('[auth] safeStorage.isEncryptionAvailable =', encAvailable);
+
         const storedRefreshToken = await window.electron.auth.getRefreshToken();
+        console.info('[auth] stored refresh token present:', !!storedRefreshToken);
         if (cancelled) return;
 
         if (storedRefreshToken) {
@@ -89,7 +95,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const response = await api.refreshToken(storedRefreshToken);
             if (cancelled) return;
             refreshTokenRef.current = response.refreshToken;
-            void window.electron.auth.setRefreshToken(response.refreshToken).catch(() => undefined);
+            void window.electron.auth.setRefreshToken(response.refreshToken).catch((err) => {
+          console.warn('[auth] setRefreshToken failed:', err);
+        });
             setUser(response.user);
             void window.electron.auth.setSessionActive(true);
             scheduleRefresh(logout);
@@ -114,7 +122,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = (accessToken: string, refreshToken: string, userData: User) => {
     refreshTokenRef.current = refreshToken;
     api.setToken(accessToken);
-    void window.electron.auth.setRefreshToken(refreshToken).catch(() => undefined);
+    void window.electron.auth.setRefreshToken(refreshToken).catch((err) => {
+      console.warn('[auth] setRefreshToken failed:', err);
+    });
     void window.electron.auth.setSessionActive(true);
     setUser(userData);
     scheduleRefresh(logout);

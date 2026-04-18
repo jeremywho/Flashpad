@@ -7,7 +7,7 @@ import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import { settingsStore, AppSettings } from './settings';
 import { checkForUpdates as requestUpdateCheck } from '../src/services/updater-listeners';
-import { getStoredRefreshToken, storeRefreshToken, clearStoredRefreshToken } from './authStore';
+import { getStoredRefreshToken, storeRefreshToken, clearStoredRefreshToken, isEncryptionAvailable } from './authStore';
 
 let mainWindow: BrowserWindow | null = null;
 let quickCaptureWindow: BrowserWindow | null = null;
@@ -704,6 +704,10 @@ ipcMain.handle('auth:set-refresh-token', async (_event, token: unknown) => {
 
 ipcMain.handle('auth:clear-refresh-token', async () => {
   await clearStoredRefreshToken();
+});
+
+ipcMain.handle('auth:is-encryption-available', () => {
+  return isEncryptionAvailable();
 });
 
 ipcMain.handle('note-created-from-quick-capture', () => {

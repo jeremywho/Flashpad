@@ -57,6 +57,8 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke('auth:set-refresh-token', token),
     clearRefreshToken: (): Promise<void> =>
       ipcRenderer.invoke('auth:clear-refresh-token'),
+    isEncryptionAvailable: (): Promise<boolean> =>
+      ipcRenderer.invoke('auth:is-encryption-available'),
   },
   quickCapture: {
     close: (): Promise<void> => ipcRenderer.invoke('close-quick-capture'),

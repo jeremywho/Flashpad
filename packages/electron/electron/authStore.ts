@@ -8,6 +8,10 @@ function getSessionPath(): string {
   return path.join(app.getPath('userData'), SESSION_FILENAME);
 }
 
+export function isEncryptionAvailable(): boolean {
+  return safeStorage.isEncryptionAvailable();
+}
+
 export async function getStoredRefreshToken(): Promise<string | null> {
   if (!safeStorage.isEncryptionAvailable()) return null;
   const filePath = getSessionPath();
@@ -22,7 +26,9 @@ export async function getStoredRefreshToken(): Promise<string | null> {
 }
 
 export async function storeRefreshToken(token: string): Promise<void> {
-  if (!safeStorage.isEncryptionAvailable()) return;
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error('safeStorage encryption is not available on this machine');
+  }
   const encrypted = safeStorage.encryptString(token);
   const filePath = getSessionPath();
   await fsPromises.writeFile(filePath, encrypted, { mode: 0o600 });
