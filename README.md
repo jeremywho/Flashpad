@@ -133,13 +133,21 @@ Run these from the project root:
     "DefaultConnection": "Data Source=flashpad.db"
   },
   "JwtSettings": {
-    "SecretKey": "your-secret-key-min-32-chars",
-    "Issuer": "Flashpad",
-    "Audience": "FlashpadUsers",
-    "ExpirationDays": 7
+    "Issuer": "FlashpadAPI",
+    "Audience": "FlashpadClients"
+  },
+  "H4": {
+    "Endpoint": "https://h4.gg"
   }
 }
 ```
+
+Supply sensitive backend secrets outside source control:
+
+- `JwtSettings__SecretKey` for JWT signing
+- `H4__ApiKey` for H4 ingestion
+
+Production startup fails if either secret is missing.
 
 ### Desktop Settings
 
@@ -242,21 +250,20 @@ Flashpad's backend is instrumented with [H4](https://github.com/jeremywho/H4), o
 
 When notes aren't syncing between clients, check H4 for:
 
-1. **Are both clients connected?** Filter for `SignalR connected` — each client should show a connection with its deviceId
-2. **Did the device register?** Look for `Device registered` with `totalDevices=2` (or however many clients are open). If you see `SignalR disconnected (no device registration)`, a client connected but never registered — it won't appear in presence tracking
-3. **Was the broadcast sent?** After a note create/update, look for `Broadcasting NoteCreated/Updated` — the `connectedDevices` count tells you how many clients were in the SignalR group at broadcast time, and `deviceIds` lists exactly which ones
+1. **Are both clients connected?** Filter for `SignalR connected` and compare the `existingDeviceCount` / `totalDevices` counts as clients join
+2. **Did the device register?** Look for `Device registered` with `totalDevices=2` (or however many clients are open). If you see `SignalR disconnected (no device registration)`, a client connected but never registered and never entered presence tracking
+3. **Was the broadcast sent?** After a note create/update, look for `Broadcasting NoteCreated/Updated` — the `connectedDevices` count tells you how many clients were in the SignalR group at broadcast time
 4. **Did the API call succeed?** Check for the HTTP request log (`POST /api/notes → 201`) with the userId and response timing
 5. **Is there a disconnect pattern?** Look for `SignalR disconnected` entries — frequent disconnects with reconnects suggest network instability
 
 ### Configuration
 
-The H4 SDK is configured in `packages/backend/appsettings.json` (dev) and `appsettings.Production.json` (prod):
+The H4 SDK endpoint lives in `packages/backend/appsettings.json` (dev) and `appsettings.Production.json` (prod). Supply the H4 API key via `H4__ApiKey` instead of committing it in config:
 
 ```json
 {
   "H4": {
-    "Endpoint": "https://h4.gg",
-    "ApiKey": "<project-api-key>"
+    "Endpoint": "https://h4.gg"
   }
 }
 ```
@@ -275,7 +282,7 @@ scp -r publish/* jeremy@flashpad.cc:/var/www/flashpad/api/
 ssh jeremy@flashpad.cc "sudo systemctl restart flashpad-api"
 ```
 
-Make sure `appsettings.Production.json` on the server has the `H4` section with the API key.
+Make sure the server provides both `JwtSettings__SecretKey` and `H4__ApiKey` in the process environment before restarting the API.
 
 ## Roadmap
 

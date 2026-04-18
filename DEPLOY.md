@@ -174,7 +174,7 @@ Reload after changes: `sudo systemctl reload caddy`
 | Web | `.env.development` | `.env.production` |
 | Electron | `.env.development` | `.env.production` |
 | Mobile | `src/config.ts` → `USE_PRODUCTION = false` | `USE_PRODUCTION = true` |
-| Backend | `appsettings.json` | `appsettings.Production.json` |
+| Backend | `appsettings.json` + local env vars | `appsettings.Production.json` + deployment env vars |
 
 ### Running Locally Against Production
 
@@ -193,6 +193,15 @@ npm run web:prod
 | Local Development | `http://localhost:5000` |
 | Production | `https://api.flashpad.cc` |
 | Android Emulator (local) | `http://10.0.2.2:5000` |
+
+### Backend Secrets
+
+Provide backend secrets outside source control before starting the production API:
+
+- `JwtSettings__SecretKey`
+- `H4__ApiKey`
+
+The backend now fails startup in production if either value is missing. A systemd drop-in or environment file is the safest way to supply them on the server.
 
 ## Database
 
