@@ -303,51 +303,6 @@ describe('processSyncQueue', () => {
   });
 });
 
-describe('getNotes background refresh', () => {
-  it('calls onDataRefresh after background bulkSaveNotes', async () => {
-    const serverNotes: Note[] = [
-      { id: 'srv-1', content: 'Server note', status: NoteStatus.Inbox, version: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-    ];
-
-    const mockApi = createMockApi({
-      getNotes: jest.fn().mockResolvedValue({
-        notes: serverNotes,
-        totalCount: 1,
-        page: 1,
-        pageSize: 1000,
-      }),
-    });
-
-    const onDataRefresh = jest.fn();
-
-    const sm = new SyncManager({
-      api: mockApi as never,
-      deviceId: 'test-device',
-      onDataRefresh,
-    });
-
-    // Perform initial sync first
-    await sm.initialSync();
-    onDataRefresh.mockClear();
-    mockApi.getNotes.mockClear();
-
-    // Call getNotes which triggers background refresh
-    mockApi.getNotes.mockResolvedValue({
-      notes: serverNotes,
-      totalCount: 1,
-      page: 1,
-      pageSize: 1000,
-    });
-
-    await sm.getNotes({ status: NoteStatus.Inbox });
-
-    // Wait for background promise to resolve
-    await new Promise((r) => setTimeout(r, 100));
-
-    expect(onDataRefresh).toHaveBeenCalled();
-  });
-});
-
 describe('CREATE operation in sync queue', () => {
   it('replaces local note with server note after successful create', async () => {
     // Seed a local note that needs syncing

@@ -427,20 +427,7 @@ export class SyncManager {
     // Read from local DB — no background server fetch.
     // Data freshness is maintained by initialSync() (startup / reconnection),
     // SignalR events (real-time), and the sync queue (offline changes).
-    const localNotes = await getLocalNotes(params);
-
-    if (this.isOnline) {
-      this.api.getNotes({ ...params, pageSize: 1000 })
-        .then(async (response) => {
-          await bulkSaveNotes(response.notes);
-          this.onDataRefresh?.();
-        })
-        .catch((error) => {
-          h4.error('Background note refresh failed', { error: (error as Error).message });
-        });
-    }
-
-    return localNotes;
+    return getLocalNotes(params);
   }
 
   async createNote(data: CreateNoteDto): Promise<Note> {
