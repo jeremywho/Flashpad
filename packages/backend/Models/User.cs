@@ -29,4 +29,6 @@ public class User
     public ICollection<Note> Notes { get; set; } = new List<Note>();
 
     public ICollection<Category> Categories { get; set; } = new List<Category>();
+
+    public ICollection<RefreshSession> RefreshSessions { get; set; } = new List<RefreshSession>();
 }

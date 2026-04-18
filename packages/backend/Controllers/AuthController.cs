@@ -16,11 +16,48 @@ public class AuthController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly IAuthService _authService;
+    private const int RefreshTokenLifetimeDays = 30;
 
     public AuthController(AppDbContext context, IAuthService authService)
     {
         _context = context;
         _authService = authService;
+    }
+
+    private static UserResponseDto MapUser(User user)
+    {
+        return new UserResponseDto
+        {
+            Id = user.Id,
+            Username = user.Username,
+            Email = user.Email,
+            FullName = user.FullName,
+            CreatedAt = user.CreatedAt,
+            UpdatedAt = user.UpdatedAt
+        };
+    }
+
+    private async Task<AuthResponseDto> CreateAuthResponseAsync(User user)
+    {
+        var refreshToken = _authService.GenerateRefreshToken();
+        var refreshSession = new RefreshSession
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            TokenHash = _authService.HashRefreshToken(refreshToken),
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = DateTime.UtcNow.AddDays(RefreshTokenLifetimeDays)
+        };
+
+        _context.RefreshSessions.Add(refreshSession);
+        await _context.SaveChangesAsync();
+
+        return new AuthResponseDto
+        {
+            AccessToken = _authService.GenerateAccessToken(user, refreshSession.Id),
+            RefreshToken = refreshToken,
+            User = MapUser(user)
+        };
     }
 
     [HttpPost("register")]
@@ -51,21 +88,7 @@ public class AuthController : ControllerBase
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
 
-        var token = _authService.GenerateJwtToken(user);
-
-        return Ok(new AuthResponseDto
-        {
-            Token = token,
-            User = new UserResponseDto
-            {
-                Id = user.Id,
-                Username = user.Username,
-                Email = user.Email,
-                FullName = user.FullName,
-                CreatedAt = user.CreatedAt,
-                UpdatedAt = user.UpdatedAt
-            }
-        });
+        return Ok(await CreateAuthResponseAsync(user));
     }
 
     [HttpPost("login")]
@@ -79,53 +102,59 @@ public class AuthController : ControllerBase
             return Unauthorized(new { message = "Invalid username or password" });
         }
 
-        var token = _authService.GenerateJwtToken(user);
+        return Ok(await CreateAuthResponseAsync(user));
+    }
+
+    [HttpPost("refresh")]
+    public async Task<ActionResult<AuthResponseDto>> Refresh([FromBody] RefreshTokenRequestDto dto)
+    {
+        var refreshTokenHash = _authService.HashRefreshToken(dto.RefreshToken);
+        var existingSession = await _context.RefreshSessions
+            .Include(session => session.User)
+            .FirstOrDefaultAsync(session => session.TokenHash == refreshTokenHash);
+
+        if (existingSession == null || existingSession.RevokedAt != null || existingSession.ExpiresAt <= DateTime.UtcNow)
+        {
+            return Unauthorized(new { message = "Invalid refresh token" });
+        }
+
+        var replacementRefreshToken = _authService.GenerateRefreshToken();
+        var replacementSession = new RefreshSession
+        {
+            Id = Guid.NewGuid(),
+            UserId = existingSession.UserId,
+            TokenHash = _authService.HashRefreshToken(replacementRefreshToken),
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = DateTime.UtcNow.AddDays(RefreshTokenLifetimeDays)
+        };
+
+        existingSession.RevokedAt = DateTime.UtcNow;
+        existingSession.ReplacedBySessionId = replacementSession.Id;
+
+        _context.RefreshSessions.Add(replacementSession);
+        await _context.SaveChangesAsync();
 
         return Ok(new AuthResponseDto
         {
-            Token = token,
-            User = new UserResponseDto
-            {
-                Id = user.Id,
-                Username = user.Username,
-                Email = user.Email,
-                FullName = user.FullName,
-                CreatedAt = user.CreatedAt,
-                UpdatedAt = user.UpdatedAt
-            }
+            AccessToken = _authService.GenerateAccessToken(existingSession.User, replacementSession.Id),
+            RefreshToken = replacementRefreshToken,
+            User = MapUser(existingSession.User)
         });
     }
 
-    [Authorize]
-    [HttpPost("refresh")]
-    public async Task<ActionResult<AuthResponseDto>> Refresh()
+    [HttpPost("logout")]
+    public async Task<ActionResult> Logout([FromBody] RefreshTokenRequestDto dto)
     {
-        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (userIdClaim == null || !int.TryParse(userIdClaim, out var userId))
+        var refreshTokenHash = _authService.HashRefreshToken(dto.RefreshToken);
+        var existingSession = await _context.RefreshSessions
+            .FirstOrDefaultAsync(session => session.TokenHash == refreshTokenHash);
+
+        if (existingSession != null && existingSession.RevokedAt == null)
         {
-            return Unauthorized(new { message = "Invalid token" });
+            existingSession.RevokedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
         }
 
-        var user = await _context.Users.FindAsync(userId);
-        if (user == null)
-        {
-            return Unauthorized(new { message = "User not found" });
-        }
-
-        var token = _authService.GenerateJwtToken(user);
-
-        return Ok(new AuthResponseDto
-        {
-            Token = token,
-            User = new UserResponseDto
-            {
-                Id = user.Id,
-                Username = user.Username,
-                Email = user.Email,
-                FullName = user.FullName,
-                CreatedAt = user.CreatedAt,
-                UpdatedAt = user.UpdatedAt
-            }
-        });
+        return NoContent();
     }
 }

@@ -15,6 +15,7 @@ namespace Backend.Controllers;
 [Authorize]
 public class NotesController : ControllerBase
 {
+    private const int MaxPageSize = 1000;
     private readonly AppDbContext _context;
     private readonly INotesHubService _hubService;
     private readonly IH4Logger _h4;
@@ -45,6 +46,27 @@ public class NotesController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50)
     {
+        if (page < 1)
+        {
+            return BadRequest(new { message = "Page must be greater than or equal to 1" });
+        }
+
+        if (pageSize < 1)
+        {
+            return BadRequest(new { message = "Page size must be greater than or equal to 1" });
+        }
+
+        if (pageSize > MaxPageSize)
+        {
+            pageSize = MaxPageSize;
+        }
+
+        var skip = (long)(page - 1) * pageSize;
+        if (skip > int.MaxValue)
+        {
+            return BadRequest(new { message = "Requested page is too large" });
+        }
+
         var userId = GetCurrentUserId();
 
         var query = _context.Notes
@@ -75,7 +97,7 @@ public class NotesController : ControllerBase
 
         var notes = await query
             .OrderByDescending(n => n.UpdatedAt)
-            .Skip((page - 1) * pageSize)
+            .Skip((int)skip)
             .Take(pageSize)
             .Select(n => new NoteResponseDto
             {
@@ -92,7 +114,17 @@ public class NotesController : ControllerBase
             })
             .ToListAsync();
 
-        _h4.Info("Notes listed", new { userId, status = status?.ToString(), categoryId, search, page, pageSize, totalCount, returnedCount = notes.Count });
+        _h4.Info("Notes listed", new
+        {
+            userId,
+            status = status?.ToString(),
+            categoryId,
+            hasSearch = !string.IsNullOrWhiteSpace(search),
+            page,
+            pageSize,
+            totalCount,
+            returnedCount = notes.Count
+        });
 
         return Ok(new NoteListResponseDto
         {
@@ -118,7 +150,7 @@ public class NotesController : ControllerBase
             return NotFound(new { message = "Note not found" });
         }
 
-        _h4.Debug("Note fetched", new { userId, noteId = id, version = note.Version, deviceId = note.DeviceId });
+        _h4.Debug("Note fetched", new { userId, noteId = id, version = note.Version });
 
         return Ok(new NoteResponseDto
         {
@@ -181,7 +213,7 @@ public class NotesController : ControllerBase
             UpdatedAt = note.UpdatedAt
         };
 
-        _h4.Info("Note created", new { userId, noteId = note.Id, deviceId = dto.DeviceId, version = note.Version, categoryId = note.CategoryId, preview = note.Content?[..Math.Min(note.Content?.Length ?? 0, 80)] });
+        _h4.Info("Note created", new { userId, noteId = note.Id, version = note.Version, categoryId = note.CategoryId });
         await _hubService.NotifyNoteCreated(userId, response, dto.DeviceId);
 
         return CreatedAtAction(nameof(GetNote), new { id = note.Id }, response);
@@ -204,7 +236,7 @@ public class NotesController : ControllerBase
         // Optimistic concurrency: reject stale writes
         if (dto.BaseVersion.HasValue && dto.BaseVersion.Value != note.Version)
         {
-            _h4.Warning("Note update conflict", new { userId, noteId = note.Id, clientVersion = dto.BaseVersion.Value, serverVersion = note.Version, deviceId = dto.DeviceId });
+            _h4.Warning("Note update conflict", new { userId, noteId = note.Id, clientVersion = dto.BaseVersion.Value, serverVersion = note.Version });
             return Conflict(new { message = "Note was modified by another device", serverVersion = note.Version, clientVersion = dto.BaseVersion.Value });
         }
 
@@ -262,7 +294,7 @@ public class NotesController : ControllerBase
             UpdatedAt = note.UpdatedAt
         };
 
-        _h4.Info("Note updated", new { userId, noteId = note.Id, deviceId = dto.DeviceId, version = note.Version, categoryId = note.CategoryId, preview = note.Content?[..Math.Min(note.Content?.Length ?? 0, 80)] });
+        _h4.Info("Note updated", new { userId, noteId = note.Id, version = note.Version, categoryId = note.CategoryId });
         await _hubService.NotifyNoteUpdated(userId, response, dto.DeviceId);
 
         return Ok(response);
@@ -301,7 +333,7 @@ public class NotesController : ControllerBase
             UpdatedAt = note.UpdatedAt
         };
 
-        _h4.Info("Note archived", new { userId, noteId = note.Id, deviceId });
+        _h4.Info("Note archived", new { userId, noteId = note.Id });
         await _hubService.NotifyNoteStatusChanged(userId, response, deviceId);
 
         return Ok(response);
@@ -342,7 +374,7 @@ public class NotesController : ControllerBase
             UpdatedAt = note.UpdatedAt
         };
 
-        _h4.Info("Note restored", new { userId, noteId = note.Id, deviceId });
+        _h4.Info("Note restored", new { userId, noteId = note.Id });
         await _hubService.NotifyNoteStatusChanged(userId, response, deviceId);
 
         return Ok(response);
@@ -366,7 +398,7 @@ public class NotesController : ControllerBase
 
         await _context.SaveChangesAsync();
 
-        _h4.Info("Note trashed", new { userId, noteId = note.Id, deviceId });
+        _h4.Info("Note trashed", new { userId, noteId = note.Id });
         await _hubService.NotifyNoteDeleted(userId, id, deviceId);
 
         return NoContent();
@@ -388,7 +420,7 @@ public class NotesController : ControllerBase
         _context.Notes.Remove(note);
         await _context.SaveChangesAsync();
 
-        _h4.Info("Note permanently deleted", new { userId, noteId = note.Id, deviceId });
+        _h4.Info("Note permanently deleted", new { userId, noteId = note.Id });
         await _hubService.NotifyNoteDeleted(userId, id, deviceId);
 
         return NoContent();
@@ -408,7 +440,7 @@ public class NotesController : ControllerBase
         _context.Notes.RemoveRange(trashedNotes);
         await _context.SaveChangesAsync();
 
-        _h4.Info("Trash emptied", new { userId, deletedCount = trashedNotes.Count, noteIds = string.Join(",", noteIds) });
+        _h4.Info("Trash emptied", new { userId, deletedCount = trashedNotes.Count });
 
         foreach (var noteId in noteIds)
         {
@@ -464,7 +496,7 @@ public class NotesController : ControllerBase
             UpdatedAt = note.UpdatedAt
         };
 
-        _h4.Info("Note moved", new { userId, noteId = note.Id, fromCategoryId = previousCategoryId, toCategoryId = dto.CategoryId, deviceId = note.DeviceId });
+        _h4.Info("Note moved", new { userId, noteId = note.Id, fromCategoryId = previousCategoryId, toCategoryId = dto.CategoryId });
         await _hubService.NotifyNoteUpdated(userId, response, note.DeviceId);
 
         return Ok(response);

@@ -1,4 +1,5 @@
 using System.Text;
+using Backend.Configuration;
 using Backend.Data;
 using H4.Sdk;
 using Backend.Hubs;
@@ -8,6 +9,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+var resolvedSecrets = SecretConfigurationResolver.Resolve(builder.Configuration, builder.Environment);
+builder.Configuration.AddInMemoryCollection(SecretConfigurationResolver.ToConfigurationOverrides(resolvedSecrets));
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -19,12 +22,18 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<INotesHubService, NotesHubService>();
 
 // Database
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException("ConnectionStrings:DefaultConnection must be configured.");
+}
+
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlite(connectionString));
 
 // JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey not configured");
+var secretKey = resolvedSecrets.JwtSecretKey;
 
 builder.Services.AddAuthentication(options =>
 {
@@ -67,7 +76,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddH4(options =>
 {
     options.Endpoint = builder.Configuration["H4:Endpoint"] ?? "https://h4.gg";
-    options.ApiKey = builder.Configuration["H4:ApiKey"] ?? "";
+    options.ApiKey = resolvedSecrets.H4ApiKey;
     options.Source = "backend";
 });
 
@@ -101,7 +110,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.EnsureCreated();
+    await DatabaseMigrationBootstrapper.MigrateAsync(db);
 }
 
 // Configure the HTTP request pipeline.

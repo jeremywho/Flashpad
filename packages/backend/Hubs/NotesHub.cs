@@ -97,7 +97,7 @@ public class NotesHub(IH4Logger h4) : Hub
         var userId = GetCurrentUserId();
         await Groups.AddToGroupAsync(Context.ConnectionId, $"user_{userId}");
         var existingDevices = PresenceTracker.GetUserDevices(userId);
-        h4.Info("SignalR connected", new { userId, connectionId = Context.ConnectionId, existingDeviceCount = existingDevices.Count, existingDeviceIds = string.Join(",", existingDevices.Select(d => d.DeviceId)) });
+        h4.Info("SignalR connected", new { userId, existingDeviceCount = existingDevices.Count });
         await base.OnConnectedAsync();
     }
 
@@ -110,8 +110,8 @@ public class NotesHub(IH4Logger h4) : Hub
         var removed = PresenceTracker.RemoveDevice(userId, Context.ConnectionId);
         if (removed != null)
         {
-            h4.Info("SignalR disconnected", new { userId, connectionId = Context.ConnectionId, deviceId = removed.DeviceId, deviceName = removed.DeviceName, reason = exception?.Message });
             var devices = PresenceTracker.GetUserDevices(userId);
+            h4.Info("SignalR disconnected", new { userId, remainingDeviceCount = devices.Count, reason = exception?.Message });
             await Clients.Group($"user_{userId}").SendAsync("DeviceDisconnected", new
             {
                 removed.DeviceId,
@@ -128,7 +128,7 @@ public class NotesHub(IH4Logger h4) : Hub
         }
         else
         {
-            h4.Warning("SignalR disconnected (no device registration)", new { userId, connectionId = Context.ConnectionId, reason = exception?.Message });
+            h4.Warning("SignalR disconnected (no device registration)", new { userId, reason = exception?.Message });
         }
 
         await base.OnDisconnectedAsync(exception);
@@ -139,7 +139,7 @@ public class NotesHub(IH4Logger h4) : Hub
     {
         var userId = GetCurrentUserId();
         await Groups.AddToGroupAsync(Context.ConnectionId, $"user_{userId}");
-        h4.Debug("JoinUserGroup", new { userId, connectionId = Context.ConnectionId });
+        h4.Debug("JoinUserGroup", new { userId });
     }
 
     // Client registers their device for presence tracking
@@ -149,7 +149,7 @@ public class NotesHub(IH4Logger h4) : Hub
         PresenceTracker.AddDevice(userId, Context.ConnectionId, deviceId, deviceName);
 
         var devices = PresenceTracker.GetUserDevices(userId);
-        h4.Info("Device registered", new { userId, deviceId, deviceName, connectionId = Context.ConnectionId, totalDevices = devices.Count });
+        h4.Info("Device registered", new { userId, totalDevices = devices.Count });
 
         // Notify all user's devices about the new connection
         await Clients.Group($"user_{userId}").SendAsync("DeviceConnected", new
@@ -190,7 +190,7 @@ public class NotesHub(IH4Logger h4) : Hub
         var userId = GetCurrentUserId();
         PresenceTracker.UpdateLastSeen(userId, Context.ConnectionId);
         var devices = PresenceTracker.GetUserDevices(userId);
-        h4.Debug("Heartbeat", new { userId, connectionId = Context.ConnectionId, totalDevices = devices.Count, deviceIds = string.Join(",", devices.Select(d => d.DeviceId)) });
+        h4.Debug("Heartbeat", new { userId, totalDevices = devices.Count });
     }
 }
 
@@ -226,28 +226,28 @@ public class NotesHubService(IHubContext<NotesHub> hubContext, IH4Logger h4) : I
     public async Task NotifyNoteCreated(int userId, NoteResponseDto note, string? senderDeviceId = null)
     {
         var devices = PresenceTracker.GetUserDevices(userId);
-        h4.Info("Broadcasting NoteCreated", new { userId, noteId = note.Id, deviceId = note.DeviceId, version = note.Version, connectedDevices = devices.Count, excludingSender = senderDeviceId, deviceIds = string.Join(",", devices.Select(d => d.DeviceId)) });
+        h4.Info("Broadcasting NoteCreated", new { userId, noteId = note.Id, version = note.Version, connectedDevices = devices.Count, excludedOriginDevice = senderDeviceId != null });
         await GetTargetClients(userId, senderDeviceId).SendAsync("NoteCreated", note);
     }
 
     public async Task NotifyNoteUpdated(int userId, NoteResponseDto note, string? senderDeviceId = null)
     {
         var devices = PresenceTracker.GetUserDevices(userId);
-        h4.Info("Broadcasting NoteUpdated", new { userId, noteId = note.Id, deviceId = note.DeviceId, version = note.Version, connectedDevices = devices.Count, excludingSender = senderDeviceId, deviceIds = string.Join(",", devices.Select(d => d.DeviceId)) });
+        h4.Info("Broadcasting NoteUpdated", new { userId, noteId = note.Id, version = note.Version, connectedDevices = devices.Count, excludedOriginDevice = senderDeviceId != null });
         await GetTargetClients(userId, senderDeviceId).SendAsync("NoteUpdated", note);
     }
 
     public async Task NotifyNoteDeleted(int userId, Guid noteId, string? senderDeviceId = null)
     {
         var devices = PresenceTracker.GetUserDevices(userId);
-        h4.Info("Broadcasting NoteDeleted", new { userId, noteId, connectedDevices = devices.Count, excludingSender = senderDeviceId });
+        h4.Info("Broadcasting NoteDeleted", new { userId, noteId, connectedDevices = devices.Count, excludedOriginDevice = senderDeviceId != null });
         await GetTargetClients(userId, senderDeviceId).SendAsync("NoteDeleted", noteId);
     }
 
     public async Task NotifyNoteStatusChanged(int userId, NoteResponseDto note, string? senderDeviceId = null)
     {
         var devices = PresenceTracker.GetUserDevices(userId);
-        h4.Info("Broadcasting NoteStatusChanged", new { userId, noteId = note.Id, status = note.Status.ToString(), connectedDevices = devices.Count, excludingSender = senderDeviceId });
+        h4.Info("Broadcasting NoteStatusChanged", new { userId, noteId = note.Id, status = note.Status.ToString(), connectedDevices = devices.Count, excludedOriginDevice = senderDeviceId != null });
         await GetTargetClients(userId, senderDeviceId).SendAsync("NoteStatusChanged", note);
     }
 

@@ -1,23 +1,11 @@
+using Backend.DTOs;
+using Backend.Observability;
 using H4.Sdk;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Backend.Controllers;
-
-public class ClientLogEntry
-{
-    public string Level { get; set; } = "Info";
-    public string Message { get; set; } = "";
-    public string Source { get; set; } = "unknown";
-    public string DeviceId { get; set; } = "unknown";
-    public string Timestamp { get; set; } = "";
-    public Dictionary<string, object>? Metadata { get; set; }
-}
-
-public class ClientLogBatchDto
-{
-    public List<ClientLogEntry> Logs { get; set; } = new();
-}
 
 [ApiController]
 [Route("api/client-logs")]
@@ -32,43 +20,42 @@ public class ClientLogsController : ControllerBase
     }
 
     [HttpPost]
+    [RequestSizeLimit(ClientLogSanitizer.MaxRequestBytes)]
     public IActionResult IngestLogs([FromBody] ClientLogBatchDto batch)
     {
-        if (batch.Logs.Count == 0)
-            return BadRequest(new { message = "No logs provided" });
-
-        if (batch.Logs.Count > 100)
-            return BadRequest(new { message = "Too many logs in batch (max 100)" });
-
-        foreach (var entry in batch.Logs)
+        if (Request.ContentLength is > ClientLogSanitizer.MaxRequestBytes)
         {
-            var metadata = entry.Metadata ?? new Dictionary<string, object>();
-            metadata["clientSource"] = entry.Source;
-            metadata["deviceId"] = entry.DeviceId;
-            if (!string.IsNullOrEmpty(entry.Timestamp))
-                metadata["clientTimestamp"] = entry.Timestamp;
+            return StatusCode(StatusCodes.Status413PayloadTooLarge, new { message = $"Client log payload too large (max {ClientLogSanitizer.MaxRequestBytes} bytes)" });
+        }
 
-            var message = $"[{entry.Source}] {entry.Message}";
+        if (batch is null || batch.Logs is null || batch.Logs.Count == 0)
+        {
+            return BadRequest(new { message = "No logs provided" });
+        }
 
-            switch (entry.Level.ToLower())
+        if (!ClientLogSanitizer.TryNormalizeBatch(batch, User, HttpContext, out var logs, out var error))
+        {
+            return BadRequest(new { message = error });
+        }
+
+        foreach (var entry in logs)
+        {
+            switch (entry.Level.ToLowerInvariant())
             {
                 case "debug":
-                    _h4.Debug(message, metadata);
+                    _h4.Debug(entry.Message, entry.Metadata);
                     break;
                 case "info":
-                    _h4.Info(message, metadata);
+                    _h4.Info(entry.Message, entry.Metadata);
                     break;
                 case "warning":
-                    _h4.Warning(message, metadata);
+                    _h4.Warning(entry.Message, entry.Metadata);
                     break;
                 case "error":
-                    _h4.Error(message, metadata);
+                    _h4.Error(entry.Message, entry.Metadata);
                     break;
                 case "fatal":
-                    _h4.Fatal(message, metadata);
-                    break;
-                default:
-                    _h4.Info(message, metadata);
+                    _h4.Fatal(entry.Message, entry.Metadata);
                     break;
             }
         }

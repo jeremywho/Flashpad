@@ -4,6 +4,8 @@ namespace Backend.Services;
 
 public interface IAuthService
 {
-    string GenerateJwtToken(User user);
+    string GenerateAccessToken(User user, Guid sessionId);
+    string GenerateRefreshToken();
+    string HashRefreshToken(string refreshToken);
     int? ValidateJwtToken(string token);
 }

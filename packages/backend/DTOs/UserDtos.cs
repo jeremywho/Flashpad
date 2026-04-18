@@ -53,6 +53,14 @@ public class UserResponseDto
 
 public class AuthResponseDto
 {
-    public string Token { get; set; } = string.Empty;
+    public string AccessToken { get; set; } = string.Empty;
+    public string RefreshToken { get; set; } = string.Empty;
+    public string Token => AccessToken;
     public UserResponseDto User { get; set; } = null!;
+}
+
+public class RefreshTokenRequestDto
+{
+    [Required]
+    public string RefreshToken { get; set; } = string.Empty;
 }

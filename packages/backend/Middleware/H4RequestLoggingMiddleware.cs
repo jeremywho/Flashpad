@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using System.Security.Claims;
+using Backend.Observability;
 using H4.Sdk;
 
 namespace Backend.Middleware;
@@ -40,27 +40,9 @@ public class H4RequestLoggingMiddleware(RequestDelegate next)
         {
             sw.Stop();
 
-            var userId = context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             var method = context.Request.Method;
             var statusCode = error != null ? 500 : context.Response.StatusCode;
-
-            var metadata = new Dictionary<string, object>
-            {
-                ["method"] = method,
-                ["path"] = path,
-                ["statusCode"] = statusCode,
-                ["durationMs"] = sw.ElapsedMilliseconds,
-            };
-
-            if (userId != null)
-                metadata["userId"] = userId;
-
-            var query = context.Request.QueryString.Value;
-            if (!string.IsNullOrEmpty(query))
-                metadata["query"] = query;
-
-            if (error != null)
-                metadata["error"] = error.Message;
+            var metadata = RequestLogMetadataBuilder.Build(context, sw.ElapsedMilliseconds, statusCode, error);
 
             var msg = $"{method} {path} → {statusCode} ({sw.ElapsedMilliseconds}ms)";
 

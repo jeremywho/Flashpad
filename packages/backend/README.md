@@ -47,16 +47,17 @@ dotnet build --configuration Release
 
 ## Configuration
 
-Edit `appsettings.json`:
+Keep non-secret defaults in `appsettings.json` and supply secrets out of band:
 
 - **ConnectionStrings**: Database connection
-- **JwtSettings**: JWT configuration (secret key, issuer, audience)
+- **JwtSettings**: JWT issuer/audience in config, `JwtSettings__SecretKey` via environment variable or deployment secret
+- **H4**: Endpoint in config, `H4__ApiKey` via environment variable or deployment secret
 
-**Security Note**: Change the JWT secret key in production!
+**Security Note**: Production startup now fails unless `JwtSettings__SecretKey` and `H4__ApiKey` are supplied externally.
 
 ## Database Migrations
 
-This template uses `EnsureCreated()` for simplicity. For production, use migrations:
+The backend now uses EF Core migrations at startup. Existing databases that were created with the older `EnsureCreated()` flow are upgraded by a one-time bootstrap that restores the missing `RefreshSessions` table and seeds migration history before the normal migration pipeline runs.
 
 ```bash
 # Install EF tools
@@ -68,6 +69,8 @@ dotnet ef migrations add InitialCreate
 # Update database
 dotnet ef database update
 ```
+
+If startup reports a database schema issue, recreate the SQLite file or repair the schema before retrying. The migration bootstrap only bridges a complete legacy schema forward; it does not try to recover from partial/manual tampering.
 
 ## Switching Databases
 
