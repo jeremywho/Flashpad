@@ -37,7 +37,7 @@ const api = new ApiClient('http://localhost:5000');
 
 // Login
 const response = await api.login({ username, password });
-api.setToken(response.token);
+api.setToken(response.accessToken);
 
 // Get current user
 const user = await api.getCurrentUser();
@@ -67,7 +67,7 @@ interface User {
 - `RegisterDto`: Registration data
 - `LoginDto`: Login credentials
 - `UpdateUserDto`: User update data
-- `AuthResponse`: Authentication response with token
+- `AuthResponse`: Authentication response with access and refresh tokens
 - `ApiError`: Error response
 
 ## Adding New Types

@@ -22,7 +22,11 @@ import {
 export function getTokenExpiryMs(token: string): number | null {
   try {
     const payload = token.split('.')[1];
-    const decoded = JSON.parse(atob(payload));
+    const normalized = payload
+      .replace(/-/g, '+')
+      .replace(/_/g, '/')
+      .padEnd(Math.ceil(payload.length / 4) * 4, '=');
+    const decoded = JSON.parse(atob(normalized));
     if (typeof decoded.exp === 'number') {
       return decoded.exp * 1000;
     }
@@ -51,6 +55,10 @@ export class ApiClient {
   getTokenExpiryMs(): number | null {
     if (!this.token) return null;
     return getTokenExpiryMs(this.token);
+  }
+
+  private getAccessToken(response: AuthResponse): string {
+    return response.accessToken || response.token || '';
   }
 
   private async request<T>(
@@ -99,8 +107,9 @@ export class ApiClient {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    this.setToken(response.token);
-    return response;
+    const accessToken = this.getAccessToken(response);
+    this.setToken(accessToken);
+    return { ...response, accessToken };
   }
 
   async login(data: LoginDto): Promise<AuthResponse> {
@@ -108,16 +117,26 @@ export class ApiClient {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    this.setToken(response.token);
-    return response;
+    const accessToken = this.getAccessToken(response);
+    this.setToken(accessToken);
+    return { ...response, accessToken };
   }
 
-  async refreshToken(): Promise<AuthResponse> {
+  async refreshToken(refreshToken: string): Promise<AuthResponse> {
     const response = await this.request<AuthResponse>('/api/auth/refresh', {
       method: 'POST',
+      body: JSON.stringify({ refreshToken }),
     });
-    this.setToken(response.token);
-    return response;
+    const accessToken = this.getAccessToken(response);
+    this.setToken(accessToken);
+    return { ...response, accessToken };
+  }
+
+  async logoutSession(refreshToken: string): Promise<void> {
+    await this.request<void>('/api/auth/logout', {
+      method: 'POST',
+      body: JSON.stringify({ refreshToken }),
+    });
   }
 
   async getCurrentUser(): Promise<User> {
