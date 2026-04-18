@@ -4,6 +4,8 @@ import {
   serializeNote,
   extractIdFromFilename,
   createDefaultMetadata,
+  normalizeNoteId,
+  isValidNoteId,
   NoteMetadata,
 } from './markdown-parser';
 
@@ -72,6 +74,173 @@ interface SyncQueueFile {
   nextId: number;
 }
 
+function getNextSyncQueueId(): number {
+  return syncQueueCache.length > 0 ? Math.max(...syncQueueCache.map((i) => i.id)) + 1 : 1;
+}
+
+function parseSyncQueuePayload(payload: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(payload);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function buildNoteCreatePayload(
+  note: LocalNote,
+  existingPayload: Record<string, unknown>
+): Record<string, unknown> {
+  const payload: Record<string, unknown> = { ...existingPayload };
+  payload.content = note.content;
+
+  if (note.categoryId) {
+    payload.categoryId = note.categoryId;
+  } else {
+    delete payload.categoryId;
+  }
+
+  if (note.deviceId) {
+    payload.deviceId = note.deviceId;
+  }
+
+  return payload;
+}
+
+function buildCategoryCreatePayload(
+  category: LocalCategory,
+  existingPayload: Record<string, unknown>
+): Record<string, unknown> {
+  const payload: Record<string, unknown> = { ...existingPayload };
+  payload.name = category.name;
+  payload.color = category.color;
+
+  if (category.icon) {
+    payload.icon = category.icon;
+  } else {
+    delete payload.icon;
+  }
+
+  return payload;
+}
+
+function upsertPendingCreateSnapshot(
+  entityType: 'note' | 'category',
+  entityId: string,
+  payloadBuilder: (existingPayload: Record<string, unknown>) => Record<string, unknown>,
+  createIfMissing: boolean
+): boolean {
+  const existingItem = syncQueueCache.find(
+    (item) =>
+      item.entityType === entityType &&
+      item.entityId === entityId &&
+      item.operation === SyncOperation.Create
+  );
+
+  if (existingItem) {
+    const nextPayload = JSON.stringify(payloadBuilder(parseSyncQueuePayload(existingItem.payload)));
+    if (existingItem.payload === nextPayload && existingItem.baseVersion === null) {
+      return false;
+    }
+
+    existingItem.payload = nextPayload;
+    existingItem.baseVersion = null;
+    return true;
+  }
+
+  if (!createIfMissing) {
+    return false;
+  }
+
+  syncQueueCache.push({
+    id: getNextSyncQueueId(),
+    entityType,
+    entityId,
+    operation: SyncOperation.Create,
+    payload: JSON.stringify(payloadBuilder({})),
+    baseVersion: null,
+    createdAt: new Date().toISOString(),
+    retryCount: 0,
+    lastError: null,
+  });
+  return true;
+}
+
+function removePendingCreateSnapshot(entityType: 'note' | 'category', entityId: string): boolean {
+  const beforeLength = syncQueueCache.length;
+  syncQueueCache = syncQueueCache.filter(
+    (item) =>
+      !(
+        item.entityType === entityType &&
+        item.entityId === entityId &&
+        item.operation === SyncOperation.Create
+      )
+  );
+  return syncQueueCache.length !== beforeLength;
+}
+
+export async function remapCategoryReferences(
+  fromCategoryId: string,
+  toCategoryId: string
+): Promise<void> {
+  await initDatabase();
+
+  if (!fromCategoryId || !toCategoryId || fromCategoryId === toCategoryId) {
+    return;
+  }
+
+  let queueChanged = false;
+
+  for (const note of notesCache.values()) {
+    if (note.categoryId !== fromCategoryId) {
+      continue;
+    }
+
+    note.categoryId = toCategoryId;
+    await writeNoteFile(note);
+
+    if (note.isLocal && !note.serverId) {
+      queueChanged =
+        upsertPendingCreateSnapshot(
+          'note',
+          note.id,
+          (existingPayload) => buildNoteCreatePayload(note, existingPayload),
+          false
+        ) || queueChanged;
+    }
+  }
+
+  for (const item of syncQueueCache) {
+    if (item.entityType !== 'note') {
+      continue;
+    }
+
+    if (
+      item.operation !== SyncOperation.Create &&
+      item.operation !== SyncOperation.Update &&
+      item.operation !== SyncOperation.Move
+    ) {
+      continue;
+    }
+
+    const payload = parseSyncQueuePayload(item.payload);
+    if (payload.categoryId === fromCategoryId) {
+      payload.categoryId = toCategoryId;
+      const nextPayload = JSON.stringify(payload);
+      if (item.payload !== nextPayload) {
+        item.payload = nextPayload;
+        queueChanged = true;
+      }
+    }
+  }
+
+  if (queueChanged) {
+    await saveSyncQueueFile();
+  }
+}
+
 // Initialize database from file system
 async function initDatabase(): Promise<void> {
   if (initialized) return;
@@ -105,6 +274,9 @@ async function loadNotesFromFiles(): Promise<void> {
 
   for (const filename of files) {
     const id = extractIdFromFilename(filename);
+    if (!id) {
+      continue;
+    }
     const content = await window.electron.fs.readNote(id);
 
     if (content) {
@@ -136,32 +308,15 @@ async function loadNotesFromFiles(): Promise<void> {
   }
 
   // Queue unsynced notes that don't already have a pending sync entry.
-  // We push directly to syncQueueCache here (not via addToSyncQueue)
-  // because initDatabase hasn't finished yet and addToSyncQueue would re-enter it.
   let queueChanged = false;
   for (const note of unsyncedNotes) {
-    const existingEntry = syncQueueCache.find(
-      (i) => i.entityId === note.id && i.entityType === 'note'
-    );
-    if (!existingEntry) {
-      const nextId =
-        syncQueueCache.length > 0 ? Math.max(...syncQueueCache.map((i) => i.id)) + 1 : 1;
-      syncQueueCache.push({
-        id: nextId,
-        entityType: 'note',
-        entityId: note.id,
-        operation: SyncOperation.Create,
-        payload: JSON.stringify({
-          content: note.content,
-          categoryId: note.categoryId,
-        }),
-        baseVersion: null,
-        createdAt: new Date().toISOString(),
-        retryCount: 0,
-        lastError: null,
-      });
-      queueChanged = true;
-    }
+    queueChanged =
+      upsertPendingCreateSnapshot(
+        'note',
+        note.id,
+        (existingPayload) => buildNoteCreatePayload(note, existingPayload),
+        true
+      ) || queueChanged;
   }
   if (queueChanged) {
     await saveSyncQueueFile();
@@ -176,6 +331,23 @@ async function loadCategoriesFromFile(): Promise<void> {
     for (const cat of data.categories) {
       categoriesCache.set(cat.id, cat);
     }
+  }
+
+  let queueChanged = false;
+  for (const category of categoriesCache.values()) {
+    if (category.isLocal && !category.serverId) {
+      queueChanged =
+        upsertPendingCreateSnapshot(
+          'category',
+          category.id,
+          (existingPayload) => buildCategoryCreatePayload(category, existingPayload),
+          true
+        ) || queueChanged;
+    }
+  }
+
+  if (queueChanged) {
+    await saveSyncQueueFile();
   }
 }
 
@@ -206,6 +378,10 @@ async function saveSyncQueueFile(): Promise<void> {
 }
 
 async function writeNoteFile(note: LocalNote): Promise<void> {
+  if (!isValidNoteId(note.id)) {
+    throw new Error(`Unsafe note ID: ${note.id}`);
+  }
+
   const metadata: NoteMetadata = {
     id: note.id,
     categoryId: note.categoryId,
@@ -258,12 +434,21 @@ export async function getLocalNotes(params: {
 export async function getLocalNote(id: string): Promise<Note | null> {
   await initDatabase();
 
-  const note = notesCache.get(id);
+  const safeId = normalizeNoteId(id);
+  if (!safeId) {
+    return null;
+  }
+
+  const note = notesCache.get(safeId);
   return note ? localNoteToNote(note) : null;
 }
 
 export async function saveLocalNote(note: Note, isLocal = false): Promise<void> {
   await initDatabase();
+
+  if (!isValidNoteId(note.id)) {
+    throw new Error(`Unsafe note ID: ${note.id}`);
+  }
 
   const existing = notesCache.get(note.id);
 
@@ -282,17 +467,41 @@ export async function saveLocalNote(note: Note, isLocal = false): Promise<void> 
 
   notesCache.set(note.id, localNote);
   await writeNoteFile(localNote);
+
+  if (localNote.isLocal && !localNote.serverId) {
+    const queueChanged = upsertPendingCreateSnapshot(
+      'note',
+      localNote.id,
+      (existingPayload) => buildNoteCreatePayload(localNote, existingPayload),
+      false
+    );
+    if (queueChanged) {
+      await saveSyncQueueFile();
+    }
+  }
 }
 
 export async function deleteLocalNote(id: string): Promise<void> {
   await initDatabase();
 
-  notesCache.delete(id);
-  writingNotes.add(id);
+  const safeId = normalizeNoteId(id);
+  if (!safeId) {
+    return;
+  }
+
+  const existing = notesCache.get(safeId);
+  notesCache.delete(safeId);
+  if (existing?.isLocal && !existing.serverId) {
+    const queueChanged = removePendingCreateSnapshot('note', safeId);
+    if (queueChanged) {
+      await saveSyncQueueFile();
+    }
+  }
+  writingNotes.add(safeId);
   try {
-    await window.electron.fs.deleteNote(id);
+    await window.electron.fs.deleteNote(safeId);
   } finally {
-    setTimeout(() => writingNotes.delete(id), 500);
+    setTimeout(() => writingNotes.delete(safeId), 500);
   }
 }
 
@@ -366,13 +575,33 @@ export async function saveLocalCategory(category: Category, isLocal = false): Pr
 
   categoriesCache.set(category.id, localCategory);
   await saveCategoriesFile();
+
+  if (localCategory.isLocal && !localCategory.serverId) {
+    const queueChanged = upsertPendingCreateSnapshot(
+      'category',
+      localCategory.id,
+      (existingPayload) => buildCategoryCreatePayload(localCategory, existingPayload),
+      false
+    );
+    if (queueChanged) {
+      await saveSyncQueueFile();
+    }
+  }
 }
 
 export async function deleteLocalCategory(id: string): Promise<void> {
   await initDatabase();
 
+  const existing = categoriesCache.get(id);
   categoriesCache.delete(id);
   await saveCategoriesFile();
+
+  if (existing?.isLocal && !existing.serverId) {
+    const queueChanged = removePendingCreateSnapshot('category', id);
+    if (queueChanged) {
+      await saveSyncQueueFile();
+    }
+  }
 }
 
 export async function bulkSaveCategories(categories: Category[]): Promise<void> {
@@ -557,10 +786,14 @@ export function isWritingNote(id: string): boolean {
 }
 
 export async function reloadNoteFromFile(id: string): Promise<Note | null> {
-  const content = await window.electron.fs.readNote(id);
+  const safeId = normalizeNoteId(id);
+  if (!safeId) {
+    return null;
+  }
+  const content = await window.electron.fs.readNote(safeId);
   if (!content) {
     // File was deleted
-    notesCache.delete(id);
+    notesCache.delete(safeId);
     return null;
   }
 
@@ -589,16 +822,25 @@ export async function reloadNoteFromFile(id: string): Promise<Note | null> {
 
   if (isNew && note.isLocal && !note.serverId) {
     // Externally created note with frontmatter that hasn't been synced yet
-    await addToSyncQueue({
-      entityType: 'note',
-      entityId: note.id,
-      operation: SyncOperation.Create,
-      payload: JSON.stringify({
-        content: note.content,
-        categoryId: note.categoryId,
-      }),
-      baseVersion: null,
-    });
+    const queueChanged = upsertPendingCreateSnapshot(
+      'note',
+      note.id,
+      (existingPayload) => buildNoteCreatePayload(note, existingPayload),
+      true
+    );
+    if (queueChanged) {
+      await saveSyncQueueFile();
+    }
+  } else if (!isNew && note.isLocal && !note.serverId) {
+    const queueChanged = upsertPendingCreateSnapshot(
+      'note',
+      note.id,
+      (existingPayload) => buildNoteCreatePayload(note, existingPayload),
+      false
+    );
+    if (queueChanged) {
+      await saveSyncQueueFile();
+    }
   } else if (!isNew && note.serverId) {
     // Existing synced note edited externally — queue an update if content
     // or category changed
@@ -669,8 +911,20 @@ async function ingestPlainMarkdown(originalFileId: string, content: string): Pro
 }
 
 export async function handleFileDeleted(id: string): Promise<void> {
-  const existing = notesCache.get(id);
-  notesCache.delete(id);
+  const safeId = normalizeNoteId(id);
+  if (!safeId) {
+    return;
+  }
+
+  const existing = notesCache.get(safeId);
+  notesCache.delete(safeId);
+
+  if (existing?.isLocal && !existing.serverId) {
+    const queueChanged = removePendingCreateSnapshot('note', safeId);
+    if (queueChanged) {
+      await saveSyncQueueFile();
+    }
+  }
 
   // If the deleted note was synced to the server, queue a server-side delete
   if (existing?.serverId) {

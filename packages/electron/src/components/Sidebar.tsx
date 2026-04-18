@@ -152,6 +152,7 @@ export default function Sidebar({
           let dotClass = 'connected';
           let label = 'synced';
           if (syncStatus === 'syncing') { dotClass = 'syncing'; label = 'syncing'; }
+          else if (syncStatus === 'error') { dotClass = 'error'; label = pendingCount && pendingCount > 0 ? `${pendingCount} retry needed` : 'retry needed'; }
           else if (pendingCount && pendingCount > 0) { dotClass = 'pending'; label = `${pendingCount} pending`; }
           else if (connectionState === 'disconnected') { dotClass = 'disconnected'; label = 'offline'; }
           else if (connectionState === 'connecting') { dotClass = 'connecting'; label = 'connecting'; }

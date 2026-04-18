@@ -8,6 +8,7 @@ const config: Config = {
     '^@shared/(.*)$': '<rootDir>/../shared/src/$1',
     '^@shared$': '<rootDir>/../shared/src/index.ts',
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^sql\\.js/dist/sql-wasm\\.wasm\\?url$': '<rootDir>/src/types/sql-wasm-url.mock.ts',
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {

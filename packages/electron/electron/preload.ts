@@ -44,12 +44,19 @@ contextBridge.exposeInMainWorld('electron', {
     reset: (): Promise<AppSettings> => ipcRenderer.invoke('reset-settings'),
   },
   app: {
+    apiBaseUrl: process.env.VITE_API_URL || 'http://localhost:5000',
     getVersion: (): Promise<string> => ipcRenderer.invoke('get-app-version'),
     checkForUpdates: (): Promise<void> => ipcRenderer.invoke('check-for-updates'),
   },
+  auth: {
+    setSessionActive: (isActive: boolean): Promise<void> =>
+      ipcRenderer.invoke('auth:set-session-active', isActive),
+  },
   quickCapture: {
     close: (): Promise<void> => ipcRenderer.invoke('close-quick-capture'),
-    getAuthToken: (): Promise<string | null> => ipcRenderer.invoke('get-auth-token'),
+    isAuthenticated: (): Promise<boolean> => ipcRenderer.invoke('quick-capture:is-authenticated'),
+    createNote: (payload: { content: string; deviceId?: string }): Promise<{ noteId: string }> =>
+      ipcRenderer.invoke('quick-capture:create-note', payload),
     notifyNoteCreated: (): Promise<void> => ipcRenderer.invoke('note-created-from-quick-capture'),
   },
   quickCaptureCode: {

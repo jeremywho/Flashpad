@@ -32,9 +32,13 @@ export function createMockElectron(store: MockNoteStore) {
       getVersion: jest.fn().mockResolvedValue('0.0.0-test'),
       checkForUpdates: jest.fn().mockResolvedValue(undefined),
     },
+    auth: {
+      setSessionActive: jest.fn().mockResolvedValue(undefined),
+    },
     quickCapture: {
       close: jest.fn().mockResolvedValue(undefined),
-      getAuthToken: jest.fn().mockResolvedValue(null),
+      isAuthenticated: jest.fn().mockResolvedValue(false),
+      createNote: jest.fn().mockResolvedValue({ noteId: 'local_test_note' }),
       notifyNoteCreated: jest.fn().mockResolvedValue(undefined),
     },
     quickCaptureCode: {

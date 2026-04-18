@@ -1,16 +1,23 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, globalShortcut, screen, dialog } from 'electron';
+import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, globalShortcut, screen, dialog, shell } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import chokidar from 'chokidar';
 import path from 'path';
+import { pathToFileURL } from 'url';
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import { settingsStore, AppSettings } from './settings';
+import { checkForUpdates as requestUpdateCheck } from '../src/services/updater-listeners';
 
 let mainWindow: BrowserWindow | null = null;
 let quickCaptureWindow: BrowserWindow | null = null;
 let quickCaptureCodeWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
+let quickCaptureSessionActive = false;
+
+const NOTE_ID_REGEX = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+const ALLOWED_DATA_FILES = new Set(['categories.json', 'sync-queue.json', 'device-info.json']);
+const DEFAULT_QUICK_CAPTURE_DEVICE_ID = 'electron-desktop';
 
 // File system storage
 let watcher: ReturnType<typeof chokidar.watch> | null = null;
@@ -26,6 +33,235 @@ function getDataDir(): string {
 
 function getNotesDir(): string {
   return path.join(getDataDir(), 'notes');
+}
+
+function isValidNoteId(noteId: string): boolean {
+  return NOTE_ID_REGEX.test(noteId);
+}
+
+function resolvePathWithinBaseDir(baseDir: string, relativePath: string): string | null {
+  const resolvedPath = path.resolve(baseDir, relativePath);
+  const relative = path.relative(baseDir, resolvedPath);
+
+  if (relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative))) {
+    return resolvedPath;
+  }
+
+  return null;
+}
+
+function isAllowedDataFilename(filename: string): boolean {
+  return ALLOWED_DATA_FILES.has(filename);
+}
+
+function generateLocalNoteId(): string {
+  return `local_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
+
+function escapeYamlString(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function serializeLocalNoteFile(note: {
+  id: string;
+  content: string;
+  deviceId: string;
+  createdAt: string;
+  updatedAt: string;
+}): string {
+  const yaml = [
+    `id: "${escapeYamlString(note.id)}"`,
+    'categoryId: null',
+    'status: 0',
+    'version: 1',
+    `deviceId: "${escapeYamlString(note.deviceId)}"`,
+    `createdAt: "${escapeYamlString(note.createdAt)}"`,
+    `updatedAt: "${escapeYamlString(note.updatedAt)}"`,
+    'isLocal: true',
+    'serverId: null',
+  ].join('\n');
+
+  return `---\n${yaml}\n---\n${note.content}`;
+}
+
+interface SyncQueueItem {
+  id: number;
+  entityType: 'note' | 'category';
+  entityId: string;
+  operation: 'CREATE' | 'UPDATE' | 'DELETE' | 'ARCHIVE' | 'RESTORE' | 'TRASH' | 'MOVE';
+  payload: string;
+  baseVersion: number | null;
+  createdAt: string;
+  retryCount: number;
+  lastError: string | null;
+}
+
+interface SyncQueueFile {
+  items: SyncQueueItem[];
+  nextId: number;
+}
+
+async function readDataJsonFile<T>(filename: string): Promise<T | null> {
+  if (!isAllowedDataFilename(filename)) {
+    throw new Error(`Unsafe data filename: ${filename}`);
+  }
+
+  const dataDir = getDataDir();
+  const filePath = resolvePathWithinBaseDir(dataDir, filename);
+  if (!filePath) {
+    return null;
+  }
+
+  try {
+    const content = await fs.readFile(filePath, 'utf-8');
+    return JSON.parse(content) as T;
+  } catch {
+    return null;
+  }
+}
+
+async function writeDataJsonFile(filename: string, data: unknown): Promise<void> {
+  if (!isAllowedDataFilename(filename)) {
+    throw new Error(`Unsafe data filename: ${filename}`);
+  }
+
+  await ensureDataDirectories();
+  const dataDir = getDataDir();
+  const filePath = resolvePathWithinBaseDir(dataDir, filename);
+  if (!filePath) {
+    throw new Error(`Unsafe data path: ${filename}`);
+  }
+
+  await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
+}
+
+async function queueQuickCaptureNote(content: string, deviceId?: string): Promise<{ noteId: string }> {
+  const trimmedContent = content.trim();
+  if (!trimmedContent) {
+    throw new Error('Note content is required');
+  }
+
+  await ensureDataDirectories();
+
+  const noteId = generateLocalNoteId();
+  const timestamp = new Date().toISOString();
+  const resolvedDeviceId = (deviceId?.trim() || DEFAULT_QUICK_CAPTURE_DEVICE_ID);
+  const noteFilePath = resolvePathWithinBaseDir(getNotesDir(), `${noteId}.md`);
+
+  if (!noteFilePath) {
+    throw new Error(`Unsafe note path: ${noteId}`);
+  }
+
+  await fs.writeFile(
+    noteFilePath,
+    serializeLocalNoteFile({
+      id: noteId,
+      content: trimmedContent,
+      deviceId: resolvedDeviceId,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }),
+    'utf-8'
+  );
+
+  const existingQueue = (await readDataJsonFile<SyncQueueFile>('sync-queue.json')) ?? {
+    items: [],
+    nextId: 1,
+  };
+  const items = Array.isArray(existingQueue.items) ? [...existingQueue.items] : [];
+  const nextId =
+    typeof existingQueue.nextId === 'number' && existingQueue.nextId > 0
+      ? existingQueue.nextId
+      : (items.length > 0 ? Math.max(...items.map((item) => item.id)) + 1 : 1);
+
+  items.push({
+    id: nextId,
+    entityType: 'note',
+    entityId: noteId,
+    operation: 'CREATE',
+    payload: JSON.stringify({
+      content: trimmedContent,
+      deviceId: resolvedDeviceId,
+    }),
+    baseVersion: null,
+    createdAt: timestamp,
+    retryCount: 0,
+    lastError: null,
+  });
+
+  await writeDataJsonFile('sync-queue.json', {
+    items,
+    nextId: nextId + 1,
+  });
+
+  if (mainWindow) {
+    mainWindow.webContents.send('refresh-notes');
+  }
+
+  return { noteId };
+}
+
+function getAllowedWindowBaseUrl(): URL {
+  if (process.env.VITE_DEV_SERVER_URL) {
+    return new URL(process.env.VITE_DEV_SERVER_URL);
+  }
+
+  return pathToFileURL(path.join(__dirname, '../dist/index.html'));
+}
+
+function isAllowedWindowNavigation(targetUrl: string, allowedBaseUrl: URL): boolean {
+  try {
+    const parsedUrl = new URL(targetUrl);
+
+    if (allowedBaseUrl.protocol === 'file:') {
+      return (
+        parsedUrl.protocol === 'file:' &&
+        parsedUrl.host === allowedBaseUrl.host &&
+        parsedUrl.pathname === allowedBaseUrl.pathname
+      );
+    }
+
+    return parsedUrl.origin === allowedBaseUrl.origin;
+  } catch {
+    return false;
+  }
+}
+
+function isExternalWebUrl(targetUrl: string): boolean {
+  try {
+    const parsedUrl = new URL(targetUrl);
+    return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function attachWindowSecurityGuards(window: BrowserWindow): void {
+  const allowedBaseUrl = getAllowedWindowBaseUrl();
+  const { webContents } = window;
+
+  webContents.on('will-navigate', (event, targetUrl) => {
+    if (isAllowedWindowNavigation(targetUrl, allowedBaseUrl)) {
+      return;
+    }
+
+    event.preventDefault();
+    if (isExternalWebUrl(targetUrl)) {
+      void shell.openExternal(targetUrl);
+    }
+  });
+
+  webContents.setWindowOpenHandler(({ url }) => {
+    if (isAllowedWindowNavigation(url, allowedBaseUrl)) {
+      return { action: 'allow' };
+    }
+
+    if (isExternalWebUrl(url)) {
+      void shell.openExternal(url);
+    }
+
+    return { action: 'deny' };
+  });
 }
 
 async function ensureDataDirectories(): Promise<void> {
@@ -143,7 +379,7 @@ function createTray() {
     {
       label: `Check for Updates (v${version})`,
       click: () => {
-        autoUpdater.checkForUpdatesAndNotify();
+        checkForUpdates();
       },
     },
     { type: 'separator' },
@@ -206,6 +442,7 @@ function createWindow() {
       nodeIntegration: false,
     },
   });
+  attachWindowSecurityGuards(mainWindow);
 
   if (saved?.maximized) {
     mainWindow.maximize();
@@ -282,6 +519,7 @@ function createQuickCaptureWindow() {
       nodeIntegration: false,
     },
   });
+  attachWindowSecurityGuards(quickCaptureWindow);
 
   const quickCaptureUrl = process.env.VITE_DEV_SERVER_URL
     ? `${process.env.VITE_DEV_SERVER_URL}#/quick-capture`
@@ -330,6 +568,7 @@ function createQuickCaptureCodeWindow() {
       nodeIntegration: false,
     },
   });
+  attachWindowSecurityGuards(quickCaptureCodeWindow);
 
   const quickCaptureCodeUrl = process.env.VITE_DEV_SERVER_URL
     ? `${process.env.VITE_DEV_SERVER_URL}#/quick-capture-code`
@@ -374,45 +613,25 @@ function registerGlobalShortcut() {
 }
 
 function checkForUpdates() {
-  autoUpdater.checkForUpdatesAndNotify();
-
-  autoUpdater.on('checking-for-update', () => {
-    console.log('[updater] Checking for update...');
-  });
-
-  autoUpdater.on('update-available', (info) => {
-    console.log('[updater] Update available:', info.version);
-  });
-
-  autoUpdater.on('update-not-available', (info) => {
-    console.log('[updater] No update available. Current version is up to date:', info.version);
-  });
-
-  autoUpdater.on('download-progress', (progress) => {
-    console.log(`[updater] Download progress: ${Math.round(progress.percent)}%`);
-  });
-
-  autoUpdater.on('error', (err) => {
-    console.error('[updater] Error:', err.message);
-  });
-
-  autoUpdater.on('update-downloaded', (info) => {
-    console.log('[updater] Update downloaded:', info.version);
-    if (mainWindow) {
-      mainWindow.webContents.send('update-downloaded');
-    }
-    dialog.showMessageBox({
-      type: 'info',
-      title: 'Update Ready',
-      message: `Version ${info.version} has been downloaded.`,
-      detail: 'Restart now to apply the update?',
-      buttons: ['Restart', 'Later'],
-      defaultId: 0,
-    }).then(({ response }) => {
-      if (response === 0) {
-        autoUpdater.quitAndInstall();
+  void requestUpdateCheck(autoUpdater, console, {
+    onUpdateDownloaded: (info) => {
+      console.log('[updater] Update downloaded:', info.version);
+      if (mainWindow) {
+        mainWindow.webContents.send('update-downloaded');
       }
-    });
+      dialog.showMessageBox({
+        type: 'info',
+        title: 'Update Ready',
+        message: `Version ${info.version} has been downloaded.`,
+        detail: 'Restart now to apply the update?',
+        buttons: ['Restart', 'Later'],
+        defaultId: 0,
+      }).then(({ response }) => {
+        if (response === 0) {
+          autoUpdater.quitAndInstall();
+        }
+      });
+    },
   });
 }
 
@@ -447,7 +666,7 @@ ipcMain.handle('get-app-version', () => {
 });
 
 ipcMain.handle('check-for-updates', () => {
-  autoUpdater.checkForUpdatesAndNotify();
+  checkForUpdates();
 });
 
 ipcMain.handle('install-update', () => {
@@ -467,17 +686,26 @@ ipcMain.handle('close-quick-capture-code', () => {
   }
 });
 
-ipcMain.handle('get-auth-token', () => {
-  if (mainWindow) {
-    return mainWindow.webContents.executeJavaScript('localStorage.getItem("token")');
-  }
-  return null;
+ipcMain.handle('auth:set-session-active', (_event, isActive: boolean) => {
+  quickCaptureSessionActive = isActive;
 });
 
 ipcMain.handle('note-created-from-quick-capture', () => {
   if (mainWindow) {
     mainWindow.webContents.send('refresh-notes');
   }
+});
+
+ipcMain.handle('quick-capture:is-authenticated', () => {
+  return quickCaptureSessionActive;
+});
+
+ipcMain.handle('quick-capture:create-note', async (_event, payload: { content: string; deviceId?: string }) => {
+  if (!quickCaptureSessionActive) {
+    throw new Error('Please log in to the main app first');
+  }
+
+  return queueQuickCaptureNote(payload.content, payload.deviceId);
 });
 
 // File system IPC handlers
@@ -519,8 +747,16 @@ ipcMain.handle('fs:list-notes', async () => {
 
 ipcMain.handle('fs:read-note', async (_event, id: string) => {
   try {
+    if (!isValidNoteId(id)) {
+      return null;
+    }
+
     const notesDir = getNotesDir();
-    const filePath = path.join(notesDir, `${id}.md`);
+    const filePath = resolvePathWithinBaseDir(notesDir, `${id}.md`);
+    if (!filePath) {
+      return null;
+    }
+
     const content = await fs.readFile(filePath, 'utf-8');
     return content;
   } catch {
@@ -529,16 +765,32 @@ ipcMain.handle('fs:read-note', async (_event, id: string) => {
 });
 
 ipcMain.handle('fs:write-note', async (_event, id: string, content: string) => {
+  if (!isValidNoteId(id)) {
+    throw new Error(`Unsafe note ID: ${id}`);
+  }
+
   await ensureDataDirectories();
   const notesDir = getNotesDir();
-  const filePath = path.join(notesDir, `${id}.md`);
+  const filePath = resolvePathWithinBaseDir(notesDir, `${id}.md`);
+  if (!filePath) {
+    throw new Error(`Unsafe note path: ${id}`);
+  }
+
   await fs.writeFile(filePath, content, 'utf-8');
 });
 
 ipcMain.handle('fs:delete-note', async (_event, id: string) => {
   try {
+    if (!isValidNoteId(id)) {
+      return;
+    }
+
     const notesDir = getNotesDir();
-    const filePath = path.join(notesDir, `${id}.md`);
+    const filePath = resolvePathWithinBaseDir(notesDir, `${id}.md`);
+    if (!filePath) {
+      return;
+    }
+
     await fs.unlink(filePath);
   } catch {
     // File may not exist, ignore error
@@ -547,20 +799,14 @@ ipcMain.handle('fs:delete-note', async (_event, id: string) => {
 
 ipcMain.handle('fs:read-json', async (_event, filename: string) => {
   try {
-    const dataDir = getDataDir();
-    const filePath = path.join(dataDir, filename);
-    const content = await fs.readFile(filePath, 'utf-8');
-    return JSON.parse(content);
+    return await readDataJsonFile(filename);
   } catch {
     return null;
   }
 });
 
 ipcMain.handle('fs:write-json', async (_event, filename: string, data: unknown) => {
-  await ensureDataDirectories();
-  const dataDir = getDataDir();
-  const filePath = path.join(dataDir, filename);
-  await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
+  await writeDataJsonFile(filename, data);
 });
 
 ipcMain.handle('fs:watch-start', () => {

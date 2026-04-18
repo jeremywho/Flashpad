@@ -60,12 +60,17 @@ export interface ElectronAPI {
     reset: () => Promise<AppSettings>;
   };
   app: {
+    apiBaseUrl: string;
     getVersion: () => Promise<string>;
     checkForUpdates: () => Promise<void>;
   };
+  auth: {
+    setSessionActive: (isActive: boolean) => Promise<void>;
+  };
   quickCapture: {
     close: () => Promise<void>;
-    getAuthToken: () => Promise<string | null>;
+    isAuthenticated: () => Promise<boolean>;
+    createNote: (payload: { content: string; deviceId?: string }) => Promise<{ noteId: string }>;
     notifyNoteCreated: () => Promise<void>;
   };
   quickCaptureCode: {

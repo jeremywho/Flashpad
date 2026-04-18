@@ -50,6 +50,19 @@ export async function launchApp(opts: {
 
   const page = await app.firstWindow();
 
+  if (process.env.FLASHPAD_E2E_VERBOSE === '1') {
+    page.on('console', (msg) => {
+      console.log(`[electron:${msg.type()}] ${msg.text()}`);
+    });
+    page.on('pageerror', (error) => {
+      console.log('[electron:pageerror]', error instanceof Error ? error.stack ?? error.message : String(error));
+    });
+    page.on('requestfailed', (request) => {
+      const failure = request.failure();
+      console.log('[electron:requestfailed]', request.method(), request.url(), failure?.errorText ?? 'unknown');
+    });
+  }
+
   // Wait for the app to be ready
   await page.waitForLoadState('domcontentloaded');
 
@@ -104,7 +117,7 @@ export async function loginViaUi(page: Page, username: string, password: string)
   }
 
   // Wait for login form
-  await loginField.waitFor({ state: 'visible', timeout: 10_000 });
+  await loginField.waitFor({ state: 'visible', timeout: 30_000 });
 
   await loginField.fill(username);
   await page.locator('#password').fill(password);

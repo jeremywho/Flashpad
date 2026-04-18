@@ -1,6 +1,6 @@
 /**
  * Register and login a test user directly via the API.
- * Returns the JWT token and credentials.
+ * Returns the access token and credentials.
  */
 export async function registerAndLogin(
   baseUrl: string,
@@ -35,7 +35,7 @@ export async function registerAndLogin(
   }
 
   const data = await loginRes.json();
-  return { token: data.token, username, password };
+  return { token: data.accessToken ?? data.token, username, password };
 }
 
 /**

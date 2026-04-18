@@ -7,6 +7,31 @@ let store: MockNoteStore;
 // (notesCache, initialized flag, etc.)
 let db: typeof import('../database');
 
+function buildPendingCreateQueueItem(
+  entityType: 'note' | 'category',
+  entityId: string,
+  payload: Record<string, unknown>,
+  id = 1
+) {
+  return {
+    id,
+    entityType,
+    entityId,
+    operation: 'CREATE',
+    payload: JSON.stringify(payload),
+    baseVersion: null,
+    createdAt: '2026-04-12T00:00:00.000Z',
+    retryCount: 0,
+    lastError: null,
+  };
+}
+
+function getQueuedCreates() {
+  return ((store.json.get('sync-queue.json') as { items?: Array<{ operation: string; payload: string }> } | undefined)?.items ?? []).filter(
+    (item) => item.operation === 'CREATE'
+  );
+}
+
 beforeEach(async () => {
   // Reset module registry so database.ts reinitializes
   jest.resetModules();
@@ -181,6 +206,33 @@ describe('reloadNoteFromFile', () => {
     expect(updateItem!.baseVersion).toBe(2);
   });
 
+  it('treats malicious frontmatter ids as plain markdown and regenerates a safe local id', async () => {
+    // Initialize with empty state
+    await db.getLocalNotes({});
+
+    // Simulate a file whose frontmatter tries to traverse out of the notes dir.
+    const maliciousFile = buildNoteFile({
+      id: '../../escape',
+      content: '# Safe content\nThe frontmatter id is unsafe.',
+      isLocal: true,
+      serverId: null,
+    });
+    store.notes.set('malicious-frontmatter', maliciousFile);
+
+    const note = await db.reloadNoteFromFile('malicious-frontmatter');
+
+    expect(note).not.toBeNull();
+    expect(note!.id).toMatch(/^local_/);
+    expect(note!.content).toContain('The frontmatter id is unsafe.');
+
+    // The original unsafe file should be replaced by a generated note file.
+    expect(store.notes.has('malicious-frontmatter')).toBe(false);
+
+    const queue = await db.getSyncQueue();
+    const createItem = queue.find((i) => i.entityId === note!.id && i.operation === 'CREATE');
+    expect(createItem).toBeDefined();
+  });
+
   it('does NOT queue UPDATE when content has not changed', async () => {
     const noteFile = buildNoteFile({
       id: 'unchanged-note',
@@ -335,5 +387,75 @@ describe('startup unsynced note detection', () => {
       (i) => i.entityId === 'unsynced-at-boot' && i.operation === 'CREATE'
     );
     expect(createItem).toBeDefined();
+  });
+
+  it('rewrites an existing local-only CREATE snapshot to the latest note file state on init', async () => {
+    const noteFile = buildNoteFile({
+      id: 'stale-local-note',
+      content: 'Latest local content',
+      categoryId: 'updated-category',
+      isLocal: true,
+      serverId: null,
+      version: 4,
+    });
+    store.notes.set('stale-local-note', noteFile);
+    store.json.set('sync-queue.json', {
+      items: [
+        buildPendingCreateQueueItem('note', 'stale-local-note', {
+          content: 'Old content',
+          categoryId: 'old-category',
+          deviceId: 'old-device',
+        }),
+      ],
+      nextId: 2,
+    });
+
+    await db.getLocalNotes({});
+
+    const queue = getQueuedCreates();
+    expect(queue).toHaveLength(1);
+    expect(JSON.parse(queue[0].payload)).toMatchObject({
+      content: 'Latest local content',
+      categoryId: 'updated-category',
+    });
+  });
+});
+
+describe('startup unsynced category detection', () => {
+  it('rewrites an existing local-only CREATE snapshot to the latest category file state on init', async () => {
+    store.json.set('categories.json', {
+      categories: [
+        {
+          id: 'local-category',
+          name: 'Latest category',
+          color: '#22c55e',
+          icon: 'sparkles',
+          sortOrder: 7,
+          createdAt: '2026-04-12T00:00:00.000Z',
+          updatedAt: '2026-04-12T00:00:00.000Z',
+          isLocal: true,
+          serverId: null,
+        },
+      ],
+    });
+    store.json.set('sync-queue.json', {
+      items: [
+        buildPendingCreateQueueItem('category', 'local-category', {
+          name: 'Old category',
+          color: '#111111',
+        }),
+      ],
+      nextId: 2,
+    });
+
+    await db.getLocalCategories();
+
+    const queue = getQueuedCreates();
+    expect(queue).toHaveLength(1);
+    expect(JSON.parse(queue[0].payload)).toMatchObject({
+      name: 'Latest category',
+      color: '#22c55e',
+      icon: 'sparkles',
+    });
   });
 });

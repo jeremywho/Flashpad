@@ -38,14 +38,25 @@ export async function startBackend(opts?: { port?: number }): Promise<BackendIns
 
   let dotnetBin: string;
   try {
-    const which = execSync('which dotnet', { encoding: 'utf-8' }).trim();
-    dotnetBin = fs.realpathSync(which);
+    if (process.platform === 'win32') {
+      const where = execSync('where dotnet', { encoding: 'utf-8' }).trim().split(/\r?\n/)[0];
+      dotnetBin = fs.realpathSync(where);
+    } else {
+      const which = execSync('which dotnet', { encoding: 'utf-8' }).trim();
+      dotnetBin = fs.realpathSync(which);
+    }
   } catch {
-    dotnetBin = '/usr/local/share/dotnet/dotnet';
+    dotnetBin = process.platform === 'win32' ? 'dotnet.exe' : '/usr/local/share/dotnet/dotnet';
   }
 
   const dotnetDir = path.dirname(dotnetBin);
-  const fullPath = [dotnetDir, '/usr/local/bin', '/usr/bin', '/bin', process.env.PATH].filter(Boolean).join(':');
+  const fullPath = [
+    dotnetDir,
+    process.platform === 'win32' ? '' : '/usr/local/bin',
+    process.platform === 'win32' ? '' : '/usr/bin',
+    process.platform === 'win32' ? '' : '/bin',
+    process.env.PATH,
+  ].filter(Boolean).join(path.delimiter);
 
   const env: Record<string, string> = {
     ...process.env as Record<string, string>,
@@ -56,7 +67,7 @@ export async function startBackend(opts?: { port?: number }): Promise<BackendIns
     ConnectionStrings__DefaultConnection: `Data Source=${dbPath}`,
     JwtSettings__SecretKey: 'dGVzdC1zZWNyZXQta2V5LWZvci1lMmUtdGVzdHMtMTIzNDU2Nzg5MA==',
     H4__Endpoint: `http://localhost:${port}`,
-    H4__ApiKey: '',
+    H4__ApiKey: 'e2e-test-h4-api-key',
   };
 
   const dllPath = path.join(backendDir, 'bin', 'Debug', 'net10.0', 'Flashpad.dll');

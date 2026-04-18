@@ -12,7 +12,7 @@ import { saveLocalNote, deleteLocalNote, saveLocalCategory, deleteLocalCategory 
 
 type ViewType = 'inbox' | 'archive' | 'trash' | string;
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = window.electron.app.apiBaseUrl || import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 function Home() {
   const { api, logout } = useAuth();
@@ -181,8 +181,8 @@ function Home() {
       },
       onSyncItemFailed: (item) => {
         const op = item.operation.toLowerCase();
-        toast.error(`Failed to sync ${item.entityType} ${op} after 3 attempts`);
-        h4.error('Sync item permanently failed', {
+        toast.error(`Failed to sync ${item.entityType} ${op}. Retry needed.`);
+        h4.error('Sync item requires manual retry', {
           entityType: item.entityType,
           entityId: item.entityId,
           operation: item.operation,
@@ -291,6 +291,7 @@ function Home() {
       fetchNotes();
       fetchCategories();
       fetchInboxCount();
+      syncManagerRef.current?.processSyncQueue();
     };
 
     window.electron.onRefreshNotes(handleRefresh);

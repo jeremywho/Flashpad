@@ -29,9 +29,14 @@ import {
   SyncOperation,
   getInboxCount as getLocalInboxCount,
   getCategoryCounts,
+  remapCategoryReferences,
 } from './database';
 
 export type SyncStatus = 'idle' | 'syncing' | 'offline' | 'error';
+
+interface QueuedCreateNotePayload extends CreateNoteDto {
+  status?: NoteStatus;
+}
 
 export interface SyncManagerOptions {
   api: ApiClient;
@@ -125,6 +130,11 @@ export class SyncManager {
     this.onAuthError?.();
   }
 
+  private isConflictError(error: unknown): boolean {
+    return (error instanceof HttpError && error.status === 409)
+      || (typeof error === 'object' && error !== null && 'status' in error && (error as { status?: number }).status === 409);
+  }
+
   // Initial data sync - fetch from server and populate local DB
   async initialSync(): Promise<void> {
     if (!this.isOnline) {
@@ -201,12 +211,15 @@ export class SyncManager {
       // Drain loop: keep processing until the queue is empty or we're blocked
       let queue = await getSyncQueue();
       const hadItems = queue.length > 0;
+      let hasRetryRequiredItems = false;
       while (queue.length > 0) {
         h4.info('Processing sync queue', {
           queueSize: queue.length,
           operations: queue.map(i => `${i.operation}:${i.entityType}:${i.entityId}`).join(', '),
         });
 
+        let queueInvalidated = false;
+        let queueBlocked = false;
         for (const item of queue) {
           try {
             const payload = JSON.parse(item.payload);
@@ -214,23 +227,78 @@ export class SyncManager {
             switch (item.operation) {
               case SyncOperation.Create:
                 if (item.entityType === 'note') {
-                  const newNote = await this.api.createNote(payload as CreateNoteDto);
+                  const notePayload = payload as QueuedCreateNotePayload;
+                  const localNote = item.entityId.startsWith('local_')
+                    ? await getLocalNote(item.entityId)
+                    : null;
+
+                  if (item.entityId.startsWith('local_') && !localNote) {
+                    h4.warning('Dropping stale local note create', {
+                      itemId: item.id,
+                      noteId: item.entityId,
+                    });
+                    break;
+                  }
+
+                  const createRequest: CreateNoteDto = {
+                    content: localNote?.content ?? notePayload.content,
+                    categoryId: localNote?.categoryId ?? notePayload.categoryId,
+                    deviceId: localNote?.deviceId ?? notePayload.deviceId,
+                  };
+                  const finalStatus = localNote?.status ?? notePayload.status ?? NoteStatus.Inbox;
+                  const finalDeviceId = localNote?.deviceId ?? notePayload.deviceId;
+
+                  let serverNote = await this.api.createNote(createRequest);
+
+                  if (finalStatus === NoteStatus.Archived) {
+                    serverNote = await this.api.archiveNote(serverNote.id, finalDeviceId);
+                  } else if (finalStatus === NoteStatus.Trash) {
+                    await this.api.trashNote(serverNote.id, finalDeviceId);
+                    serverNote = await this.api.getNote(serverNote.id);
+                  }
+
                   // Update local note with server ID
-                  const localNote = await getLocalNote(item.entityId);
                   if (localNote) {
                     await deleteLocalNote(item.entityId);
-                    await saveLocalNote(newNote, false);
                   }
+                  await saveLocalNote(serverNote, false);
                 } else if (item.entityType === 'category') {
-                  const newCategory = await this.api.createCategory(payload as CreateCategoryDto);
-                  await deleteLocalCategory(item.entityId);
+                  const localCategory = item.entityId.startsWith('local_')
+                    ? (await getLocalCategories()).find((category) => category.id === item.entityId) ?? null
+                    : null;
+
+                  if (item.entityId.startsWith('local_') && !localCategory) {
+                    h4.warning('Dropping stale local category create', {
+                      itemId: item.id,
+                      categoryId: item.entityId,
+                    });
+                    break;
+                  }
+
+                  const categoryPayload = payload as CreateCategoryDto;
+                  const newCategory = await this.api.createCategory({
+                    name: localCategory?.name ?? categoryPayload.name,
+                    color: localCategory?.color ?? categoryPayload.color,
+                    icon: localCategory?.icon ?? categoryPayload.icon,
+                  });
                   await saveLocalCategory(newCategory, false);
+                  await remapCategoryReferences(item.entityId, newCategory.id);
+                  if (localCategory) {
+                    await deleteLocalCategory(item.entityId);
+                  }
+                  queueInvalidated = true;
                 }
                 break;
 
               case SyncOperation.Update:
                 if (item.entityType === 'note') {
-                  const updatedNote = await this.api.updateNote(item.entityId, payload as UpdateNoteDto);
+                  const updatePayload = payload as UpdateNoteDto;
+                  const localNote = await getLocalNote(item.entityId);
+                  const updatedNote = await this.api.updateNote(item.entityId, {
+                    ...updatePayload,
+                    deviceId: updatePayload.deviceId ?? localNote?.deviceId ?? (this.deviceId || undefined),
+                    baseVersion: item.baseVersion ?? updatePayload.baseVersion,
+                  });
                   await saveLocalNote(updatedNote, false);
                 } else if (item.entityType === 'category') {
                   const updatedCategory = await this.api.updateCategory(item.entityId, payload as UpdateCategoryDto);
@@ -276,15 +344,54 @@ export class SyncManager {
               this.handleAuthError();
               return;
             }
-            h4.error('Sync queue item failed', { itemId: item.id, operation: item.operation, entityType: item.entityType, entityId: item.entityId, error: (error as Error).message, retryCount: item.retryCount });
-            await updateSyncQueueItemError(item.id, (error as Error).message);
-
-            if (item.retryCount >= 3) {
-              h4.error('Sync queue item abandoned after 3 retries', { itemId: item.id, operation: item.operation, entityType: item.entityType, entityId: item.entityId });
-              this.onSyncItemFailed?.(item);
-              await removeSyncQueueItem(item.id);
+            if (item.operation === SyncOperation.Update && item.entityType === 'note' && this.isConflictError(error)) {
+              try {
+                const latestNote = await this.api.getNote(item.entityId);
+                await saveLocalNote(latestNote, false);
+                await removeSyncQueueItem(item.id);
+                await this.updatePendingCount();
+                this.onConflict?.(item.entityId, latestNote.version);
+                continue;
+              } catch (refreshError) {
+                h4.error('Failed to refresh conflicted note during sync', {
+                  itemId: item.id,
+                  noteId: item.entityId,
+                  error: (refreshError as Error).message,
+                });
+              }
             }
+            const errorMessage = (error as Error).message;
+            h4.error('Sync queue item failed', { itemId: item.id, operation: item.operation, entityType: item.entityType, entityId: item.entityId, error: errorMessage, retryCount: item.retryCount });
+            await updateSyncQueueItemError(item.id, errorMessage);
+
+            const nextRetryCount = item.retryCount + 1;
+            if (nextRetryCount >= 3) {
+              hasRetryRequiredItems = true;
+              if (nextRetryCount === 3) {
+                h4.error('Sync queue item requires manual retry', {
+                  itemId: item.id,
+                  operation: item.operation,
+                  entityType: item.entityType,
+                  entityId: item.entityId,
+                  lastError: errorMessage,
+                });
+                this.onSyncItemFailed?.({
+                  ...item,
+                  retryCount: nextRetryCount,
+                  lastError: errorMessage,
+                });
+              }
+            }
+            queueBlocked = true;
           }
+
+          if (queueInvalidated || queueBlocked) {
+            break;
+          }
+        }
+
+        if (queueBlocked) {
+          break;
         }
 
         // Clear the flag before re-reading — any new call during the next
@@ -295,7 +402,7 @@ export class SyncManager {
         queue = await getSyncQueue();
       }
 
-      this.updateSyncStatus('idle');
+      this.updateSyncStatus(hasRetryRequiredItems ? 'error' : 'idle');
       // Only trigger a data refresh if we actually synced something —
       // otherwise idle polling generates constant API traffic for nothing
       if (hadItems) {
@@ -320,7 +427,20 @@ export class SyncManager {
     // Read from local DB — no background server fetch.
     // Data freshness is maintained by initialSync() (startup / reconnection),
     // SignalR events (real-time), and the sync queue (offline changes).
-    return await getLocalNotes(params);
+    const localNotes = await getLocalNotes(params);
+
+    if (this.isOnline) {
+      this.api.getNotes({ ...params, pageSize: 1000 })
+        .then(async (response) => {
+          await bulkSaveNotes(response.notes);
+          this.onDataRefresh?.();
+        })
+        .catch((error) => {
+          h4.error('Background note refresh failed', { error: (error as Error).message });
+        });
+    }
+
+    return localNotes;
   }
 
   async createNote(data: CreateNoteDto): Promise<Note> {

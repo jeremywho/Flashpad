@@ -99,6 +99,17 @@ interface NoteEditorProps {
 const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
 const modKey = isMac ? '⌘' : 'Ctrl';
 
+function isExternalMarkdownLink(href: string | undefined): boolean {
+  if (!href) return false;
+
+  try {
+    const url = new URL(href, window.location.href);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export default function NoteEditor({
   note,
   categories,
@@ -303,6 +314,9 @@ export default function NoteEditor({
     if (syncStatus === 'syncing') {
       return { dotClass: 'syncing', label: 'syncing' };
     }
+    if (syncStatus === 'error') {
+      return { dotClass: 'error', label: pendingCount && pendingCount > 0 ? `${pendingCount} retry needed` : 'retry needed' };
+    }
     if (pendingCount && pendingCount > 0) {
       return { dotClass: 'pending', label: `${pendingCount} pending` };
     }
@@ -478,7 +492,24 @@ export default function NoteEditor({
 
       {previewMode ? (
         <div className="note-editor-content note-editor-preview">
-          <Markdown remarkPlugins={[remarkGfm]}>{content}</Markdown>
+          <Markdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              a: ({ href, ...props }) => {
+                const external = isExternalMarkdownLink(href);
+                return (
+                  <a
+                    {...props}
+                    href={href}
+                    target={external ? '_blank' : props.target}
+                    rel={external ? 'noreferrer noopener' : props.rel}
+                  />
+                );
+              },
+            }}
+          >
+            {content}
+          </Markdown>
         </div>
       ) : (
         <textarea

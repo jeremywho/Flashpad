@@ -1,4 +1,5 @@
 import initSqlJs from 'sql.js';
+import sqlWasmUrl from 'sql.js/dist/sql-wasm.wasm?url';
 import { NoteStatus } from '@shared/index';
 import { LocalNote, LocalCategory, SyncQueueItem, SyncOperation } from './database';
 import { serializeNote, NoteMetadata } from './markdown-parser';
@@ -49,7 +50,7 @@ export async function migrateFromLocalStorage(): Promise<{
   try {
     // Initialize sql.js
     const SQL = await initSqlJs({
-      locateFile: (file: string) => `https://sql.js.org/dist/${file}`,
+      locateFile: (file: string) => (file === 'sql-wasm.wasm' ? sqlWasmUrl : file),
     });
 
     // Load old database

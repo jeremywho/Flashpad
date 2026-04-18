@@ -6,13 +6,13 @@ interface AuthContextType {
   user: User | null;
   api: ApiClient;
   isLoading: boolean;
-  login: (token: string, user: User) => void;
+  login: (accessToken: string, refreshToken: string, user: User) => void;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = window.electron.app.apiBaseUrl || import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const api = new ApiClient(API_URL);
 
 const REFRESH_BUFFER_MS = 24 * 60 * 60 * 1000; // 1 day before expiry
@@ -21,6 +21,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshTokenRef = useRef<string | null>(null);
 
   const clearRefreshTimer = useCallback(() => {
     if (refreshTimerRef.current) {
@@ -44,8 +45,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const delay = Math.max(timeUntilExpiry - REFRESH_BUFFER_MS, 0);
     refreshTimerRef.current = setTimeout(async () => {
       try {
-        const response = await api.refreshToken();
-        localStorage.setItem('token', response.token);
+        const currentRefreshToken = refreshTokenRef.current;
+        if (!currentRefreshToken) {
+          onLogout();
+          return;
+        }
+
+        const response = await api.refreshToken(currentRefreshToken);
+        refreshTokenRef.current = response.refreshToken;
         setUser(response.user);
         scheduleRefresh(onLogout);
       } catch {
@@ -56,36 +63,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     clearRefreshTimer();
-    localStorage.removeItem('token');
+    const refreshToken = refreshTokenRef.current;
+    refreshTokenRef.current = null;
+    if (refreshToken) {
+      void api.logoutSession(refreshToken).catch(() => undefined);
+    }
     api.logout();
+    void window.electron.auth.setSessionActive(false);
     SignalRManager.clear();
     setUser(null);
   }, [clearRefreshTimer]);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      api.setToken(token);
-      api
-        .getCurrentUser()
-        .then((userData) => {
-          setUser(userData);
-          scheduleRefresh(logout);
-        })
-        .catch(() => {
-          localStorage.removeItem('token');
-          api.setToken(null);
-        })
-        .finally(() => setIsLoading(false));
-    } else {
-      setIsLoading(false);
-    }
+    void window.electron.auth.setSessionActive(false);
+    setIsLoading(false);
     return clearRefreshTimer;
   }, [scheduleRefresh, logout, clearRefreshTimer]);
 
-  const login = (token: string, userData: User) => {
-    localStorage.setItem('token', token);
-    api.setToken(token);
+  const login = (accessToken: string, refreshToken: string, userData: User) => {
+    refreshTokenRef.current = refreshToken;
+    api.setToken(accessToken);
+    void window.electron.auth.setSessionActive(true);
     setUser(userData);
     scheduleRefresh(logout);
   };

@@ -18,6 +18,14 @@ export interface ParsedNote {
 }
 
 const FRONTMATTER_REGEX = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/;
+const NOTE_ID_REGEX = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+const ALLOWED_DATA_FILENAMES = new Set(['categories.json', 'sync-queue.json', 'device-info.json']);
+
+interface ParsedPathInfo {
+  root: string;
+  segments: string[];
+  isAbsolute: boolean;
+}
 
 /**
  * Parse YAML frontmatter from a markdown file content.
@@ -105,6 +113,51 @@ function serializeYaml(obj: Record<string, unknown>): string {
 }
 
 /**
+ * Check whether a note ID is safe to use as a filename segment.
+ */
+export function isValidNoteId(noteId: string): boolean {
+  return NOTE_ID_REGEX.test(noteId);
+}
+
+/**
+ * Normalize a note ID and return null if it is unsafe.
+ */
+export function normalizeNoteId(noteId: string): string | null {
+  const trimmed = noteId.trim();
+  return isValidNoteId(trimmed) ? trimmed : null;
+}
+
+/**
+ * Resolve a relative path against a base directory and ensure the result stays
+ * inside that base directory.
+ */
+export function resolvePathWithinBaseDir(baseDir: string, relativePath: string): string | null {
+  const separator = baseDir.includes('\\') && !baseDir.includes('/') ? '\\' : '/';
+  const parsedBase = parsePath(baseDir);
+  const parsedTarget = parsePath(relativePath);
+
+  const resolved = parsedTarget.isAbsolute
+    ? normalizePath(parsedTarget.root, parsedTarget.segments, separator)
+    : normalizePath(parsedBase.root, resolveRelativeSegments(parsedBase.segments, relativePath), separator);
+
+  const normalizedBase = normalizePath(parsedBase.root, parsedBase.segments, separator);
+  const baseWithSeparator = normalizedBase.endsWith(separator) ? normalizedBase : `${normalizedBase}${separator}`;
+
+  if (resolved === normalizedBase || resolved.startsWith(baseWithSeparator)) {
+    return resolved;
+  }
+
+  return null;
+}
+
+/**
+ * Check whether a JSON file name is one of the known safe data files.
+ */
+export function isAllowedDataFilename(filename: string): boolean {
+  return ALLOWED_DATA_FILENAMES.has(filename);
+}
+
+/**
  * Parse a note file content into metadata and content.
  */
 export function parseNoteFile(fileContent: string): ParsedNote | null {
@@ -120,9 +173,14 @@ export function parseNoteFile(fileContent: string): ParsedNote | null {
 
   try {
     const data = parseYaml(yamlContent);
+    const noteId = typeof data.id === 'string' ? normalizeNoteId(data.id) : null;
+
+    if (!noteId) {
+      return null;
+    }
 
     const metadata: NoteMetadata = {
-      id: String(data.id || ''),
+      id: noteId,
       categoryId: data.categoryId !== null ? String(data.categoryId) : null,
       status: typeof data.status === 'number' ? data.status : NoteStatus.Inbox,
       version: typeof data.version === 'number' ? data.version : 1,
@@ -193,6 +251,98 @@ export function createDefaultMetadata(): NoteMetadata {
  * @param filename The filename (e.g., "abc123.md")
  * @returns The note ID (e.g., "abc123")
  */
-export function extractIdFromFilename(filename: string): string {
-  return filename.replace(/\.md$/, '');
+export function extractIdFromFilename(filename: string): string | null {
+  const normalizedFilename = filename.replace(/\\/g, '/');
+
+  if (normalizedFilename.includes('/') || !normalizedFilename.endsWith('.md')) {
+    return null;
+  }
+
+  const noteId = normalizeNoteId(normalizedFilename.slice(0, -3));
+  return noteId;
+}
+
+function parsePath(value: string): ParsedPathInfo {
+  const normalized = value.replace(/\\/g, '/');
+  const driveMatch = normalized.match(/^[A-Za-z]:/);
+  const hasDrive = Boolean(driveMatch);
+  const hasLeadingSlash = normalized.startsWith('/');
+  const isAbsolute = hasDrive || hasLeadingSlash;
+
+  let root = '';
+  let remainder = normalized;
+
+  if (hasDrive) {
+    root = driveMatch![0];
+    remainder = normalized.slice(root.length);
+    if (remainder.startsWith('/')) {
+      remainder = remainder.slice(1);
+    }
+  } else if (hasLeadingSlash) {
+    remainder = normalized.slice(1);
+  }
+
+  const segments = remainder
+    .split('/')
+    .filter(Boolean)
+    .reduce<string[]>((resolved, segment) => {
+      if (segment === '.') {
+        return resolved;
+      }
+
+      if (segment === '..') {
+        if (resolved.length > 0) {
+          resolved.pop();
+        } else if (!isAbsolute) {
+          resolved.push('..');
+        }
+        return resolved;
+      }
+
+      resolved.push(segment);
+      return resolved;
+    }, []);
+
+  return {
+    root,
+    segments,
+    isAbsolute,
+  };
+}
+
+function normalizePath(root: string, segments: string[], separator: string): string {
+  const cleanedSegments = [...segments];
+  while (cleanedSegments.length > 0 && cleanedSegments[0] === '..') {
+    cleanedSegments.shift();
+  }
+
+  if (root) {
+    return cleanedSegments.length > 0
+      ? `${root}${separator}${cleanedSegments.join(separator)}`
+      : root;
+  }
+
+  return separator + cleanedSegments.join(separator);
+}
+
+function resolveRelativeSegments(baseSegments: string[], relativePath: string): string[] {
+  const resolvedSegments = [...baseSegments];
+  const normalizedRelative = relativePath.replace(/\\/g, '/');
+
+  for (const segment of normalizedRelative.split('/')) {
+    if (!segment || segment === '.') {
+      continue;
+    }
+
+    if (segment === '..') {
+      if (resolvedSegments.length > 0) {
+        resolvedSegments.pop();
+      }
+      continue;
+    }
+
+    resolvedSegments.push(segment);
+  }
+
+  return resolvedSegments;
 }

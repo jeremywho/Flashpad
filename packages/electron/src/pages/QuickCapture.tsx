@@ -1,8 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { ApiClient } from '@shared/api-client';
-import { SyncManager } from '../services/syncManager';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function QuickCapture() {
   const [content, setContent] = useState('');
@@ -11,26 +7,11 @@ export default function QuickCapture() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const syncManagerRef = useRef<SyncManager | null>(null);
 
   useEffect(() => {
     async function init() {
-      const token = await window.electron.quickCapture.getAuthToken();
-      if (token) {
-        const api = new ApiClient(API_URL);
-        api.setToken(token);
-
-        // Initialize SyncManager for offline support
-        const syncManager = new SyncManager({
-          api,
-          deviceId: localStorage.getItem('flashpad-device-id') || 'electron-quick-capture',
-          onSyncStatusChange: () => {},
-          onPendingCountChange: () => {},
-        });
-        syncManagerRef.current = syncManager;
-
-        setIsAuthenticated(true);
-      }
+      const authenticated = await window.electron.quickCapture.isAuthenticated();
+      setIsAuthenticated(authenticated);
     }
     init();
     textareaRef.current?.focus();
@@ -45,19 +26,17 @@ export default function QuickCapture() {
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
-      syncManagerRef.current?.destroy();
     };
   }, []);
 
   const handleSubmit = async () => {
-    if (!content.trim() || !syncManagerRef.current) return;
+    if (!content.trim()) return;
 
     setIsSubmitting(true);
     setError(null);
 
     try {
-      // Use SyncManager which handles offline queuing
-      await syncManagerRef.current.createNote({
+      await window.electron.quickCapture.createNote({
         content: content.trim(),
         deviceId: localStorage.getItem('flashpad-device-id') || 'electron-desktop',
       });
@@ -97,7 +76,7 @@ export default function QuickCapture() {
       <div className="quick-capture-window">
         {isOffline && (
           <div className="quick-capture-offline-badge">
-            Offline - note will sync when connected
+            Offline - note will queue locally until the main app reconnects
           </div>
         )}
         <textarea

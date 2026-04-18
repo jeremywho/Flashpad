@@ -17,7 +17,7 @@ function Login() {
 
     try {
       const response = await api.login({ username, password });
-      login(response.token, response.user);
+      login(response.accessToken, response.refreshToken, response.user);
       navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
