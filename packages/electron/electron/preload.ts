@@ -44,7 +44,7 @@ contextBridge.exposeInMainWorld('electron', {
     reset: (): Promise<AppSettings> => ipcRenderer.invoke('reset-settings'),
   },
   app: {
-    apiBaseUrl: process.env.VITE_API_URL || 'http://localhost:5000',
+    apiBaseUrl: process.env.VITE_API_URL || '',
     getVersion: (): Promise<string> => ipcRenderer.invoke('get-app-version'),
     checkForUpdates: (): Promise<void> => ipcRenderer.invoke('check-for-updates'),
   },
