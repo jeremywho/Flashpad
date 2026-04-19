@@ -83,11 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     (async () => {
       try {
-        const encAvailable = await window.electron.auth.isEncryptionAvailable();
-        console.info('[auth] safeStorage.isEncryptionAvailable =', encAvailable);
-
         const storedRefreshToken = await window.electron.auth.getRefreshToken();
-        console.info('[auth] stored refresh token present:', !!storedRefreshToken);
         if (cancelled) return;
 
         if (storedRefreshToken) {
