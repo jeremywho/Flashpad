@@ -34,7 +34,7 @@ jobs:
           working-directory: packages/mobile
 
       - name: Install all dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Install mobile-specific React Native version
         working-directory: packages/mobile
