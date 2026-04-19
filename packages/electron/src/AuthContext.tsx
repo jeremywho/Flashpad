@@ -15,7 +15,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const API_URL = window.electron.app.apiBaseUrl || import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const api = new ApiClient(API_URL);
 
-const REFRESH_BUFFER_MS = 24 * 60 * 60 * 1000; // 1 day before expiry
+const REFRESH_BUFFER_MS = 60 * 1000; // refresh 1 minute before access token expires
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
