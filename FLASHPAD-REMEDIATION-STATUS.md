@@ -6,11 +6,11 @@ Source plan: `FLASHPAD-REMEDIATION-PLAN-2026-04-12.md`
 ## P0
 
 ### P0.1 Rotate all exposed backend secrets (`F01`)
-- status: `blocked`
-- owner: `codex`
+- status: `completed`
+- owner: `codex` (code), `claude` (operational rotation 2026-04-19)
 - files_touched: [`packages/backend/Configuration/SecretConfigurationResolver.cs`, `packages/backend/Program.cs`, `packages/backend/appsettings.json`, `packages/backend/appsettings.Production.json`, `packages/backend/Flashpad.csproj`, `packages/backend/Flashpad.Tests/Flashpad.Tests.csproj`, `packages/backend/Flashpad.Tests/GlobalUsings.cs`, `packages/backend/Flashpad.Tests/SecretConfigurationResolverTests.cs`, `packages/backend/Flashpad.Tests/TestAssembly.cs`, `README.md`, `DEPLOY.md`, `packages/backend/README.md`]
-- tests_run: [`dotnet build packages/backend/Flashpad.csproj`, `dotnet test packages/backend/Flashpad.Tests/Flashpad.Tests.csproj`]
-- notes: `Removed checked-in backend secrets from config and made production startup require externally supplied JwtSettings__SecretKey and H4__ApiKey. Blocked on operational rotation outside this repo: replace deployed JWT/H4 secrets, revoke previously exposed values, and audit CI/server backups/artifacts for historical leakage before F01 can be fully closed.`
+- tests_run: [`dotnet build packages/backend/Flashpad.csproj`, `dotnet test packages/backend/Flashpad.Tests/Flashpad.Tests.csproj`, `curl /api/auth/register post-rotation smoke test`]
+- notes: `Code remediation (2026-04-12): removed checked-in backend secrets from config and made production startup require externally supplied JwtSettings__SecretKey and H4__ApiKey. Operational rotation (2026-04-19): new JWT secret generated server-side and set as systemd Environment= for flashpad-api.service; new H4 API key generated server-side, Flashpad row in h4.Projects updated (ApiKeyHash + ApiKeyPrefix) to the new value, and the new key set in the same systemd unit. Service restarted, smoke-tested: register returns 200 with valid access/refresh tokens, h4 ingestion of LogEntries and Traces verified. Previously exposed values in git history are now non-functional. Residual: CI/server backup audit for historical leakage still recommended but out of scope for this rotation.`
 
 ### P0.2 Stop leaking bearer tokens and note content into telemetry (`F04`, `F06`, part of `F16`)
 - status: `completed`
