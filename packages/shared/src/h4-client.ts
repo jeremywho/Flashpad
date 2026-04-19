@@ -39,6 +39,41 @@ export interface LogEntry {
   metadata?: Record<string, unknown>;
 }
 
+// --- Metadata sanitization (matches server ClientLogSanitizer limits) ---
+
+const MAX_METADATA_ENTRIES = 20;
+const MAX_METADATA_VALUE_LENGTH = 256;
+const MAX_METADATA_KEY_LENGTH = 64;
+
+function truncate(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value;
+  return value.slice(0, maxLength - 3) + '...';
+}
+
+function scalarize(value: unknown): string | number | boolean | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string') return truncate(value, MAX_METADATA_VALUE_LENGTH);
+  if (typeof value === 'number' || typeof value === 'boolean') return value;
+  try {
+    return truncate(JSON.stringify(value), MAX_METADATA_VALUE_LENGTH);
+  } catch {
+    return truncate(String(value), MAX_METADATA_VALUE_LENGTH);
+  }
+}
+
+function sanitizeMetadata(metadata: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  if (!metadata) return undefined;
+  const entries = Object.entries(metadata).slice(0, MAX_METADATA_ENTRIES);
+  if (entries.length === 0) return undefined;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of entries) {
+    if (!key) continue;
+    const sanitizedKey = truncate(key, MAX_METADATA_KEY_LENGTH);
+    out[sanitizedKey] = scalarize(value);
+  }
+  return out;
+}
+
 // --- Built-in IndexedDB storage adapter ---
 
 const DB_NAME = 'h4-logs';
@@ -212,11 +247,11 @@ class H4ClientLogger {
   private log(level: string, message: string, metadata?: Record<string, unknown>): void {
     const entry: LogEntry = {
       level,
-      message,
+      message: truncate(message, 4096),
       source: this.options?.source ?? 'unknown',
       deviceId: this.options?.deviceId ?? 'unknown',
       timestamp: new Date().toISOString(),
-      metadata: { ...this.options?.globalMetadata, ...metadata },
+      metadata: sanitizeMetadata({ ...this.options?.globalMetadata, ...metadata }),
     };
     this.buffer.push(entry);
 
