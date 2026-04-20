@@ -62,10 +62,10 @@ describe('deleteLocalNote', () => {
     // The note should be in writingNotes (checked via isWritingNote)
     expect(db.isWritingNote('note-1')).toBe(true);
 
-    // After 600ms the guard should be cleared
-    await new Promise((r) => setTimeout(r, 600));
+    // After the TTL elapses the guard should be cleared
+    await new Promise((r) => setTimeout(r, db.WRITING_NOTES_TTL_MS + 100));
     expect(db.isWritingNote('note-1')).toBe(false);
-  });
+  }, 10_000);
 
   it('removes note from cache and deletes file', async () => {
     const noteFile = buildNoteFile({ id: 'note-2', content: 'Test' });

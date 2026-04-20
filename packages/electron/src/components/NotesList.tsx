@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Note } from '@shared/types';
 
 interface NotesListProps {
@@ -42,7 +43,7 @@ function getTitle(content: string): string {
   return firstLine.length > 50 ? firstLine.substring(0, 50) + '...' : firstLine || 'Untitled';
 }
 
-export default function NotesList({
+function NotesListInner({
   notes,
   selectedNoteId,
   onNoteSelect,
@@ -131,3 +132,6 @@ export default function NotesList({
     </div>
   );
 }
+
+const NotesList = memo(NotesListInner);
+export default NotesList;

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Note, Category, NoteStatus } from '@shared/types';
@@ -110,7 +110,7 @@ function isExternalMarkdownLink(href: string | undefined): boolean {
   }
 }
 
-export default function NoteEditor({
+function NoteEditorInner({
   note,
   categories,
   onSave,
@@ -540,3 +540,6 @@ export default function NoteEditor({
     </div>
   );
 }
+
+const NoteEditor = memo(NoteEditorInner);
+export default NoteEditor;

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '../AuthContext';
 import { Note, Category, NoteStatus, CreateCategoryDto, SignalRClient, SignalRManager, ConnectionState, DevicePresence, h4 } from '@shared/index';
 import Sidebar from '../components/Sidebar';
@@ -121,7 +121,16 @@ function Home() {
     if (!syncManagerRef.current) return;
     try {
       const ids = await syncManagerRef.current.getPendingNoteIds();
-      setPendingNoteIds(ids);
+      // Only swap the Set reference when the contents actually changed.
+      // Otherwise every pendingCount flip rotates the reference and busts
+      // React.memo on NotesList even when nothing visible changed.
+      setPendingNoteIds((prev) => {
+        if (prev.size !== ids.size) return ids;
+        for (const id of ids) {
+          if (!prev.has(id)) return ids;
+        }
+        return prev;
+      });
     } catch (error) {
       console.error('Failed to fetch pending note IDs:', error);
     }
@@ -448,57 +457,72 @@ function Home() {
     // Connection is only stopped via SignalRManager.removeInstance() on logout
   }, [api, logout, fetchCategories, fetchInboxCount]);
 
-  // Helper to check if a note should show in current view
-  const shouldShowNoteInCurrentView = (note: Note): boolean => {
-    if (selectedView === 'inbox') {
+  // Helper to check if a note should show in current view.
+  // Reads from selectedViewRef so callers wrapped in useCallback don't need to
+  // list selectedView as a dependency — which would invalidate them on every
+  // view change and defeat memoization of NoteEditor/NotesList.
+  const shouldShowNoteInCurrentView = useCallback((note: Note): boolean => {
+    const view = selectedViewRef.current;
+    if (view === 'inbox') {
       return note.status === NoteStatus.Inbox && !note.categoryId;
     }
-    if (selectedView === 'archive') {
+    if (view === 'archive') {
       return note.status === NoteStatus.Archived;
     }
-    if (selectedView === 'trash') {
+    if (view === 'trash') {
       return note.status === NoteStatus.Trash;
     }
     // Category view
-    return note.status === NoteStatus.Inbox && note.categoryId === selectedView;
-  };
+    return note.status === NoteStatus.Inbox && note.categoryId === view;
+  }, []);
 
-  const getViewTitle = () => {
+  const viewTitle = useMemo(() => {
     if (selectedView === 'inbox') return 'Inbox';
     if (selectedView === 'archive') return 'Archive';
     if (selectedView === 'trash') return 'Trash';
     const category = categories.find((c) => c.id === selectedView);
     return category?.name || 'Notes';
-  };
+  }, [selectedView, categories]);
 
-  const handleViewChange = (view: ViewType) => {
-    if (view === selectedView) return;
+  const handleViewChange = useCallback((view: ViewType) => {
+    if (view === selectedViewRef.current) return;
     setSelectedView(view);
     setSelectedNote(null);
     setIsNewNote(false);
     setIsLoading(true);
-  };
+  }, []);
 
-  const handleNoteSelect = (note: Note) => {
+  const handleNoteSelect = useCallback((note: Note) => {
     setSelectedNote(note);
     setIsNewNote(false);
-  };
+  }, []);
 
-  const handleNewNote = () => {
+  const handleNewNote = useCallback(() => {
     setSelectedNote(null);
     setIsNewNote(true);
     setNewNoteInitialCategoryId(undefined);
-  };
+  }, []);
 
-  const handleNewNoteInCategory = (categoryId: string) => {
+  const handleNewNoteInCategory = useCallback((categoryId: string) => {
     setSelectedNote(null);
     setIsNewNote(true);
     setNewNoteInitialCategoryId(categoryId);
     // Switch to the category view
     setSelectedView(categoryId);
-  };
+  }, []);
 
-  const handleSave = async (content: string, categoryId?: string) => {
+  const handleOpenCategoryManager = useCallback(() => {
+    setShowCategoryManager(true);
+  }, []);
+
+  const handleCloseCategoryManager = useCallback(() => {
+    setShowCategoryManager(false);
+  }, []);
+
+  const handleStartSidebarResize = useCallback(() => setIsResizing('sidebar'), []);
+  const handleStartNotesListResize = useCallback(() => setIsResizing('noteslist'), []);
+
+  const handleSave = useCallback(async (content: string, categoryId?: string) => {
     if (!syncManagerRef.current) return;
 
     setIsSaving(true);
@@ -518,8 +542,10 @@ function Home() {
         setIsNewNote(false);
         fetchInboxCount();
         fetchCategories();
-      } else if (selectedNote) {
-        const updatedNote = await syncManagerRef.current.updateNote(selectedNote.id, {
+      } else {
+        const current = selectedNoteRef.current;
+        if (!current) return;
+        const updatedNote = await syncManagerRef.current.updateNote(current.id, {
           content,
           categoryId,
           deviceId: localStorage.getItem('flashpad-device-id') || 'electron-desktop',
@@ -547,13 +573,14 @@ function Home() {
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [isNewNote, fetchInboxCount, fetchCategories, shouldShowNoteInCurrentView, toast]);
 
-  const handleArchive = async () => {
-    if (!selectedNote || !syncManagerRef.current) return;
+  const handleArchive = useCallback(async () => {
+    const current = selectedNoteRef.current;
+    if (!current || !syncManagerRef.current) return;
     try {
-      await syncManagerRef.current.archiveNote(selectedNote.id);
-      setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
+      await syncManagerRef.current.archiveNote(current.id);
+      setNotes((prev) => prev.filter((n) => n.id !== current.id));
       setSelectedNote(null);
       fetchCategories();
       toast.success('Note archived');
@@ -561,13 +588,14 @@ function Home() {
       console.error('Failed to archive note:', error);
       toast.error('Failed to archive note');
     }
-  };
+  }, [fetchCategories, toast]);
 
-  const handleRestore = async () => {
-    if (!selectedNote || !syncManagerRef.current) return;
+  const handleRestore = useCallback(async () => {
+    const current = selectedNoteRef.current;
+    if (!current || !syncManagerRef.current) return;
     try {
-      await syncManagerRef.current.restoreNote(selectedNote.id);
-      setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
+      await syncManagerRef.current.restoreNote(current.id);
+      setNotes((prev) => prev.filter((n) => n.id !== current.id));
       setSelectedNote(null);
       fetchCategories();
       toast.success('Note restored');
@@ -575,13 +603,14 @@ function Home() {
       console.error('Failed to restore note:', error);
       toast.error('Failed to restore note');
     }
-  };
+  }, [fetchCategories, toast]);
 
-  const handleTrash = async () => {
-    if (!selectedNote || !syncManagerRef.current) return;
+  const handleTrash = useCallback(async () => {
+    const current = selectedNoteRef.current;
+    if (!current || !syncManagerRef.current) return;
     try {
-      await syncManagerRef.current.trashNote(selectedNote.id);
-      setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
+      await syncManagerRef.current.trashNote(current.id);
+      setNotes((prev) => prev.filter((n) => n.id !== current.id));
       setSelectedNote(null);
       fetchCategories();
       toast.success('Note moved to trash');
@@ -589,21 +618,22 @@ function Home() {
       console.error('Failed to trash note:', error);
       toast.error('Failed to move note to trash');
     }
-  };
+  }, [fetchCategories, toast]);
 
-  const handleDelete = async () => {
-    if (!selectedNote || !syncManagerRef.current) return;
+  const handleDelete = useCallback(async () => {
+    const current = selectedNoteRef.current;
+    if (!current || !syncManagerRef.current) return;
     if (!confirm('Are you sure you want to permanently delete this note?')) return;
     try {
-      await syncManagerRef.current.deleteNotePermanently(selectedNote.id);
-      setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
+      await syncManagerRef.current.deleteNotePermanently(current.id);
+      setNotes((prev) => prev.filter((n) => n.id !== current.id));
       setSelectedNote(null);
       toast.success('Note deleted permanently');
     } catch (error) {
       console.error('Failed to delete note:', error);
       toast.error('Failed to delete note');
     }
-  };
+  }, [toast]);
 
   const handleCreateCategory = async (data: CreateCategoryDto) => {
     if (!syncManagerRef.current) return;
@@ -645,6 +675,11 @@ function Home() {
     }
   };
 
+  const sidebarStyle = useMemo(() => ({ width: sidebarWidth }), [sidebarWidth]);
+  const notesListStyle = useMemo(() => ({ width: notesListWidth }), [notesListWidth]);
+  const showCategoryInList =
+    selectedView === 'inbox' || selectedView === 'archive' || selectedView === 'trash';
+
   return (
     <div className={`app-layout${isFocusMode ? ' focus-mode' : ''}`}>
       {!isFocusMode && (
@@ -653,19 +688,19 @@ function Home() {
             categories={categories}
             selectedView={selectedView}
             onViewChange={handleViewChange}
-            onManageCategories={() => setShowCategoryManager(true)}
+            onManageCategories={handleOpenCategoryManager}
             onNewNoteInCategory={handleNewNoteInCategory}
             inboxCount={inboxCount}
             archiveCount={0}
             trashCount={0}
-            style={{ width: sidebarWidth }}
+            style={sidebarStyle}
             syncStatus={syncStatus}
             connectionState={connectionState}
             pendingCount={pendingCount}
           />
           <div
             className="resize-handle"
-            onMouseDown={() => setIsResizing('sidebar')}
+            onMouseDown={handleStartSidebarResize}
           />
           <NotesList
             notes={notes}
@@ -673,16 +708,16 @@ function Home() {
             onNoteSelect={handleNoteSelect}
             onNewNote={handleNewNote}
             isLoading={isLoading}
-            viewTitle={getViewTitle()}
-            style={{ width: notesListWidth }}
+            viewTitle={viewTitle}
+            style={notesListStyle}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
-            showCategory={selectedView === 'inbox' || selectedView === 'archive' || selectedView === 'trash'}
+            showCategory={showCategoryInList}
             pendingNoteIds={pendingNoteIds}
           />
           <div
             className="resize-handle"
-            onMouseDown={() => setIsResizing('noteslist')}
+            onMouseDown={handleStartNotesListResize}
           />
         </>
       )}
@@ -710,7 +745,7 @@ function Home() {
           onCreateCategory={handleCreateCategory}
           onUpdateCategory={handleUpdateCategory}
           onDeleteCategory={handleDeleteCategory}
-          onClose={() => setShowCategoryManager(false)}
+          onClose={handleCloseCategoryManager}
         />
       )}
     </div>

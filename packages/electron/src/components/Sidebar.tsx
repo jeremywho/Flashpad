@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Category } from '@shared/types';
 import { Inbox, Archive, Trash2, Settings, User } from 'lucide-react';
@@ -26,7 +26,7 @@ interface ContextMenuState {
   categoryName: string;
 }
 
-export default function Sidebar({
+function SidebarInner({
   categories,
   selectedView,
   onViewChange,
@@ -183,3 +183,6 @@ export default function Sidebar({
     </aside>
   );
 }
+
+const Sidebar = memo(SidebarInner);
+export default Sidebar;

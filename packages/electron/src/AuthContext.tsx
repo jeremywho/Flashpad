@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ApiClient } from '@shared/api-client';
 import { User, SignalRManager } from '@shared/index';
 
@@ -115,7 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [scheduleRefresh, logout, clearRefreshTimer]);
 
-  const login = (accessToken: string, refreshToken: string, userData: User) => {
+  const login = useCallback((accessToken: string, refreshToken: string, userData: User) => {
     refreshTokenRef.current = refreshToken;
     api.setToken(accessToken);
     void window.electron.auth.setRefreshToken(refreshToken).catch((err) => {
@@ -124,10 +124,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void window.electron.auth.setSessionActive(true);
     setUser(userData);
     scheduleRefresh(logout);
-  };
+  }, [scheduleRefresh, logout]);
+
+  // Stable context value — without useMemo, every re-render (e.g. from AuthProvider's
+  // internal state changing) produces a new object and cascades re-renders through
+  // every consumer that destructures useAuth(), breaking downstream React.memo.
+  const contextValue = useMemo(
+    () => ({ user, api, isLoading, login, logout }),
+    [user, isLoading, login, logout]
+  );
 
   return (
-    <AuthContext.Provider value={{ user, api, isLoading, login, logout }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

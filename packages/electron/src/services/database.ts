@@ -13,9 +13,16 @@ import {
 let notesCache: Map<string, LocalNote> = new Map();
 let categoriesCache: Map<string, LocalCategory> = new Map();
 let syncQueueCache: SyncQueueItem[] = [];
-let initialized = false;
+// Single-flight init guard. Set to an in-flight promise for the duration of
+// initialization so concurrent callers await the same load instead of each
+// reloading every file from disk.
+let initPromise: Promise<void> | null = null;
 
-// Track which note IDs are being written to avoid reacting to our own file changes
+// Track which note IDs are being written to avoid reacting to our own file changes.
+// TTL must cover chokidar's awaitWriteFinish stabilityThreshold (300ms) plus FSEvents
+// delivery latency plus the worst-case gap during bulk sync (hundreds of sequential
+// writes). 500ms was too tight and let bulk sync echoes through → refetch storms.
+export const WRITING_NOTES_TTL_MS = 2000;
 const writingNotes: Set<string> = new Set();
 
 export interface LocalNote {
@@ -243,25 +250,24 @@ export async function remapCategoryReferences(
 
 // Initialize database from file system
 async function initDatabase(): Promise<void> {
-  if (initialized) return;
+  if (initPromise) return initPromise;
 
-  try {
-    await window.electron.fs.ensureDataDir();
+  initPromise = (async () => {
+    try {
+      await window.electron.fs.ensureDataDir();
+      // Load sync queue first (needed by loadNotesFromFiles to check for unsynced notes)
+      await loadSyncQueueFromFile();
+      await loadNotesFromFiles();
+      await loadCategoriesFromFile();
+    } catch (error) {
+      console.error('Failed to initialize database:', error);
+      // Clear on failure so the next caller can retry instead of inheriting the rejection forever.
+      initPromise = null;
+      throw error;
+    }
+  })();
 
-    // Load sync queue first (needed by loadNotesFromFiles to check for unsynced notes)
-    await loadSyncQueueFromFile();
-
-    // Load notes from files
-    await loadNotesFromFiles();
-
-    // Load categories from JSON
-    await loadCategoriesFromFile();
-
-    initialized = true;
-  } catch (error) {
-    console.error('Failed to initialize database:', error);
-    throw error;
-  }
+  return initPromise;
 }
 
 async function loadNotesFromFiles(): Promise<void> {
@@ -400,7 +406,7 @@ async function writeNoteFile(note: LocalNote): Promise<void> {
     await window.electron.fs.writeNote(note.id, fileContent);
   } finally {
     // Remove from writing set after a short delay to account for file system events
-    setTimeout(() => writingNotes.delete(note.id), 500);
+    setTimeout(() => writingNotes.delete(note.id), WRITING_NOTES_TTL_MS);
   }
 }
 
@@ -501,7 +507,7 @@ export async function deleteLocalNote(id: string): Promise<void> {
   try {
     await window.electron.fs.deleteNote(safeId);
   } finally {
-    setTimeout(() => writingNotes.delete(safeId), 500);
+    setTimeout(() => writingNotes.delete(safeId), WRITING_NOTES_TTL_MS);
   }
 }
 
@@ -940,7 +946,7 @@ export async function handleFileDeleted(id: string): Promise<void> {
 
 // Force reload all data (useful after changing data directory)
 export async function reloadAllData(): Promise<void> {
-  initialized = false;
+  initPromise = null;
   notesCache.clear();
   categoriesCache.clear();
   syncQueueCache = [];

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -38,8 +38,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const info = useCallback((message: string) => showToast(message, 'info'), [showToast]);
   const warning = useCallback((message: string) => showToast(message, 'warning'), [showToast]);
 
+  // Stable context value — without useMemo, every ToastProvider render (e.g. on
+  // showing/dismissing a toast) produces a new object and cascades re-renders
+  // through every consumer, breaking downstream React.memo.
+  const contextValue = useMemo(
+    () => ({ showToast, success, error, info, warning }),
+    [showToast, success, error, info, warning]
+  );
+
   return (
-    <ToastContext.Provider value={{ showToast, success, error, info, warning }}>
+    <ToastContext.Provider value={contextValue}>
       {children}
       <div className="toast-container">
         {toasts.map((toast) => (
