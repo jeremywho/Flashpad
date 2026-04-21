@@ -45,6 +45,14 @@ const MAX_METADATA_ENTRIES = 20;
 const MAX_METADATA_VALUE_LENGTH = 256;
 const MAX_METADATA_KEY_LENGTH = 64;
 
+// Matches server ClientLogSanitizer.MaxBatchSize — any batch larger than this
+// is rejected with HTTP 400 by the backend.
+const MAX_BATCH_SIZE = 100;
+
+// Cap for persisted (IndexedDB / custom storage) and in-memory fallback
+// buffers. Prevents unbounded growth during extended offline / auth outages.
+const MAX_PERSIST_ENTRIES = 500;
+
 function truncate(value: string, maxLength: number): string {
   if (value.length <= maxLength) return value;
   return value.slice(0, maxLength - 3) + '...';
@@ -180,29 +188,35 @@ class H4ClientLogger {
     if (options.storage) {
       // Custom storage provided (e.g. AsyncStorage adapter)
       this.storage = options.storage;
-      this.storage.loadAndClear().then((entries) => {
-        if (entries.length > 0) {
-          this.buffer.unshift(...entries);
-        }
-        this.flush();
-      });
+      this.loadPersistedAndFlush();
     } else {
       // Try IndexedDB (available in Electron/web, not React Native)
       this.idbStorage = new IndexedDBStorage();
       this.idbStorage.init().then((available) => {
         if (available) {
           this.storage = this.idbStorage;
-          this.storage!.loadAndClear().then((entries) => {
-            if (entries.length > 0) {
-              this.buffer.unshift(...entries);
-            }
-            this.flush();
-          });
-        } else {
-          this.flush();
         }
+        this.loadPersistedAndFlush();
       });
     }
+  }
+
+  private async loadPersistedAndFlush(): Promise<void> {
+    if (this.storage) {
+      try {
+        const entries = await this.storage.loadAndClear();
+        if (entries.length > 0) {
+          const capped = entries.length > MAX_PERSIST_ENTRIES
+            ? entries.slice(-MAX_PERSIST_ENTRIES)
+            : entries;
+          // concat is stack-safe for large arrays; unshift(...capped) is not
+          this.buffer = capped.concat(this.buffer);
+        }
+      } catch {
+        // Storage failures are non-fatal — proceed with whatever's in-memory
+      }
+    }
+    this.flush();
   }
 
   destroy(): void {
@@ -265,47 +279,64 @@ class H4ClientLogger {
     if (!this.options || this.buffer.length === 0 || this.flushing) return;
 
     this.flushing = true;
-    const batch = [...this.buffer];
+    // Snapshot the buffer so new logs arriving during the flush don't get
+    // dragged into this round (they're picked up on the next tick).
+    const pending = this.buffer;
     this.buffer = [];
 
     try {
       const token = this.options.getToken();
       if (!token) {
-        await this.persistOrBuffer(batch);
+        await this.persistOrBuffer(pending);
         return;
       }
 
-      const response = await fetch(`${this.options.baseUrl}/api/client-logs`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ logs: batch }),
-      });
+      while (pending.length > 0) {
+        const chunk = pending.splice(0, MAX_BATCH_SIZE);
+        try {
+          const response = await fetch(`${this.options.baseUrl}/api/client-logs`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ logs: chunk }),
+          });
 
-      if (!response.ok) {
-        if (response.status === 401 || response.status === 400) {
-          console.warn(`[h4-client] Dropping ${batch.length} logs: HTTP ${response.status}`);
+          if (response.ok) continue;
+
+          if (response.status === 400) {
+            // Malformed payload — retrying won't help. Drop this chunk
+            // and keep going so one poison batch doesn't block the rest.
+            console.warn(`[h4-client] Dropping ${chunk.length} logs: HTTP 400`);
+            continue;
+          }
+
+          // 401 (token expired) or 5xx / other: persist this chunk plus any
+          // unsent remainder so they survive until the next flush attempt.
+          await this.persistOrBuffer(chunk.concat(pending.splice(0)));
+          return;
+        } catch {
+          await this.persistOrBuffer(chunk.concat(pending.splice(0)));
           return;
         }
-        await this.persistOrBuffer(batch);
       }
-    } catch {
-      await this.persistOrBuffer(batch);
     } finally {
       this.flushing = false;
     }
   }
 
   private async persistOrBuffer(entries: LogEntry[]): Promise<void> {
+    const capped = entries.length > MAX_PERSIST_ENTRIES
+      ? entries.slice(-MAX_PERSIST_ENTRIES)
+      : entries;
     if (this.storage) {
-      await this.storage.save(entries);
+      await this.storage.save(capped);
     } else {
-      // No storage available — keep in memory with cap
-      this.buffer.unshift(...entries);
-      if (this.buffer.length > 500) {
-        this.buffer = this.buffer.slice(-500);
+      // No storage available — keep in memory with same cap.
+      this.buffer = capped.concat(this.buffer);
+      if (this.buffer.length > MAX_PERSIST_ENTRIES) {
+        this.buffer = this.buffer.slice(-MAX_PERSIST_ENTRIES);
       }
     }
   }
