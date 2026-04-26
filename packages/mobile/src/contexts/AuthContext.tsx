@@ -10,7 +10,11 @@ import {
   storeRefreshToken,
 } from '../services/authStorage';
 
-const REFRESH_BUFFER_MS = 24 * 60 * 60 * 1000; // 1 day before expiry
+// Refresh 60s before the access token expires. Access tokens live 15 min
+// (see backend AuthService.GenerateAccessToken), so a 24h buffer would
+// schedule the refresh timer with delay=0 and storm the refresh endpoint
+// — and any single refresh failure would bounce the user back to Login.
+const REFRESH_BUFFER_MS = 60 * 1000;
 
 interface AuthContextType {
   user: User | null;

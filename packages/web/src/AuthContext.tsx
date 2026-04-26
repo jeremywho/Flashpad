@@ -17,7 +17,11 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const api = new ApiClient(API_URL);
 const REFRESH_TOKEN_STORAGE_KEY = 'refreshToken';
 
-const REFRESH_BUFFER_MS = 24 * 60 * 60 * 1000; // 1 day before expiry
+// Refresh 60s before the access token expires. Access tokens live 15 min
+// (see backend AuthService.GenerateAccessToken), so a 24h buffer would
+// schedule the refresh timer with delay=0 and storm the refresh endpoint
+// — and any single refresh failure would bounce the user back to Login.
+const REFRESH_BUFFER_MS = 60 * 1000;
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
