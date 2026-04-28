@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
-import { ThemeProvider } from './ThemeContext';
+import { AppearanceProvider } from './theme/AppearanceProvider';
+import { CommandPalette } from './components/CommandPalette';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Home from './pages/Home';
@@ -44,7 +45,7 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <ThemeProvider>
+        <AppearanceProvider>
           <Routes>
             <Route
               path="/"
@@ -97,7 +98,8 @@ function App() {
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/download" element={<Download />} />
           </Routes>
-        </ThemeProvider>
+          <CommandPalette />
+        </AppearanceProvider>
       </AuthProvider>
     </BrowserRouter>
   );

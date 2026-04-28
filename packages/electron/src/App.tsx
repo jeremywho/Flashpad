@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
-import { ThemeProvider } from './ThemeContext';
+import { AppearanceProvider } from './theme/AppearanceProvider';
+import { CommandPalette } from './components/CommandPalette';
 import { ToastProvider } from './components/Toast';
 import ErrorBoundary from './components/ErrorBoundary';
 import Login from './pages/Login';
@@ -117,13 +118,14 @@ function App() {
   return (
     <ErrorBoundary>
       <HashRouter>
-        <ThemeProvider>
+        <AppearanceProvider>
           <ToastProvider>
             <AuthProvider>
               <AppRoutes />
+              <CommandPalette />
             </AuthProvider>
           </ToastProvider>
-        </ThemeProvider>
+        </AppearanceProvider>
       </HashRouter>
     </ErrorBoundary>
   );

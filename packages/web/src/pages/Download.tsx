@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTheme } from '../ThemeContext';
+import { useAppearance } from '../theme/AppearanceProvider';
 
 interface ReleaseAsset {
   name: string;
@@ -88,7 +88,9 @@ function getPlatformInfo(platform: Platform): { name: string; icon: string } {
 
 function Download() {
   const navigate = useNavigate();
-  const { theme, setTheme } = useTheme();
+  const { appearance, setAppearance } = useAppearance();
+  const theme = appearance.theme;
+  const setTheme = (t: 'dark' | 'light') => setAppearance({ theme: t });
   const [release, setRelease] = useState<Release | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

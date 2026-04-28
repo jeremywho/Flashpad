@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import { useTheme } from '../ThemeContext';
+import { AppearancePane } from '../components/AppearancePane';
 import { reloadAllData } from '../services/database';
 import type { AppSettings } from '../types/electron';
 
 function Settings() {
   const { logout } = useAuth();
-  const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const [settings, setSettings] = useState<AppSettings>({
     minimizeToTray: true,
@@ -71,7 +70,6 @@ function Settings() {
       const resetSettings = await window.electron?.settings.reset();
       if (resetSettings) {
         setSettings(resetSettings);
-        setTheme(resetSettings.theme);
         setSuccess('Settings reset to defaults!');
       }
     } catch (err) {
@@ -79,11 +77,6 @@ function Settings() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleThemeChange = (newTheme: 'dark' | 'light' | 'system') => {
-    setSettings({ ...settings, theme: newTheme });
-    setTheme(newTheme);
   };
 
   const handleLogout = () => {
@@ -154,34 +147,12 @@ function Settings() {
       <div className="container">
         <div className="form-container" style={{ margin: '50px auto' }}>
           <h2 className="text-center">App Settings</h2>
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label>Theme</label>
-              <div className="settings-theme-options">
-                <button
-                  type="button"
-                  className={`settings-theme-btn ${theme === 'dark' ? 'active' : ''}`}
-                  onClick={() => handleThemeChange('dark')}
-                >
-                  Dark
-                </button>
-                <button
-                  type="button"
-                  className={`settings-theme-btn ${theme === 'light' ? 'active' : ''}`}
-                  onClick={() => handleThemeChange('light')}
-                >
-                  Light
-                </button>
-                <button
-                  type="button"
-                  className={`settings-theme-btn ${theme === 'system' ? 'active' : ''}`}
-                  onClick={() => handleThemeChange('system')}
-                >
-                  System
-                </button>
-              </div>
-            </div>
+          <div className="form-group">
+            <label>Appearance</label>
+            <AppearancePane />
+          </div>
 
+          <form onSubmit={handleSubmit}>
             <div className="form-group">
               <label>Notes Directory</label>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>

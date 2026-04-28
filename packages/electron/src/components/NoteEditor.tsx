@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Note, Category, NoteStatus } from '@shared/types';
+import { FontSizeControl } from './FontSizeControl';
 
 const CODE_LANGUAGES = [
   '', 'javascript', 'typescript', 'python', 'csharp', 'java', 'go', 'rust',
@@ -533,6 +534,7 @@ function NoteEditorInner({
           <span>{lineCount} {lineCount === 1 ? 'line' : 'lines'}</span>
         </div>
         <div className="note-editor-footer-right">
+          <FontSizeControl />
           <span><span className="note-editor-kbd">{modKey}+S</span> save</span>
           <span><span className="note-editor-kbd">{modKey}+Shift+F</span> focus</span>
         </div>

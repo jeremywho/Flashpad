@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark" data-variant="paper">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -33,10 +33,34 @@
     <!-- Theme color -->
     <meta name="theme-color" content="#1a1a2e" />
 
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+      // FOUC-safe appearance bootstrap. Runs before any stylesheet links below.
+      (function () {
+        try {
+          var r = document.documentElement;
+          var raw = localStorage.getItem('flashpad.appearance');
+          var a = raw ? JSON.parse(raw) : {};
+          var t = a.theme;
+          if (t == null) {
+            // Migrate from legacy 'theme' key if present
+            var legacy = localStorage.getItem('theme');
+            if (legacy === 'light' || legacy === 'dark' || legacy === 'system') t = legacy;
+          }
+          if (t === 'system' || t == null) {
+            t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+          }
+          r.dataset.theme = (t === 'light') ? 'light' : 'dark';
+          var v = a.variant;
+          if (v === 'paper' || v === 'terminal' || v === 'atelier' || v === 'index') {
+            r.dataset.variant = v;
+          }
+          var fs = a.editorFontSize;
+          if (typeof fs === 'number' && fs >= 13 && fs <= 22) {
+            r.style.setProperty('--editor-size', fs + 'px');
+          }
+        } catch (e) { /* keep static fallback on <html> */ }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

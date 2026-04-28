@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Note, Category, NoteStatus } from '@shared/types';
 import { Archive, Inbox, RotateCcw, Trash2, Maximize2, X, Code, FileText } from 'lucide-react';
+import { FontSizeControl } from './FontSizeControl';
 
 const CODE_LANGUAGES = [
   '', 'javascript', 'typescript', 'python', 'csharp', 'java', 'go', 'rust',
@@ -489,6 +490,7 @@ export default function NoteEditor({
             <span>{lineCount} {lineCount === 1 ? 'line' : 'lines'}</span>
           </div>
           <div className="note-editor-footer-right">
+            <FontSizeControl />
             <span><span className="note-editor-kbd">{modKey}+S</span> save</span>
             <span><span className="note-editor-kbd">{modKey}+Shift+F</span> focus</span>
           </div>

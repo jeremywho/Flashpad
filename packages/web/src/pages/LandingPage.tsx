@@ -1,9 +1,11 @@
 import { useNavigate } from 'react-router-dom';
-import { useTheme } from '../ThemeContext';
+import { useAppearance } from '../theme/AppearanceProvider';
 
 function LandingPage() {
   const navigate = useNavigate();
-  const { theme, setTheme } = useTheme();
+  const { appearance, setAppearance } = useAppearance();
+  const theme = appearance.theme;
+  const setTheme = (t: 'dark' | 'light') => setAppearance({ theme: t });
 
   const toggleTheme = () => {
     if (theme === 'dark') {
