@@ -74,7 +74,7 @@ test.describe('Single-instance sync verification', () => {
     expect(allContent).toContain(note2.content);
   });
 
-  test.fixme('Note created via UI appears on disk and syncs to server', async () => {
+  test('Note created via UI appears on disk and syncs to server', async () => {
     app = await launchApp({ apiUrl: state.baseUrl, deviceId: 'device-solo-create' });
     await loginViaUi(app.page, state.username, state.password);
     await app.page.waitForTimeout(2000);
@@ -114,7 +114,7 @@ test.describe('Single-instance sync verification', () => {
     }
   });
 
-  test.fixme('Note created via UI is visible in the notes list', async () => {
+  test('Note created via UI is visible in the notes list', async () => {
     app = await launchApp({ apiUrl: state.baseUrl, deviceId: 'device-solo-visible' });
     await loginViaUi(app.page, state.username, state.password);
     await app.page.waitForTimeout(2000);
@@ -135,7 +135,7 @@ test.describe('Single-instance sync verification', () => {
     expect(visibleNotes.some((n) => n.includes('Visible note test'))).toBe(true);
   });
 
-  test.fixme('Notes persist across app restart', async () => {
+  test('Notes persist across app restart', async () => {
     // Create a note via API before launching
     const uniqueContent = `Persist test note ${Date.now()}`;
     await createNoteViaApi(state.baseUrl, state.token, uniqueContent);
