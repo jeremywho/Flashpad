@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../AuthContext';
-import { Note, Category, NoteStatus, CreateCategoryDto, SignalRClient, SignalRManager, ConnectionState, HttpError } from '@shared/index';
+import { Note, Category, NoteStatus, CreateCategoryDto, SignalRClient, SignalRManager, ConnectionState, HttpError, CardMenuActionId } from '@shared/index';
 import Sidebar from '../components/Sidebar';
 import NotesList from '../components/NotesList';
 import NoteEditor from '../components/NoteEditor';
@@ -386,57 +386,34 @@ function Home() {
     }
   };
 
-  const handleArchive = async () => {
-    if (!selectedNote) return;
+  const runNoteAction = async (action: CardMenuActionId, note: Note) => {
+    if (action === 'delete' && !confirm('Are you sure you want to permanently delete this note?')) {
+      return;
+    }
     try {
-      await api.archiveNote(selectedNote.id, getOrCreateWebDeviceId());
-      setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
-      setSelectedNote(null);
+      const deviceId = getOrCreateWebDeviceId();
+      if (action === 'archive') {
+        await api.archiveNote(note.id, deviceId);
+      } else if (action === 'restore') {
+        await api.restoreNote(note.id, deviceId);
+      } else if (action === 'trash') {
+        await api.trashNote(note.id, deviceId);
+      } else {
+        await api.deleteNotePermanently(note.id, deviceId);
+      }
+      setNotes((prev) => prev.filter((n) => n.id !== note.id));
+      setSelectedNote((prev) => (prev?.id === note.id ? null : prev));
       setConflictMessage(null);
-      fetchCategories();
+      if (action !== 'delete') fetchCategories();
     } catch (error) {
-      console.error('Failed to archive note:', error);
+      console.error(`Failed to ${action} note:`, error);
     }
   };
 
-  const handleRestore = async () => {
-    if (!selectedNote) return;
-    try {
-      await api.restoreNote(selectedNote.id, getOrCreateWebDeviceId());
-      setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
-      setSelectedNote(null);
-      setConflictMessage(null);
-      fetchCategories();
-    } catch (error) {
-      console.error('Failed to restore note:', error);
-    }
-  };
-
-  const handleTrash = async () => {
-    if (!selectedNote) return;
-    try {
-      await api.trashNote(selectedNote.id, getOrCreateWebDeviceId());
-      setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
-      setSelectedNote(null);
-      setConflictMessage(null);
-      fetchCategories();
-    } catch (error) {
-      console.error('Failed to trash note:', error);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!selectedNote) return;
-    if (!confirm('Are you sure you want to permanently delete this note?')) return;
-    try {
-      await api.deleteNotePermanently(selectedNote.id, getOrCreateWebDeviceId());
-      setNotes((prev) => prev.filter((n) => n.id !== selectedNote.id));
-      setSelectedNote(null);
-      setConflictMessage(null);
-    } catch (error) {
-      console.error('Failed to delete note:', error);
-    }
-  };
+  const handleArchive = () => { if (selectedNote) runNoteAction('archive', selectedNote); };
+  const handleRestore = () => { if (selectedNote) runNoteAction('restore', selectedNote); };
+  const handleTrash = () => { if (selectedNote) runNoteAction('trash', selectedNote); };
+  const handleDelete = () => { if (selectedNote) runNoteAction('delete', selectedNote); };
 
   const handleCreateCategory = async (data: CreateCategoryDto) => {
     await api.createCategory(data);
@@ -488,6 +465,8 @@ function Home() {
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             showCategory={selectedView === 'inbox' || selectedView === 'archive' || selectedView === 'trash'}
+            currentView={selectedView}
+            onNoteAction={runNoteAction}
           />
           <div
             className="resize-handle"

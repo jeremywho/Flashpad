@@ -394,6 +394,49 @@ button:disabled {
   color: var(--ink-2);
 }
 
+/* Notes List Context Menu */
+.notes-list-context-menu {
+  position: fixed;
+  background: var(--surface);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--radius);
+  padding: 4px;
+  min-width: 180px;
+  z-index: 1000;
+  box-shadow: var(--shadow);
+}
+
+.notes-list-context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  color: var(--ink);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.notes-list-context-menu-item:hover {
+  background: var(--bg-3);
+}
+
+.notes-list-context-menu-item.danger {
+  color: #e5484d;
+}
+
+.notes-list-context-menu-icon {
+  display: inline-flex;
+  width: 16px;
+  justify-content: center;
+  color: var(--ink-2);
+}
+
 /* Notes List */
 .notes-list {
   width: 300px;

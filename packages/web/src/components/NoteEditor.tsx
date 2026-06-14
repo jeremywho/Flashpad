@@ -348,6 +348,17 @@ export default function NoteEditor({
           <button className="note-editor-tab disabled" title="Preview (coming soon)">Preview</button>
           <span className="note-editor-toolbar-divider" />
 
+          {onToggleFocusMode && (
+            <button
+              className="note-editor-action-btn focus-mode-toolbar-btn"
+              onClick={onToggleFocusMode}
+              title={isFocusMode ? 'Exit Focus Mode (Ctrl+Shift+F)' : 'Focus Mode (Ctrl+Shift+F)'}
+            >
+              {isFocusMode ? <X size={14} strokeWidth={1.75} /> : <Maximize2 size={14} strokeWidth={1.75} />}
+            </button>
+          )}
+          <span className="note-editor-toolbar-divider" />
+
           <div className="note-editor-category-selector">
             <button
               className="note-editor-category-btn"
@@ -414,30 +425,9 @@ export default function NoteEditor({
             )}
           </div>
 
-          {showSavingIndicator && <span className="note-editor-saving">Saving...</span>}
-        </div>
-
-        <div className="note-editor-toolbar-right">
-          {(() => {
-            const sync = getSyncLabel();
-            return (
-              <span className="note-editor-sync-indicator">
-                <span className={`note-editor-sync-dot ${sync.dotClass}`} />
-                {sync.label}
-              </span>
-            );
-          })()}
           <span className="note-editor-toolbar-divider" />
 
-          {onToggleFocusMode && (
-            <button
-              className="note-editor-action-btn focus-mode-toolbar-btn"
-              onClick={onToggleFocusMode}
-              title={isFocusMode ? 'Exit Focus Mode (Ctrl+Shift+F)' : 'Focus Mode (Ctrl+Shift+F)'}
-            >
-              {isFocusMode ? <X size={14} strokeWidth={1.75} /> : <Maximize2 size={14} strokeWidth={1.75} />}
-            </button>
-          )}
+          {/* Note actions */}
           {note?.status === NoteStatus.Inbox && (
             <button className="note-editor-action-btn" onClick={onArchive} title="Archive">
               <Archive size={14} strokeWidth={1.75} />
@@ -462,6 +452,19 @@ export default function NoteEditor({
               <Trash2 size={14} strokeWidth={1.75} />
             </button>
           )}
+        </div>
+
+        <div className="note-editor-toolbar-right">
+          {showSavingIndicator && <span className="note-editor-saving">Saving...</span>}
+          {(() => {
+            const sync = getSyncLabel();
+            return (
+              <span className="note-editor-sync-indicator">
+                <span className={`note-editor-sync-dot ${sync.dotClass}`} />
+                {sync.label}
+              </span>
+            );
+          })()}
         </div>
       </div>
 
