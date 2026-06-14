@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '../AuthContext';
-import { Note, Category, NoteStatus, CreateCategoryDto, SignalRClient, SignalRManager, ConnectionState, DevicePresence, h4 } from '@shared/index';
+import { Note, Category, NoteStatus, CreateCategoryDto, SignalRClient, SignalRManager, ConnectionState, DevicePresence, h4, CardMenuActionId } from '@shared/index';
 import Sidebar from '../components/Sidebar';
 import NotesList from '../components/NotesList';
 import NoteEditor from '../components/NoteEditor';
@@ -594,65 +594,56 @@ function Home() {
     }
   }, [fetchInboxCount, fetchCategories, shouldShowNoteInCurrentView, toast]);
 
-  const handleArchive = useCallback(async () => {
-    const current = selectedNoteRef.current;
-    if (!current || !syncManagerRef.current) return;
+  const runNoteAction = useCallback(async (action: CardMenuActionId, note: Note) => {
+    if (!syncManagerRef.current) return;
+    if (action === 'delete' && !confirm('Are you sure you want to permanently delete this note?')) {
+      return;
+    }
     try {
-      await syncManagerRef.current.archiveNote(current.id);
-      setNotes((prev) => prev.filter((n) => n.id !== current.id));
-      setSelectedNote(null);
-      fetchCategories();
-      toast.success('Note archived');
+      if (action === 'archive') {
+        await syncManagerRef.current.archiveNote(note.id);
+      } else if (action === 'restore') {
+        await syncManagerRef.current.restoreNote(note.id);
+      } else if (action === 'trash') {
+        await syncManagerRef.current.trashNote(note.id);
+      } else {
+        await syncManagerRef.current.deleteNotePermanently(note.id);
+      }
+      setNotes((prev) => prev.filter((n) => n.id !== note.id));
+      setSelectedNote((prev) => (prev?.id === note.id ? null : prev));
+      if (action !== 'delete') fetchCategories();
+      const messages: Record<CardMenuActionId, string> = {
+        archive: 'Note archived',
+        restore: 'Note restored',
+        trash: 'Note moved to trash',
+        delete: 'Note deleted permanently',
+      };
+      toast.success(messages[action]);
     } catch (error) {
-      console.error('Failed to archive note:', error);
-      toast.error('Failed to archive note');
+      console.error(`Failed to ${action} note:`, error);
+      toast.error(`Failed to ${action} note`);
     }
   }, [fetchCategories, toast]);
 
-  const handleRestore = useCallback(async () => {
-    const current = selectedNoteRef.current;
-    if (!current || !syncManagerRef.current) return;
-    try {
-      await syncManagerRef.current.restoreNote(current.id);
-      setNotes((prev) => prev.filter((n) => n.id !== current.id));
-      setSelectedNote(null);
-      fetchCategories();
-      toast.success('Note restored');
-    } catch (error) {
-      console.error('Failed to restore note:', error);
-      toast.error('Failed to restore note');
-    }
-  }, [fetchCategories, toast]);
+  const handleArchive = useCallback(() => {
+    const note = selectedNoteRef.current;
+    if (note) runNoteAction('archive', note);
+  }, [runNoteAction]);
 
-  const handleTrash = useCallback(async () => {
-    const current = selectedNoteRef.current;
-    if (!current || !syncManagerRef.current) return;
-    try {
-      await syncManagerRef.current.trashNote(current.id);
-      setNotes((prev) => prev.filter((n) => n.id !== current.id));
-      setSelectedNote(null);
-      fetchCategories();
-      toast.success('Note moved to trash');
-    } catch (error) {
-      console.error('Failed to trash note:', error);
-      toast.error('Failed to move note to trash');
-    }
-  }, [fetchCategories, toast]);
+  const handleRestore = useCallback(() => {
+    const note = selectedNoteRef.current;
+    if (note) runNoteAction('restore', note);
+  }, [runNoteAction]);
 
-  const handleDelete = useCallback(async () => {
-    const current = selectedNoteRef.current;
-    if (!current || !syncManagerRef.current) return;
-    if (!confirm('Are you sure you want to permanently delete this note?')) return;
-    try {
-      await syncManagerRef.current.deleteNotePermanently(current.id);
-      setNotes((prev) => prev.filter((n) => n.id !== current.id));
-      setSelectedNote(null);
-      toast.success('Note deleted permanently');
-    } catch (error) {
-      console.error('Failed to delete note:', error);
-      toast.error('Failed to delete note');
-    }
-  }, [toast]);
+  const handleTrash = useCallback(() => {
+    const note = selectedNoteRef.current;
+    if (note) runNoteAction('trash', note);
+  }, [runNoteAction]);
+
+  const handleDelete = useCallback(() => {
+    const note = selectedNoteRef.current;
+    if (note) runNoteAction('delete', note);
+  }, [runNoteAction]);
 
   const handleCreateCategory = async (data: CreateCategoryDto) => {
     if (!syncManagerRef.current) return;
@@ -733,6 +724,8 @@ function Home() {
             onSearchChange={setSearchQuery}
             showCategory={showCategoryInList}
             pendingNoteIds={pendingNoteIds}
+            currentView={selectedView}
+            onNoteAction={runNoteAction}
           />
           <div
             className="resize-handle"

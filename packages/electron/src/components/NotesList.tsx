@@ -1,5 +1,21 @@
-import { memo } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { Note } from '@shared/types';
+import { getCardMenuActions, CardMenuActionId } from '@shared/index';
+import { Archive, RotateCcw, Trash2 } from 'lucide-react';
+
+const ACTION_ICONS: Record<CardMenuActionId, typeof Archive> = {
+  archive: Archive,
+  restore: RotateCcw,
+  trash: Trash2,
+  delete: Trash2,
+};
+
+interface ContextMenuState {
+  visible: boolean;
+  x: number;
+  y: number;
+  note: Note | null;
+}
 
 interface NotesListProps {
   notes: Note[];
@@ -13,6 +29,8 @@ interface NotesListProps {
   showCategory?: boolean;
   style?: React.CSSProperties;
   pendingNoteIds?: Set<string>;
+  currentView?: string;
+  onNoteAction?: (action: CardMenuActionId, note: Note) => void;
 }
 
 function formatDate(dateString: string): string {
@@ -55,7 +73,36 @@ function NotesListInner({
   showCategory = true,
   style,
   pendingNoteIds,
+  currentView,
+  onNoteAction,
 }: NotesListProps) {
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>({
+    visible: false,
+    x: 0,
+    y: 0,
+    note: null,
+  });
+
+  useEffect(() => {
+    if (!contextMenu.visible) return;
+    const close = () => setContextMenu((prev) => ({ ...prev, visible: false }));
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    document.addEventListener('click', close);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('click', close);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [contextMenu.visible]);
+
+  const handleCardContextMenu = (e: React.MouseEvent, note: Note) => {
+    if (!onNoteAction) return;
+    e.preventDefault();
+    setContextMenu({ visible: true, x: e.clientX, y: e.clientY, note });
+  };
+
   return (
     <div className="notes-list" style={style}>
       <div className="notes-list-header">
@@ -105,6 +152,7 @@ function NotesListInner({
               key={note.id}
               className={`notes-list-item ${selectedNoteId === note.id ? 'active' : ''}`}
               onClick={() => onNoteSelect(note)}
+              onContextMenu={(e) => handleCardContextMenu(e, note)}
             >
               <div className="notes-list-item-header">
                 <span className="notes-list-item-title">
@@ -127,6 +175,33 @@ function NotesListInner({
               )}
             </button>
           ))}
+        </div>
+      )}
+
+      {contextMenu.visible && contextMenu.note && (
+        <div
+          className="notes-list-context-menu"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+        >
+          {getCardMenuActions(currentView ?? 'inbox').map((action) => {
+            const Icon = ACTION_ICONS[action.id];
+            return (
+              <button
+                key={action.id}
+                className={`notes-list-context-menu-item${action.danger ? ' danger' : ''}`}
+                onClick={() => {
+                  const note = contextMenu.note;
+                  setContextMenu((prev) => ({ ...prev, visible: false }));
+                  if (note) onNoteAction?.(action.id, note);
+                }}
+              >
+                <span className="notes-list-context-menu-icon">
+                  <Icon size={15} strokeWidth={1.75} />
+                </span>
+                <span>{action.label}</span>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
