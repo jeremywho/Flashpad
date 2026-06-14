@@ -1,4 +1,5 @@
 export * from './types';
+export * from './noteCardMenu';
 export * from './api-client';
 export * from './signalr-client';
 export { h4 } from './h4-client';
