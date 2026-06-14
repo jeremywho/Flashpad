@@ -4,6 +4,7 @@ import { Note, Category, NoteStatus, CreateCategoryDto, SignalRClient, SignalRMa
 import Sidebar from '../components/Sidebar';
 import NotesList from '../components/NotesList';
 import NoteEditor from '../components/NoteEditor';
+import { decideNoteSaveMode } from '../components/noteEditorLogic';
 import CategoryManager from '../components/CategoryManager';
 import { useToast } from '../components/Toast';
 import { SyncManager, SyncStatus } from '../services/syncManager';
@@ -50,6 +51,9 @@ function Home() {
   const syncManagerRef = useRef<SyncManager | null>(null);
   const selectedViewRef = useRef(selectedView);
   const selectedNoteRef = useRef(selectedNote);
+  // Guards against a debounced autosave firing createNote twice before the first
+  // create resolves (a brand-new note has no id yet), which would duplicate it.
+  const creatingNoteRef = useRef(false);
 
   // Keep refs in sync with state for use in callbacks
   useEffect(() => {
@@ -525,30 +529,45 @@ function Home() {
   const handleSave = useCallback(async (content: string, categoryId?: string) => {
     if (!syncManagerRef.current) return;
 
+    // Decide create vs update from the LIVE selected note, not the captured
+    // isNewNote, so a debounced autosave that fires after a new note has already
+    // been created updates it instead of creating a duplicate.
+    const mode = decideNoteSaveMode(!!selectedNoteRef.current, creatingNoteRef.current);
+    if (mode === 'skip') return;
+
+    const deviceId = localStorage.getItem('flashpad-device-id') || 'electron-desktop';
     setIsSaving(true);
     try {
-      if (isNewNote) {
-        const newNote = await syncManagerRef.current.createNote({
-          content,
-          categoryId,
-          deviceId: localStorage.getItem('flashpad-device-id') || 'electron-desktop',
-        });
-        // Use deduplication to avoid race condition with SignalR broadcast
-        setNotes((prev) => {
-          if (prev.some((n) => n.id === newNote.id)) return prev;
-          return [newNote, ...prev];
-        });
-        setSelectedNote(newNote);
-        setIsNewNote(false);
-        fetchInboxCount();
-        fetchCategories();
+      if (mode === 'create') {
+        creatingNoteRef.current = true;
+        try {
+          const newNote = await syncManagerRef.current.createNote({
+            content,
+            categoryId,
+            deviceId,
+          });
+          // Adopt the server note synchronously so a follow-up autosave that
+          // fires before React commits takes the update path, not create.
+          selectedNoteRef.current = newNote;
+          // Use deduplication to avoid race condition with SignalR broadcast
+          setNotes((prev) => {
+            if (prev.some((n) => n.id === newNote.id)) return prev;
+            return [newNote, ...prev];
+          });
+          setSelectedNote(newNote);
+          setIsNewNote(false);
+          fetchInboxCount();
+          fetchCategories();
+        } finally {
+          creatingNoteRef.current = false;
+        }
       } else {
         const current = selectedNoteRef.current;
         if (!current) return;
         const updatedNote = await syncManagerRef.current.updateNote(current.id, {
           content,
           categoryId,
-          deviceId: localStorage.getItem('flashpad-device-id') || 'electron-desktop',
+          deviceId,
         });
         // Move to top if still in current view, remove if not (e.g., assigned category while in inbox)
         setNotes((prev) => {
@@ -573,7 +592,7 @@ function Home() {
     } finally {
       setIsSaving(false);
     }
-  }, [isNewNote, fetchInboxCount, fetchCategories, shouldShowNoteInCurrentView, toast]);
+  }, [fetchInboxCount, fetchCategories, shouldShowNoteInCurrentView, toast]);
 
   const handleArchive = useCallback(async () => {
     const current = selectedNoteRef.current;

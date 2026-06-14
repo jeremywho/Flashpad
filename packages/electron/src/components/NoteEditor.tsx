@@ -3,6 +3,7 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Note, Category, NoteStatus } from '@shared/types';
 import { FontSizeControl } from './FontSizeControl';
+import { shouldResetContentOnNoteIdChange } from './noteEditorLogic';
 
 const CODE_LANGUAGES = [
   '', 'javascript', 'typescript', 'python', 'csharp', 'java', 'go', 'rust',
@@ -147,12 +148,22 @@ function NoteEditorInner({
 
   // Reset content when switching to a different note (note ID changed).
   useEffect(() => {
-    if (note?.id !== prevNoteIdRef.current) {
-      setContent(note?.content || '');
-      lastSavedContentRef.current = note?.content || '';
-      prevNoteIdRef.current = note?.id;
+    if (note?.id === prevNoteIdRef.current) return;
+
+    const incoming = note?.content || '';
+    const activelyEditing =
+      !!textareaRef.current && document.activeElement === textareaRef.current;
+
+    if (shouldResetContentOnNoteIdChange(incoming, lastSavedContentRef.current, activelyEditing)) {
+      setContent(incoming);
       setPreviewMode(false);
     }
+    // else: our own brand-new note just came back with its real server id while
+    // the user is still typing. Keep their in-progress text (the editor is ahead
+    // of this snapshot); the pending autosave persists it via the update path.
+
+    lastSavedContentRef.current = incoming;
+    prevNoteIdRef.current = note?.id;
   }, [note?.id, note?.content]);
 
   // Sync category when the note changes or initialCategoryId changes.
