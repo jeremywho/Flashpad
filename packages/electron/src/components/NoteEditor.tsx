@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import { Note, Category, NoteStatus } from '@shared/types';
 import { FontSizeControl } from './FontSizeControl';
 import { shouldResetContentOnNoteIdChange } from './noteEditorLogic';
+import { Code, Maximize2, X, Archive, Inbox, RotateCcw, Trash2 } from 'lucide-react';
 
 const CODE_LANGUAGES = [
   '', 'javascript', 'typescript', 'python', 'csharp', 'java', 'go', 'rust',
@@ -382,6 +383,18 @@ function NoteEditorInner({
           >Preview</button>
           <span className="note-editor-toolbar-divider" />
 
+          {/* Focus / fullscreen */}
+          {onToggleFocusMode && (
+            <button
+              className="note-editor-action-btn focus-mode-toolbar-btn"
+              onClick={onToggleFocusMode}
+              title={isFocusMode ? 'Exit Focus Mode (Ctrl+Shift+F)' : 'Focus Mode (Ctrl+Shift+F)'}
+            >
+              {isFocusMode ? <X size={15} strokeWidth={1.75} /> : <Maximize2 size={15} strokeWidth={1.75} />}
+            </button>
+          )}
+          <span className="note-editor-toolbar-divider" />
+
           {/* Category selector */}
           <div className="note-editor-category-selector">
             <button
@@ -433,7 +446,7 @@ function NoteEditorInner({
               onClick={() => setShowCodeLangDropdown(!showCodeLangDropdown)}
               title="Insert Code Block (Ctrl+Shift+K)"
             >
-              &lt;/&gt;
+              <Code size={15} strokeWidth={1.75} />
             </button>
             {showCodeLangDropdown && (
               <div className="note-editor-code-lang-dropdown">
@@ -450,10 +463,37 @@ function NoteEditorInner({
             )}
           </div>
 
-          {showSavingIndicator && <span className="note-editor-saving">Saving...</span>}
+          <span className="note-editor-toolbar-divider" />
+
+          {/* Note actions */}
+          {note?.status === NoteStatus.Inbox && (
+            <button className="note-editor-action-btn" onClick={onArchive} title="Archive">
+              <Archive size={15} strokeWidth={1.75} />
+            </button>
+          )}
+          {note?.status === NoteStatus.Archived && (
+            <button className="note-editor-action-btn" onClick={onRestore} title="Move to Inbox">
+              <Inbox size={15} strokeWidth={1.75} />
+            </button>
+          )}
+          {note?.status === NoteStatus.Trash ? (
+            <>
+              <button className="note-editor-action-btn" onClick={onRestore} title="Restore">
+                <RotateCcw size={15} strokeWidth={1.75} />
+              </button>
+              <button className="note-editor-action-btn danger" onClick={onDelete} title="Delete Permanently">
+                <Trash2 size={15} strokeWidth={1.75} />
+              </button>
+            </>
+          ) : (
+            <button className="note-editor-action-btn" onClick={onTrash} title="Move to Trash">
+              <Trash2 size={15} strokeWidth={1.75} />
+            </button>
+          )}
         </div>
 
         <div className="note-editor-toolbar-right">
+          {showSavingIndicator && <span className="note-editor-saving">Saving...</span>}
           {/* Sync indicator */}
           {(() => {
             const sync = getSyncInfo();
@@ -464,41 +504,6 @@ function NoteEditorInner({
               </span>
             );
           })()}
-          <span className="note-editor-toolbar-divider" />
-
-          {onToggleFocusMode && (
-            <button
-              className="note-editor-action-btn focus-mode-toolbar-btn"
-              onClick={onToggleFocusMode}
-              title={isFocusMode ? 'Exit Focus Mode (Ctrl+Shift+F)' : 'Focus Mode (Ctrl+Shift+F)'}
-            >
-              {isFocusMode ? '\u2715' : '\u2922'}
-            </button>
-          )}
-          {note?.status === NoteStatus.Inbox && (
-            <button className="note-editor-action-btn" onClick={onArchive} title="Archive">
-              &#128451;
-            </button>
-          )}
-          {note?.status === NoteStatus.Archived && (
-            <button className="note-editor-action-btn" onClick={onRestore} title="Move to Inbox">
-              &#128229;
-            </button>
-          )}
-          {note?.status === NoteStatus.Trash ? (
-            <>
-              <button className="note-editor-action-btn" onClick={onRestore} title="Restore">
-                &#8634;
-              </button>
-              <button className="note-editor-action-btn danger" onClick={onDelete} title="Delete Permanently">
-                &#128465;
-              </button>
-            </>
-          ) : (
-            <button className="note-editor-action-btn" onClick={onTrash} title="Move to Trash">
-              &#128465;
-            </button>
-          )}
         </div>
       </div>
 
