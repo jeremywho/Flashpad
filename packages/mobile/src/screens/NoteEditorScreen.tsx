@@ -21,6 +21,7 @@ import { SyncManager } from '../services/syncManager';
 import { getLocalNote } from '../services/database';
 import type { Note, Category, NoteStatus } from '@flashpad/shared';
 import { getOrCreateMobileDeviceId } from '../services/deviceId';
+import { categoryDefaultsToPreview, rememberCategoryViewMode } from '../services/categoryViewModeStore';
 
 interface NoteEditorScreenProps {
   navigation: any;
@@ -49,6 +50,9 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const syncManagerRef = useRef<SyncManager | null>(null);
   const isMountedRef = useRef(true);
+  // Ensures the category's sticky Edit/Preview default is applied only once,
+  // when the note first loads — never overriding a later manual toggle.
+  const initialViewModeAppliedRef = useRef(false);
 
   const noteId = route.params?.noteId;
   const isNew = route.params?.isNew || !noteId;
@@ -63,6 +67,20 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
       }
     };
   }, []);
+
+  // Apply the category's sticky Preview/Edit default once the note loads.
+  // New notes stay in Edit (you can't type in Preview).
+  useEffect(() => {
+    if (isNew || !note?.id || initialViewModeAppliedRef.current) return;
+    initialViewModeAppliedRef.current = true;
+    let cancelled = false;
+    categoryDefaultsToPreview(note.categoryId).then((prefersPreview) => {
+      if (!cancelled && prefersPreview) setPreviewMode(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [note?.id, note?.categoryId, isNew]);
 
   // Initialize SyncManager
   useEffect(() => {
@@ -414,14 +432,14 @@ function NoteEditorScreen({ navigation, route }: NoteEditorScreenProps) {
         <View style={styles.modeTabs}>
           <TouchableOpacity
             style={[styles.modeTab, !previewMode && styles.modeTabActive]}
-            onPress={() => setPreviewMode(false)}
+            onPress={() => { setPreviewMode(false); rememberCategoryViewMode(selectedCategoryId, false); }}
           >
             <Pencil size={14} strokeWidth={1.75} color={!previewMode ? colors.accent : colors.textMuted} />
             <Text style={[styles.modeTabText, !previewMode && styles.modeTabTextActive]}>Edit</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.modeTab, previewMode && styles.modeTabActive]}
-            onPress={() => setPreviewMode(true)}
+            onPress={() => { setPreviewMode(true); rememberCategoryViewMode(selectedCategoryId, true); }}
           >
             <Eye size={14} strokeWidth={1.75} color={previewMode ? colors.accent : colors.textMuted} />
             <Text style={[styles.modeTabText, previewMode && styles.modeTabTextActive]}>Preview</Text>

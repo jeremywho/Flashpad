@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import { Note, Category, NoteStatus } from '@shared/types';
 import { FontSizeControl } from './FontSizeControl';
 import { shouldResetContentOnNoteIdChange } from './noteEditorLogic';
+import { categoryDefaultsToPreview, rememberCategoryViewMode } from '../categoryViewModeStore';
 import { Code, Maximize2, X, Archive, Inbox, RotateCcw, Trash2 } from 'lucide-react';
 
 const CODE_LANGUAGES = [
@@ -133,7 +134,9 @@ function NoteEditorInner({
 }: NoteEditorProps) {
   const showSavingIndicator = useDebouncedSavingIndicator(isSaving);
   const [content, setContent] = useState(note?.content || '');
-  const [previewMode, setPreviewMode] = useState(false);
+  const [previewMode, setPreviewMode] = useState(
+    () => !isNew && categoryDefaultsToPreview(note?.categoryId ?? initialCategoryId)
+  );
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(
     note?.categoryId ?? initialCategoryId
   );
@@ -157,7 +160,7 @@ function NoteEditorInner({
 
     if (shouldResetContentOnNoteIdChange(incoming, lastSavedContentRef.current, activelyEditing)) {
       setContent(incoming);
-      setPreviewMode(false);
+      setPreviewMode(!isNew && categoryDefaultsToPreview(note?.categoryId ?? initialCategoryId));
     }
     // else: our own brand-new note just came back with its real server id while
     // the user is still typing. Keep their in-progress text (the editor is ahead
@@ -375,11 +378,11 @@ function NoteEditorInner({
           {/* Edit/Preview tabs */}
           <button
             className={`note-editor-tab ${!previewMode ? 'active' : ''}`}
-            onClick={() => setPreviewMode(false)}
+            onClick={() => { setPreviewMode(false); rememberCategoryViewMode(selectedCategoryId, false); }}
           >Edit</button>
           <button
             className={`note-editor-tab ${previewMode ? 'active' : ''}`}
-            onClick={() => setPreviewMode(true)}
+            onClick={() => { setPreviewMode(true); rememberCategoryViewMode(selectedCategoryId, true); }}
           >Preview</button>
           <span className="note-editor-toolbar-divider" />
 
