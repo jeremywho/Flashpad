@@ -765,6 +765,13 @@ ipcMain.handle('fs:list-notes', async () => {
   }
 });
 
+ipcMain.handle('fs:get-note-path', (_event, id: string) => {
+  if (!isValidNoteId(id)) {
+    return null;
+  }
+  return resolvePathWithinBaseDir(getNotesDir(), `${id}.md`);
+});
+
 ipcMain.handle('fs:read-note', async (_event, id: string) => {
   try {
     if (!isValidNoteId(id)) {

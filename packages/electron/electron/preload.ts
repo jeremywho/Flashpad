@@ -74,6 +74,7 @@ contextBridge.exposeInMainWorld('electron', {
     // Notes directory operations
     listNotes: (): Promise<string[]> => ipcRenderer.invoke('fs:list-notes'),
     readNote: (id: string): Promise<string | null> => ipcRenderer.invoke('fs:read-note', id),
+    getNotePath: (id: string): Promise<string | null> => ipcRenderer.invoke('fs:get-note-path', id),
     writeNote: (id: string, content: string): Promise<void> =>
       ipcRenderer.invoke('fs:write-note', id, content),
     deleteNote: (id: string): Promise<void> => ipcRenderer.invoke('fs:delete-note', id),

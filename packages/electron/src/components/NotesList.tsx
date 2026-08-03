@@ -1,7 +1,7 @@
 import { useState, useEffect, memo } from 'react';
 import { Note } from '@shared/types';
 import { getCardMenuActions, CardMenuActionId } from '@shared/index';
-import { Archive, RotateCcw, Trash2 } from 'lucide-react';
+import { Archive, RotateCcw, Trash2, Copy } from 'lucide-react';
 
 const ACTION_ICONS: Record<CardMenuActionId, typeof Archive> = {
   archive: Archive,
@@ -31,6 +31,7 @@ interface NotesListProps {
   pendingNoteIds?: Set<string>;
   currentView?: string;
   onNoteAction?: (action: CardMenuActionId, note: Note) => void;
+  onCopyPath?: (note: Note) => void;
 }
 
 function formatDate(dateString: string): string {
@@ -75,6 +76,7 @@ function NotesListInner({
   pendingNoteIds,
   currentView,
   onNoteAction,
+  onCopyPath,
 }: NotesListProps) {
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     visible: false,
@@ -202,6 +204,24 @@ function NotesListInner({
               </button>
             );
           })}
+          {onCopyPath && (
+            <>
+              <div className="notes-list-context-menu-divider" />
+              <button
+                className="notes-list-context-menu-item"
+                onClick={() => {
+                  const note = contextMenu.note;
+                  setContextMenu((prev) => ({ ...prev, visible: false }));
+                  if (note) onCopyPath(note);
+                }}
+              >
+                <span className="notes-list-context-menu-icon">
+                  <Copy size={15} strokeWidth={1.75} />
+                </span>
+                <span>Copy full path</span>
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

@@ -625,6 +625,21 @@ function Home() {
     }
   }, [fetchCategories, toast]);
 
+  const handleCopyNotePath = useCallback(async (note: Note) => {
+    try {
+      const notePath = await window.electron.fs.getNotePath(note.id);
+      if (!notePath) {
+        toast.error('Could not resolve note path');
+        return;
+      }
+      await navigator.clipboard.writeText(notePath);
+      toast.success('Full path copied');
+    } catch (error) {
+      console.error('Failed to copy note path:', error);
+      toast.error('Failed to copy path');
+    }
+  }, [toast]);
+
   const handleArchive = useCallback(() => {
     const note = selectedNoteRef.current;
     if (note) runNoteAction('archive', note);
@@ -726,6 +741,7 @@ function Home() {
             pendingNoteIds={pendingNoteIds}
             currentView={selectedView}
             onNoteAction={runNoteAction}
+            onCopyPath={handleCopyNotePath}
           />
           <div
             className="resize-handle"

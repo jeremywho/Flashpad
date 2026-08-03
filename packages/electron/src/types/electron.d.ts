@@ -26,6 +26,7 @@ export interface ElectronFsAPI {
   // Notes directory operations
   listNotes: () => Promise<string[]>;
   readNote: (id: string) => Promise<string | null>;
+  getNotePath: (id: string) => Promise<string | null>;
   writeNote: (id: string, content: string) => Promise<void>;
   deleteNote: (id: string) => Promise<void>;
 

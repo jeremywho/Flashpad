@@ -1591,6 +1591,12 @@ h1, h2, h3 {
   color: var(--ink-2);
 }
 
+.notes-list-context-menu-divider {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--rule-2);
+}
+
 /* Focus Mode */
 .app-layout.focus-mode .note-editor,
 .app-layout.focus-mode .note-editor-empty {
