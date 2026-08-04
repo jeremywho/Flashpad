@@ -67,6 +67,7 @@ export interface ElectronAPI {
   };
   auth: {
     setSessionActive: (isActive: boolean) => Promise<void>;
+    isPrimaryWindow: () => Promise<boolean>;
     getRefreshToken: () => Promise<string | null>;
     setRefreshToken: (token: string) => Promise<void>;
     clearRefreshToken: () => Promise<void>;

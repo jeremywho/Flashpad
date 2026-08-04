@@ -51,6 +51,8 @@ contextBridge.exposeInMainWorld('electron', {
   auth: {
     setSessionActive: (isActive: boolean): Promise<void> =>
       ipcRenderer.invoke('auth:set-session-active', isActive),
+    isPrimaryWindow: (): Promise<boolean> =>
+      ipcRenderer.invoke('auth:is-primary-window'),
     getRefreshToken: (): Promise<string | null> =>
       ipcRenderer.invoke('auth:get-refresh-token'),
     setRefreshToken: (token: string): Promise<void> =>

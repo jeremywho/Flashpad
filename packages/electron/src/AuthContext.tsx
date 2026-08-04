@@ -82,6 +82,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
 
     (async () => {
+      // Only the primary (main) window owns token refresh. Secondary windows
+      // (quick-capture) read their auth state from the main process via IPC and
+      // must NOT refresh here — doing so rotates the single-use refresh token out
+      // from under the main window and forces a re-login for every window.
+      const isPrimary = await window.electron.auth.isPrimaryWindow();
+      if (cancelled) return;
+      if (!isPrimary) {
+        setIsLoading(false);
+        return;
+      }
+
       try {
         const storedRefreshToken = await window.electron.auth.getRefreshToken();
         if (cancelled) return;

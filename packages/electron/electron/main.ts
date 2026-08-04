@@ -691,6 +691,13 @@ ipcMain.handle('auth:set-session-active', (_event, isActive: boolean) => {
   quickCaptureSessionActive = isActive;
 });
 
+// Only the main window owns the token-refresh loop. Secondary windows
+// (quick-capture) must not refresh, or they rotate the single-use refresh token
+// out from under the main window and force a re-login.
+ipcMain.handle('auth:is-primary-window', (event) => {
+  return event.sender.id === mainWindow?.webContents.id;
+});
+
 ipcMain.handle('auth:get-refresh-token', async () => {
   return getStoredRefreshToken();
 });
@@ -850,17 +857,34 @@ ipcMain.handle('fs:check-migration-needed', async () => {
   return true;
 });
 
-app.whenReady().then(() => {
-  createTray();
-  createWindow();
-  registerGlobalShortcut();
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+// Enforce a single running instance. Without this, launching the app again
+// (e.g. clicking the icon while it's hidden in the tray) starts a second process
+// whose own main window runs a second token-refresh loop — the two instances then
+// race over the shared single-use refresh token and force a re-login.
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      if (!mainWindow.isVisible()) mainWindow.show();
+      mainWindow.focus();
     }
   });
-});
+
+  app.whenReady().then(() => {
+    createTray();
+    createWindow();
+    registerGlobalShortcut();
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      }
+    });
+  });
+}
 
 app.on('window-all-closed', () => {
   const settings = settingsStore.store;
