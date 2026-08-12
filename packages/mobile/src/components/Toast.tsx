@@ -70,14 +70,14 @@ const ToastItem = React.memo(function ToastItem({ toast, onRemove }: ToastItemPr
   const getTypeStyles = () => {
     switch (toast.type) {
       case 'success':
-        return { borderColor: '#22c55e', iconColor: '#22c55e', icon: '\u2713' };
+        return { borderColor: colors.success, iconColor: colors.success, icon: '\u2713' };
       case 'error':
-        return { borderColor: '#ef4444', iconColor: '#ef4444', icon: '\u2715' };
+        return { borderColor: colors.danger, iconColor: colors.danger, icon: '\u2715' };
       case 'warning':
-        return { borderColor: '#f59e0b', iconColor: '#f59e0b', icon: '\u26a0' };
+        return { borderColor: colors.warning, iconColor: colors.warning, icon: '\u26a0' };
       case 'info':
       default:
-        return { borderColor: '#6366f1', iconColor: '#6366f1', icon: '\u2139' };
+        return { borderColor: colors.accent, iconColor: colors.accent, icon: '\u2139' };
     }
   };
 
@@ -164,14 +164,14 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   toastIcon: {
-    fontSize: 16,
+    fontSize: 19,
     marginRight: 10,
     width: 20,
     textAlign: 'center',
   },
   toastMessage: {
     color: colors.text,
-    fontSize: 14,
+    fontSize: 17,
     flex: 1,
   },
 });

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Note, Category, NoteStatus } from '@shared/types';
 import { Archive, Inbox, RotateCcw, Trash2, Maximize2, X, Code, FileText } from 'lucide-react';
 import { FontSizeControl } from './FontSizeControl';
+import { useAppearance, MIN_FONT, MAX_FONT } from '../theme/AppearanceProvider';
 
 const CODE_LANGUAGES = [
   '', 'javascript', 'typescript', 'python', 'csharp', 'java', 'go', 'rust',
@@ -125,6 +126,7 @@ export default function NoteEditor({
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showCodeLangDropdown, setShowCodeLangDropdown] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRootRef = useRef<HTMLDivElement>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Track the last content we sent to onSave to distinguish our own saves
   // from external updates (e.g., edits from another device via SignalR).
@@ -132,6 +134,46 @@ export default function NoteEditor({
   // Track the note ID to detect when the user switches to a different note.
   const prevNoteIdRef = useRef<string | undefined>(note?.id);
   const prevResetTokenRef = useRef(resetToken);
+
+  // Shift + wheel over the text resizes it.
+  const { appearance, setAppearance } = useAppearance();
+  const fontSizeRef = useRef(appearance.editorFontSize);
+  fontSizeRef.current = appearance.editorFontSize;
+
+  useEffect(() => {
+    const root = editorRootRef.current;
+    if (!root) return;
+
+    // React registers wheel listeners as passive, so preventDefault() from an
+    // onWheel prop is ignored and the pane would resize *and* scroll sideways
+    // (shift+wheel is horizontal scroll by default). Hence a native listener.
+    let carried = 0;
+    const WHEEL_PER_STEP = 100; // one mouse notch ≈ one point of type
+
+    const onWheel = (e: WheelEvent) => {
+      if (!e.shiftKey) return;
+      const target = e.target as HTMLElement | null;
+      if (!target?.closest('.note-editor-content')) return;
+      e.preventDefault();
+
+      // deltaY is in pixels, lines or pages depending on the device.
+      const lines = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
+      carried += e.deltaY * lines;
+
+      const steps = Math.trunc(carried / WHEEL_PER_STEP);
+      if (!steps) return;
+      carried -= steps * WHEEL_PER_STEP;
+
+      // Wheel away from you enlarges, matching every other zoom control.
+      const next = Math.max(MIN_FONT, Math.min(MAX_FONT, fontSizeRef.current - steps));
+      if (next !== fontSizeRef.current) setAppearance({ editorFontSize: next });
+    };
+
+    root.addEventListener('wheel', onWheel, { passive: false });
+    return () => root.removeEventListener('wheel', onWheel);
+    // The empty state returns before the ref'd element renders, so this has to
+    // re-run once a note actually exists or the listener is never attached.
+  }, [setAppearance, note?.id, isNew]);
 
   // Reset content when switching to a different note (note ID changed).
   useEffect(() => {
@@ -341,7 +383,7 @@ export default function NoteEditor({
   const selectedCategory = categories.find((c) => c.id === selectedCategoryId);
 
   return (
-    <div className="note-editor">
+    <div className="note-editor" ref={editorRootRef}>
       <div className="note-editor-toolbar">
         <div className="note-editor-toolbar-left">
           <button className="note-editor-tab active">Edit</button>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Note } from '@shared/types';
-import { getCardMenuActions, CardMenuActionId } from '@shared/index';
+import { getCardMenuActions, getNoteCardText, CardMenuActionId } from '@shared/index';
 import { Archive, RotateCcw, Trash2 } from 'lucide-react';
 
 const ACTION_ICONS: Record<CardMenuActionId, typeof Archive> = {
@@ -47,17 +47,6 @@ function formatDate(dateString: string): string {
   } else {
     return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
   }
-}
-
-function getPreview(content: string): string {
-  const lines = content.split('\n').filter((line) => line.trim());
-  const preview = lines.slice(0, 2).join(' ');
-  return preview.length > 100 ? preview.substring(0, 100) + '...' : preview;
-}
-
-function getTitle(content: string): string {
-  const firstLine = content.split('\n')[0].trim();
-  return firstLine.length > 50 ? firstLine.substring(0, 50) + '...' : firstLine || 'Untitled';
 }
 
 export default function NotesList({
@@ -145,7 +134,9 @@ export default function NotesList({
         </div>
       ) : (
         <div className="notes-list-items">
-          {notes.map((note) => (
+          {notes.map((note) => {
+            const { title, preview } = getNoteCardText(note.content);
+            return (
             <button
               key={note.id}
               className={`notes-list-item ${selectedNoteId === note.id ? 'active' : ''}`}
@@ -153,10 +144,10 @@ export default function NotesList({
               onContextMenu={(e) => handleCardContextMenu(e, note)}
             >
               <div className="notes-list-item-header">
-                <span className="notes-list-item-title">{getTitle(note.content)}</span>
+                <span className="notes-list-item-title">{title}</span>
                 <span className="notes-list-item-date">{formatDate(note.updatedAt)}</span>
               </div>
-              <div className="notes-list-item-preview">{getPreview(note.content)}</div>
+              {preview && <div className="notes-list-item-preview">{preview}</div>}
               {showCategory && note.categoryName && (
                 <div className="notes-list-item-category">
                   <span
@@ -167,7 +158,8 @@ export default function NotesList({
                 </div>
               )}
             </button>
-          ))}
+            );
+          })}
         </div>
       )}
 

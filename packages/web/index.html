@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark" data-variant="paper">
+<html lang="en" data-theme="dark" data-variant="ledger">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -51,13 +51,17 @@
           }
           r.dataset.theme = (t === 'light') ? 'light' : 'dark';
           var v = a.variant;
-          if (v === 'paper' || v === 'terminal' || v === 'atelier' || v === 'index') {
+          // Mirrors the v2 migration in AppearanceProvider, so a stored
+          // 'paper' does not flash before React corrects it.
+          if (a.v !== 2 && v === 'paper') { v = 'ledger'; }
+          if (v === 'ledger' || v === 'paper' || v === 'terminal' || v === 'atelier' || v === 'index') {
             r.dataset.variant = v;
           }
+          // Bounds and the v2 size floor mirror AppearanceProvider.
           var fs = a.editorFontSize;
-          if (typeof fs === 'number' && fs >= 13 && fs <= 22) {
-            r.style.setProperty('--editor-size', fs + 'px');
-          }
+          if (typeof fs !== 'number' || fs < 13 || fs > 32) { fs = 22; }
+          if (a.v !== 2) { fs = Math.max(fs, 22); }
+          r.style.setProperty('--editor-size', fs + 'px');
         } catch (e) { /* keep static fallback on <html> */ }
       })();
     </script>

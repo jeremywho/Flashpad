@@ -69,7 +69,7 @@ function RegisterScreen({ navigation }: any) {
       elevation: 5,
     },
     title: {
-      fontSize: 24,
+      fontSize: 28,
       fontWeight: 'bold',
       fontFamily: fonts.semiBold,
       marginBottom: 20,
@@ -90,7 +90,7 @@ function RegisterScreen({ navigation }: any) {
       borderColor: theme.border,
       borderRadius: 4,
       padding: 10,
-      fontSize: 16,
+      fontSize: 19,
       fontFamily: fonts.regular,
       color: theme.text,
       backgroundColor: theme.surfaceVariant,
@@ -107,7 +107,7 @@ function RegisterScreen({ navigation }: any) {
     },
     buttonText: {
       color: '#fff',
-      fontSize: 16,
+      fontSize: 19,
       fontWeight: '500',
       fontFamily: fonts.medium,
     },

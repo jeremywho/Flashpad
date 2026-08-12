@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: colors.textSecondary,
-    fontSize: 16,
+    fontSize: 19,
   },
   noteItem: {
     padding: 16,
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   },
   noteTitle: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 19,
     fontWeight: '600',
     fontFamily: fonts.semiBold,
     color: colors.text,
@@ -201,11 +201,11 @@ const styles = StyleSheet.create({
   },
   noteDate: {
     fontFamily: fonts.mono,
-    fontSize: 11,
+    fontSize: 13,
     color: colors.textMuted,
   },
   notePreview: {
-    fontSize: 14,
+    fontSize: 17,
     fontFamily: fonts.regular,
     color: colors.textSecondary,
     lineHeight: 20,
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   categoryName: {
-    fontSize: 12,
+    fontSize: 14.5,
     color: colors.textMuted,
   },
   emptyList: {
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 19,
     color: colors.textSecondary,
     marginBottom: 16,
   },
@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
   },
   emptyButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 19,
     fontWeight: '600',
   },
   fab: {
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: '#2a2a2a',
+    borderColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -1,4 +1,4 @@
-import { getNoteCardText } from '../noteCardText';
+import { getNoteCardText } from '@shared/index';
 
 describe('getNoteCardText', () => {
   it('does not repeat the title in the preview', () => {

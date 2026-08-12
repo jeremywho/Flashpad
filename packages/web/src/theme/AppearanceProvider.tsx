@@ -1,7 +1,7 @@
 import * as React from 'react';
 
 export type Theme = 'light' | 'dark' | 'system';
-export type Variant = 'paper' | 'terminal' | 'atelier' | 'index';
+export type Variant = 'ledger' | 'paper' | 'terminal' | 'atelier' | 'index';
 
 export interface Appearance {
   theme: Theme;
@@ -9,13 +9,25 @@ export interface Appearance {
   editorFontSize: number;
 }
 
-const DEFAULT: Appearance = { theme: 'dark', variant: 'paper', editorFontSize: 16 };
-const STORAGE_KEY = 'flashpad.appearance';
-const MIN_FONT = 13;
-const MAX_FONT = 22;
+// Single source of truth for the editor size bounds — FontSizeControl and the
+// FOUC bootstrap in index.html both key off these.
+export const MIN_FONT = 13;
+export const MAX_FONT = 32;
+export const DEFAULT_FONT = 22;
 
-// Feature flag: gate non-Paper variants behind VITE_MULTI_THEME.
+const DEFAULT: Appearance = { theme: 'dark', variant: 'ledger', editorFontSize: DEFAULT_FONT };
+const STORAGE_KEY = 'flashpad.appearance';
+
+// Bumped when the shipped default changes. Relying on validVariant() alone to
+// retire a variant only works in production, where the old variant is disabled;
+// in dev every variant stays enabled, so a stored 'paper' would validate and
+// pin the old theme forever.
+const APPEARANCE_VERSION = 2;
+
+// Feature flag: gate the non-shipping variants behind VITE_MULTI_THEME.
 // Default: enabled in dev, disabled in production. Override with VITE_MULTI_THEME=true|false.
+// A stored variant that is not enabled fails validVariant() and falls back to
+// DEFAULT, so anyone carrying 'paper' in localStorage lands on Ledger.
 const MULTI_THEME_ENABLED: boolean = (() => {
   const v = import.meta.env.VITE_MULTI_THEME;
   if (v === 'true') return true;
@@ -24,8 +36,8 @@ const MULTI_THEME_ENABLED: boolean = (() => {
 })();
 
 export const ENABLED_VARIANTS: readonly Variant[] = MULTI_THEME_ENABLED
-  ? ['paper', 'terminal', 'atelier', 'index']
-  : ['paper'];
+  ? ['ledger', 'paper', 'terminal', 'atelier', 'index']
+  : ['ledger'];
 
 function validVariant(v: unknown): v is Variant {
   return typeof v === 'string' && (ENABLED_VARIANTS as readonly string[]).includes(v);
@@ -57,13 +69,21 @@ function loadInitial(): Appearance {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
+      const stale = parsed.v !== APPEARANCE_VERSION;
+      let variant = validVariant(parsed.variant) ? parsed.variant : DEFAULT.variant;
+      let fontSize = clampFont(parsed.editorFontSize);
+      // One-way move off the previous defaults. Choosing Paper or a smaller
+      // size again afterwards sticks, because setAppearance() stamps the
+      // current version on save. Anyone already reading larger keeps their size.
+      if (stale && variant === 'paper') variant = DEFAULT.variant;
+      if (stale) fontSize = Math.max(fontSize, DEFAULT_FONT);
       return {
         theme: parsed.theme === 'light' || parsed.theme === 'dark' || parsed.theme === 'system' ? parsed.theme : DEFAULT.theme,
-        variant: validVariant(parsed.variant) ? parsed.variant : DEFAULT.variant,
-        editorFontSize: clampFont(parsed.editorFontSize),
+        variant,
+        editorFontSize: fontSize,
       };
     }
-    // One-time migration from legacy 'theme' key
+    // One-time migration from the legacy 'theme' key.
     const oldTheme = localStorage.getItem('theme');
     if (oldTheme === 'light' || oldTheme === 'dark' || oldTheme === 'system') {
       return { ...DEFAULT, theme: oldTheme };
@@ -101,7 +121,9 @@ export function AppearanceProvider({ children }: { children: React.ReactNode }) 
       if (typeof patch.editorFontSize === 'number') {
         next.editorFontSize = clampFont(patch.editorFontSize);
       }
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...next, v: APPEARANCE_VERSION }));
+      } catch { /* ignore */ }
       return next;
     });
   }, []);

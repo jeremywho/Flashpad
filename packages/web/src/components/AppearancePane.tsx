@@ -7,6 +7,7 @@ const THEMES: { id: Theme; label: string }[] = [
 ];
 
 const ALL_VARIANTS: { id: Variant; label: string; blurb: string }[] = [
+  { id: 'ledger', label: 'Ledger', blurb: 'Bone ground, one ink blue.' },
   { id: 'paper', label: 'Paper', blurb: 'Warm, editorial, serif body.' },
   { id: 'terminal', label: 'Terminal', blurb: 'Mono, dense, phosphor.' },
   { id: 'atelier', label: 'Atelier', blurb: 'Architectural, hairline.' },

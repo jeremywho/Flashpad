@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 20.5,
     fontWeight: '600',
     fontFamily: fonts.semiBold,
     color: colors.text,
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     minWidth: 60,
   },
   headerButtonText: {
-    fontSize: 16,
+    fontSize: 19,
     fontFamily: fonts.regular,
     color: colors.textSecondary,
   },
@@ -254,14 +254,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   offlineBannerText: {
-    color: '#f59e0b',
-    fontSize: 13,
+    color: colors.warning,
+    fontSize: 15.5,
     textAlign: 'center',
   },
   textInput: {
     flex: 1,
     padding: 24,
-    fontSize: 18,
+    fontSize: 22,
     lineHeight: 30,
     letterSpacing: 0.2,
     fontFamily: fonts.regular,
@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: colors.danger,
-    fontSize: 14,
+    fontSize: 17,
     textAlign: 'center',
   },
   footer: {
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
   },
   footerHint: {
     color: colors.textMuted,
-    fontSize: 13,
+    fontSize: 15.5,
     fontFamily: fonts.regular,
     textAlign: 'center',
   },
@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
   },
   authMessageText: {
     color: colors.textSecondary,
-    fontSize: 16,
+    fontSize: 19,
     marginBottom: 20,
     textAlign: 'center',
   },
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
   },
   loginButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 19,
     fontWeight: '600',
   },
 });

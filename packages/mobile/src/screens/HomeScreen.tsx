@@ -1087,7 +1087,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '700',
     fontFamily: fonts.semiBold,
     color: colors.text,
@@ -1106,7 +1106,7 @@ const styles = StyleSheet.create({
   },
   emptyTrashButtonText: {
     color: colors.danger,
-    fontSize: 14,
+    fontSize: 17,
     fontWeight: '600',
   },
   headerIconButton: {
@@ -1116,7 +1116,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerIcon: {
-    fontSize: 24,
+    fontSize: 28,
     color: colors.accent,
   },
   searchContainer: {
@@ -1133,7 +1133,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     paddingRight: 40,
-    fontSize: 15,
+    fontSize: 18,
     color: colors.text,
     borderWidth: 1,
     borderColor: colors.border,
@@ -1168,23 +1168,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   syncDotPending: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: colors.warning,
   },
   syncDotError: {
-    backgroundColor: '#ef4444',
+    backgroundColor: colors.danger,
   },
   syncDotOffline: {
-    backgroundColor: '#ef4444',
+    backgroundColor: colors.danger,
   },
   syncDotConnected: {
-    backgroundColor: '#22c55e',
+    backgroundColor: colors.success,
   },
   syncDotConnecting: {
-    backgroundColor: '#6366f1',
+    backgroundColor: colors.accent,
   },
   syncText: {
     fontFamily: fonts.mono,
-    fontSize: 11,
+    fontSize: 13,
     color: colors.textSecondary,
   },
   centered: {
@@ -1194,7 +1194,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: colors.textSecondary,
-    fontSize: 16,
+    fontSize: 19,
   },
   swipeAction: {
     backgroundColor: colors.danger,
@@ -1210,7 +1210,7 @@ const styles = StyleSheet.create({
   },
   swipeActionText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 17,
     fontWeight: '600',
   },
   noteItem: {
@@ -1227,7 +1227,7 @@ const styles = StyleSheet.create({
   },
   noteTitle: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 19,
     fontWeight: '600',
     fontFamily: fonts.semiBold,
     color: colors.text,
@@ -1240,7 +1240,7 @@ const styles = StyleSheet.create({
   },
   noteDate: {
     fontFamily: fonts.mono,
-    fontSize: 11,
+    fontSize: 13,
     color: colors.textMuted,
   },
   localBadge: {
@@ -1250,12 +1250,12 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   localBadgeText: {
-    fontSize: 10,
-    color: '#f59e0b',
+    fontSize: 12,
+    color: colors.warning,
     fontWeight: '600',
   },
   notePreview: {
-    fontSize: 14,
+    fontSize: 17,
     fontFamily: fonts.regular,
     color: colors.textSecondary,
     lineHeight: 20,
@@ -1272,7 +1272,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   categoryName: {
-    fontSize: 12,
+    fontSize: 14.5,
     color: colors.textMuted,
   },
   emptyList: {
@@ -1285,7 +1285,7 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 19,
     color: colors.textSecondary,
     marginBottom: 16,
   },
@@ -1297,7 +1297,7 @@ const styles = StyleSheet.create({
   },
   emptyButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 19,
     fontWeight: '600',
   },
   fab: {
@@ -1309,7 +1309,7 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: '#2a2a2a',
+    borderColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1325,7 +1325,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   headerTitleArrow: {
-    fontSize: 10,
+    fontSize: 12,
     color: colors.textMuted,
     marginLeft: 6,
   },
@@ -1353,12 +1353,12 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '600',
     color: colors.text,
   },
   modalClose: {
-    fontSize: 16,
+    fontSize: 19,
     color: colors.accent,
     fontWeight: '500',
   },
@@ -1370,7 +1370,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   modalSectionTitle: {
-    fontSize: 12,
+    fontSize: 14.5,
     fontWeight: '600',
     color: colors.textMuted,
     textTransform: 'uppercase',
@@ -1402,7 +1402,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   filterOptionText: {
-    fontSize: 16,
+    fontSize: 19,
     color: colors.text,
     flex: 1,
   },
@@ -1411,12 +1411,12 @@ const styles = StyleSheet.create({
     color: colors.accent,
   },
   filterOptionCount: {
-    fontSize: 14,
+    fontSize: 17,
     color: colors.textMuted,
     marginRight: 8,
   },
   filterOptionCheck: {
-    fontSize: 16,
+    fontSize: 19,
     color: colors.accent,
     fontWeight: '600',
   },
@@ -1440,7 +1440,7 @@ const styles = StyleSheet.create({
   },
   checkboxCheck: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 17,
     fontWeight: '600',
   },
   noteTitleWithCheckbox: {
@@ -1478,12 +1478,12 @@ const styles = StyleSheet.create({
   },
   selectionBarButtonText: {
     color: colors.accent,
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '500',
   },
   selectionBarCount: {
     color: colors.textSecondary,
-    fontSize: 14,
+    fontSize: 17,
   },
   selectionBarPrimary: {
     backgroundColor: colors.accent,
@@ -1491,7 +1491,7 @@ const styles = StyleSheet.create({
   },
   selectionBarPrimaryText: {
     color: '#fff',
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '600',
   },
 });
