@@ -160,7 +160,7 @@ function Settings() {
                   type="text"
                   value={dataDir}
                   readOnly
-                  style={{ flex: 1, backgroundColor: 'var(--bg-tertiary)', cursor: 'default' }}
+                  style={{ flex: 1, backgroundColor: 'var(--bg-3)', cursor: 'default' }}
                 />
                 <button
                   type="button"
@@ -175,7 +175,7 @@ function Settings() {
                 {settings.dataDirectory && (
                   <span
                     onClick={handleResetDataDirectory}
-                    style={{ marginLeft: '8px', color: 'var(--accent-color)', cursor: 'pointer' }}
+                    style={{ marginLeft: '8px', color: 'var(--accent)', cursor: 'pointer' }}
                   >
                     Reset to default
                   </span>
@@ -289,9 +289,9 @@ function Settings() {
             </ul>
           </div>
 
-          <div className="settings-about" style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid var(--border-color)' }}>
+          <div className="settings-about" style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid var(--rule)' }}>
             <h3>About</h3>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '12px' }}>
+            <p style={{ color: 'var(--ink-2)', marginBottom: '12px' }}>
               Flashpad v{appVersion || '...'}
             </p>
             <button

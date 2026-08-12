@@ -2,6 +2,7 @@ import { useState, useEffect, memo } from 'react';
 import { Note } from '@shared/types';
 import { getCardMenuActions, CardMenuActionId } from '@shared/index';
 import { Archive, RotateCcw, Trash2, Copy } from 'lucide-react';
+import { getNoteCardText } from './noteCardText';
 
 const ACTION_ICONS: Record<CardMenuActionId, typeof Archive> = {
   archive: Archive,
@@ -49,17 +50,6 @@ function formatDate(dateString: string): string {
   } else {
     return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
   }
-}
-
-function getPreview(content: string): string {
-  const lines = content.split('\n').filter((line) => line.trim());
-  const preview = lines.slice(0, 2).join(' ');
-  return preview.length > 100 ? preview.substring(0, 100) + '...' : preview;
-}
-
-function getTitle(content: string): string {
-  const firstLine = content.split('\n')[0].trim();
-  return firstLine.length > 50 ? firstLine.substring(0, 50) + '...' : firstLine || 'Untitled';
 }
 
 function NotesListInner({
@@ -149,7 +139,9 @@ function NotesListInner({
         </div>
       ) : (
         <div className="notes-list-items">
-          {notes.map((note) => (
+          {notes.map((note) => {
+            const { title, preview } = getNoteCardText(note.content);
+            return (
             <button
               key={note.id}
               className={`notes-list-item ${selectedNoteId === note.id ? 'active' : ''}`}
@@ -161,11 +153,11 @@ function NotesListInner({
                   {pendingNoteIds?.has(note.id) && (
                     <span className="notes-list-item-sync-dot" title="Pending sync" />
                   )}
-                  {getTitle(note.content)}
+                  {title}
                 </span>
                 <span className="notes-list-item-date">{formatDate(note.updatedAt)}</span>
               </div>
-              <div className="notes-list-item-preview">{getPreview(note.content)}</div>
+              {preview && <div className="notes-list-item-preview">{preview}</div>}
               {showCategory && note.categoryName && (
                 <div className="notes-list-item-category">
                   <span
@@ -176,7 +168,8 @@ function NotesListInner({
                 </div>
               )}
             </button>
-          ))}
+            );
+          })}
         </div>
       )}
 
