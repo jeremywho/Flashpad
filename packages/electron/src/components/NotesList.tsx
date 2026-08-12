@@ -2,7 +2,7 @@ import { useState, useEffect, memo } from 'react';
 import { Note } from '@shared/types';
 import { getCardMenuActions, CardMenuActionId } from '@shared/index';
 import { Archive, RotateCcw, Trash2, Copy } from 'lucide-react';
-import { getNoteCardText } from './noteCardText';
+import { getNoteCardText } from '@shared/index';
 
 const ACTION_ICONS: Record<CardMenuActionId, typeof Archive> = {
   archive: Archive,
