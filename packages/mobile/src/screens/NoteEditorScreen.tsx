@@ -561,29 +561,29 @@ const markdownTheme = {
 
 const markdownStyles = {
   text: {
-    fontSize: 18,
+    fontSize: 22,
     lineHeight: 30,
     fontFamily: fonts.regular,
     color: colors.text,
   },
   h1: {
     color: colors.text,
-    fontSize: 28,
+    fontSize: 34,
     fontFamily: fonts.semiBold,
   },
   h2: {
     color: colors.text,
-    fontSize: 24,
+    fontSize: 28,
     fontFamily: fonts.semiBold,
   },
   h3: {
     color: colors.text,
-    fontSize: 20,
+    fontSize: 24,
     fontFamily: fonts.medium,
   },
   h4: {
     color: colors.text,
-    fontSize: 18,
+    fontSize: 22,
     fontFamily: fonts.medium,
   },
   link: {
@@ -603,7 +603,7 @@ const markdownStyles = {
     backgroundColor: colors.surfaceElevated,
     color: colors.text,
     fontFamily: fonts.mono,
-    fontSize: 14,
+    fontSize: 17,
   },
   code: {
     backgroundColor: colors.surfaceElevated,
@@ -651,7 +651,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: colors.textSecondary,
-    fontSize: 16,
+    fontSize: 19,
   },
   localNoteBanner: {
     backgroundColor: 'rgba(245, 158, 11, 0.2)',
@@ -661,8 +661,8 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(245, 158, 11, 0.3)',
   },
   localNoteBannerText: {
-    color: '#f59e0b',
-    fontSize: 13,
+    color: colors.warning,
+    fontSize: 15.5,
     textAlign: 'center',
   },
   conflictBanner: {
@@ -674,13 +674,13 @@ const styles = StyleSheet.create({
   },
   conflictBannerText: {
     color: colors.danger,
-    fontSize: 13,
+    fontSize: 15.5,
     textAlign: 'center',
   },
   editor: {
     flex: 1,
     padding: 24,
-    fontSize: 18,
+    fontSize: 22,
     lineHeight: 30,
     letterSpacing: 0.2,
     fontFamily: fonts.regular,
@@ -697,7 +697,7 @@ const styles = StyleSheet.create({
   },
   headerButtonText: {
     color: colors.accent,
-    fontSize: 16,
+    fontSize: 19,
     fontFamily: fonts.medium,
   },
   ghostButton: {
@@ -705,7 +705,7 @@ const styles = StyleSheet.create({
     height: 36,
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: '#2a2a2a',
+    borderColor: colors.border,
     borderRadius: 6,
     justifyContent: 'center',
     alignItems: 'center',
@@ -715,7 +715,7 @@ const styles = StyleSheet.create({
   },
   savingText: {
     color: colors.textMuted,
-    fontSize: 14,
+    fontSize: 17,
   },
   offlineBadge: {
     backgroundColor: 'rgba(239, 68, 68, 0.2)',
@@ -724,8 +724,8 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   offlineBadgeText: {
-    color: '#ef4444',
-    fontSize: 12,
+    color: colors.danger,
+    fontSize: 14.5,
     fontWeight: '600',
     fontFamily: fonts.mono,
   },
@@ -737,7 +737,7 @@ const styles = StyleSheet.create({
   },
   editorFooterText: {
     fontFamily: fonts.mono,
-    fontSize: 11,
+    fontSize: 13,
     color: '#404040',
   },
   // Toolbar row
@@ -774,7 +774,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceElevated,
   },
   modeTabText: {
-    fontSize: 13,
+    fontSize: 15.5,
     fontFamily: fonts.medium,
     color: colors.textMuted,
   },
@@ -790,7 +790,7 @@ const styles = StyleSheet.create({
   },
   previewPlaceholder: {
     color: colors.textMuted,
-    fontSize: 16,
+    fontSize: 19,
     fontStyle: 'italic',
   },
   categoryDot: {
@@ -800,13 +800,13 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   categoryName: {
-    fontSize: 14,
+    fontSize: 17,
     color: colors.text,
     fontWeight: '500',
     fontFamily: fonts.medium,
   },
   categoryNameMuted: {
-    fontSize: 14,
+    fontSize: 17,
     color: colors.textMuted,
     fontFamily: fonts.regular,
   },
@@ -837,12 +837,12 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '600',
     color: colors.text,
   },
   modalClose: {
-    fontSize: 16,
+    fontSize: 19,
     color: colors.accent,
     fontWeight: '500',
   },
@@ -867,7 +867,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
   },
   categoryOptionText: {
-    fontSize: 16,
+    fontSize: 19,
     color: colors.text,
     flex: 1,
   },
@@ -876,7 +876,7 @@ const styles = StyleSheet.create({
     color: colors.accent,
   },
   categoryOptionCheck: {
-    fontSize: 16,
+    fontSize: 19,
     color: colors.accent,
     fontWeight: '600',
   },

@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 16,
+    fontSize: 19,
     fontFamily: fonts.regular,
     color: colors.text,
     borderWidth: 1,
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
   },
   submitButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 19,
     fontWeight: '600',
     fontFamily: fonts.medium,
   },
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: colors.textSecondary,
-    fontSize: 16,
+    fontSize: 19,
   },
   centered: {
     flex: 1,
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: colors.textSecondary,
-    fontSize: 16,
+    fontSize: 19,
   },
   emptyContainer: {
     flex: 1,
@@ -320,13 +320,13 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   emptyText: {
-    fontSize: 18,
+    fontSize: 22,
     fontFamily: fonts.regular,
     color: colors.textSecondary,
     marginBottom: 8,
   },
   emptySubtext: {
-    fontSize: 14,
+    fontSize: 17,
     fontFamily: fonts.regular,
     color: colors.textMuted,
     textAlign: 'center',
@@ -358,13 +358,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   categoryName: {
-    fontSize: 16,
+    fontSize: 19,
     fontWeight: '500',
     fontFamily: fonts.medium,
     color: colors.text,
   },
   categoryCount: {
-    fontSize: 13,
+    fontSize: 15.5,
     fontFamily: fonts.mono,
     color: colors.textMuted,
     marginTop: 2,
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     color: colors.accent,
-    fontSize: 14,
+    fontSize: 17,
     fontWeight: '500',
   },
   deleteButton: {
@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     color: colors.danger,
-    fontSize: 14,
+    fontSize: 17,
     fontWeight: '500',
   },
 });
