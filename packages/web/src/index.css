@@ -1,34 +1,9 @@
+/* Colour lives entirely in styles/themes.css — every value below this
+   line is consumed through a semantic token, never a literal. The one
+   declaration kept here is a mono fallback for the brief moment before
+   a variant is applied to <html>. */
 :root {
-  --bg-primary: #141414;
-  --bg-secondary: #191919;
-  --bg-tertiary: #1c1c1c;
-  --bg-hover: #1f1f1f;
-  --bg-active: #252525;
-  --text-primary: #d8d8d8;
-  --text-secondary: #b0b0b0;
-  --text-muted: #505050;
-  --border-color: #232323;
-  --accent-color: var(--accent);
-  --accent-hover: var(--accent);
-  --danger-color: #ef4444;
-  --success-color: #22c55e;
   --font-mono: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
-}
-
-[data-theme="light"] {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8f9fa;
-  --bg-tertiary: #f0f1f3;
-  --bg-hover: #e9ecef;
-  --bg-active: #dee2e6;
-  --text-primary: #1a1a1a;
-  --text-secondary: #4a5568;
-  --text-muted: #718096;
-  --border-color: #e2e8f0;
-  --accent-color: var(--accent);
-  --accent-hover: var(--accent);
-  --danger-color: #ef4444;
-  --success-color: #22c55e;
 }
 
 * {
@@ -60,7 +35,7 @@ body {
 }
 
 .form-title {
-  font-size: 32px;
+  font-size: 38.5px;
   font-weight: 700;
   color: var(--accent);
   text-align: center;
@@ -85,7 +60,7 @@ label {
   margin-bottom: 6px;
   font-weight: 500;
   color: var(--ink);
-  font-size: 14px;
+  font-size: 17px;
 }
 
 input {
@@ -93,7 +68,7 @@ input {
   padding: 12px;
   border: 1px solid var(--rule);
   border-radius: var(--radius);
-  font-size: 14px;
+  font-size: 17px;
   background: var(--surface);
   color: var(--ink);
 }
@@ -108,7 +83,7 @@ select {
   padding: 12px;
   border: 1px solid var(--rule);
   border-radius: var(--radius);
-  font-size: 14px;
+  font-size: 17px;
   background: var(--surface);
   color: var(--ink);
   cursor: pointer;
@@ -149,7 +124,7 @@ button:disabled {
   color: var(--accent-ink);
   border: none;
   border-radius: 4px;
-  font-size: 16px;
+  font-size: 19px;
   font-weight: 500;
 }
 
@@ -164,15 +139,15 @@ button:disabled {
 }
 
 .error {
-  color: var(--danger-color);
-  font-size: 14px;
+  color: var(--danger);
+  font-size: 17px;
   margin-top: 10px;
   margin-bottom: 16px;
 }
 
 .success {
-  color: var(--success-color);
-  font-size: 14px;
+  color: var(--success);
+  font-size: 17px;
   margin-top: 5px;
 }
 
@@ -201,7 +176,7 @@ button:disabled {
   justify-content: center;
   background: var(--bg);
   color: var(--ink-2);
-  font-size: 16px;
+  font-size: 19px;
 }
 
 /* App Layout */
@@ -240,7 +215,7 @@ button:disabled {
 }
 
 .sidebar-logo {
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--ink-2);
   margin: 0;
@@ -260,7 +235,7 @@ button:disabled {
 
 .sidebar-section-header {
   padding: 14px 8px 4px;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
   color: var(--ink-4);
@@ -277,7 +252,7 @@ button:disabled {
   background: none;
   border: none;
   color: var(--ink-2);
-  font-size: 14px;
+  font-size: 17px;
   cursor: pointer;
   text-align: left;
   border-radius: var(--radius);
@@ -314,7 +289,7 @@ button:disabled {
 
 .sidebar-count {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 13px;
   color: var(--ink-3);
   background: none;
   padding: 0;
@@ -344,7 +319,7 @@ button:disabled {
   border: 1px dashed var(--rule);
   border-radius: var(--radius);
   color: var(--ink-3);
-  font-size: 13px;
+  font-size: 15.5px;
   cursor: pointer;
   transition: all 0.15s;
 }
@@ -377,7 +352,7 @@ button:disabled {
   border: none;
   border-radius: var(--radius);
   color: var(--ink);
-  font-size: 13px;
+  font-size: 15.5px;
   cursor: pointer;
   text-align: left;
   white-space: nowrap;
@@ -390,7 +365,7 @@ button:disabled {
 .sidebar-context-menu-icon {
   width: 16px;
   text-align: center;
-  font-size: 14px;
+  font-size: 17px;
   color: var(--ink-2);
 }
 
@@ -416,7 +391,7 @@ button:disabled {
   border: none;
   border-radius: var(--radius);
   color: var(--ink);
-  font-size: 13px;
+  font-size: 15.5px;
   cursor: pointer;
   text-align: left;
   white-space: nowrap;
@@ -427,7 +402,7 @@ button:disabled {
 }
 
 .notes-list-context-menu-item.danger {
-  color: #e5484d;
+  color: var(--danger);
 }
 
 .notes-list-context-menu-icon {
@@ -456,7 +431,7 @@ button:disabled {
 }
 
 .notes-list-title {
-  font-size: 16px;
+  font-size: 19px;
   font-weight: 600;
   margin: 0;
 }
@@ -469,7 +444,7 @@ button:disabled {
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   color: var(--ink-3);
-  font-size: 18px;
+  font-size: 22px;
   line-height: 1;
   display: flex;
   align-items: center;
@@ -494,7 +469,7 @@ button:disabled {
   background: var(--surface);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
-  font-size: 14px;
+  font-size: 17px;
   color: var(--ink);
   transition: border-color 0.15s;
 }
@@ -519,7 +494,7 @@ button:disabled {
   background: var(--bg-3);
   border: none;
   border-radius: 50%;
-  font-size: 14px;
+  font-size: 17px;
   line-height: 1;
   color: var(--ink-2);
   display: flex;
@@ -569,7 +544,7 @@ button:disabled {
 }
 
 .notes-list-item-title {
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 500;
   color: var(--ink);
   flex: 1;
@@ -580,14 +555,14 @@ button:disabled {
 
 .notes-list-item-date {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 13px;
   color: var(--ink-3);
   flex-shrink: 0;
   margin-left: 8px;
 }
 
 .notes-list-item-preview {
-  font-size: 13px;
+  font-size: 15.5px;
   color: var(--ink-2);
   line-height: 1.4;
   overflow: hidden;
@@ -601,7 +576,7 @@ button:disabled {
   align-items: center;
   gap: 6px;
   margin-top: 8px;
-  font-size: 11px;
+  font-size: 13px;
   color: var(--ink-3);
 }
 
@@ -647,7 +622,7 @@ button:disabled {
 }
 
 .note-editor-empty-icon {
-  font-size: 48px;
+  font-size: 57px;
   display: block;
   margin-bottom: 16px;
   opacity: 0.5;
@@ -671,10 +646,10 @@ button:disabled {
 
 .note-editor-conflict-banner {
   padding: 10px 20px;
-  border-bottom: 1px solid rgba(245, 158, 11, 0.28);
-  background: rgba(245, 158, 11, 0.12);
-  color: #f59e0b;
-  font-size: 13px;
+  border-bottom: 1px solid var(--warning-line);
+  background: var(--warning-tint);
+  color: var(--warning);
+  font-size: 15.5px;
 }
 
 .note-editor-category-selector {
@@ -685,7 +660,7 @@ button:disabled {
 }
 
 .note-editor-category-label {
-  font-size: 12px;
+  font-size: 14.5px;
   color: var(--ink-3);
   font-weight: 500;
 }
@@ -699,7 +674,7 @@ button:disabled {
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   color: var(--ink-2);
-  font-size: 13px;
+  font-size: 15.5px;
   cursor: pointer;
   width: auto;
 }
@@ -715,7 +690,7 @@ button:disabled {
 }
 
 .note-editor-category-arrow {
-  font-size: 10px;
+  font-size: 12px;
   margin-left: 4px;
 }
 
@@ -743,7 +718,7 @@ button:disabled {
   border: none;
   border-radius: 4px;
   color: var(--ink);
-  font-size: 13px;
+  font-size: 15.5px;
   cursor: pointer;
   text-align: left;
 }
@@ -753,12 +728,12 @@ button:disabled {
 }
 
 .note-editor-category-option.selected {
-  background: var(--accent-color-alpha);
+  background: var(--sel);
   color: var(--accent);
 }
 
 .note-editor-saving {
-  font-size: 12px;
+  font-size: 14.5px;
   color: var(--ink-3);
   animation: saving-fade-in 0.2s ease-in;
 }
@@ -775,7 +750,7 @@ button:disabled {
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   color: var(--ink-3);
-  font-size: 12px;
+  font-size: 14.5px;
   cursor: pointer;
   font-family: inherit;
 }
@@ -806,7 +781,7 @@ button:disabled {
   align-items: center;
   gap: 4px;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 13px;
   color: var(--ink-4);
 }
 
@@ -817,10 +792,10 @@ button:disabled {
   flex-shrink: 0;
 }
 
-.note-editor-sync-dot.connected { background: var(--success-color); }
+.note-editor-sync-dot.connected { background: var(--success); }
 .note-editor-sync-dot.connecting,
-.note-editor-sync-dot.reconnecting { background: #f59e0b; animation: pulse 1.5s ease-in-out infinite; }
-.note-editor-sync-dot.disconnected { background: var(--danger-color); }
+.note-editor-sync-dot.reconnecting { background: var(--warning); animation: pulse 1.5s ease-in-out infinite; }
+.note-editor-sync-dot.disconnected { background: var(--danger); }
 
 /* Editor footer bar */
 .note-editor-footer {
@@ -830,7 +805,7 @@ button:disabled {
   padding: 6px 14px;
   border-top: 1px solid var(--rule);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 13px;
   color: var(--ink-4);
 }
 
@@ -848,7 +823,7 @@ button:disabled {
 
 .note-editor-kbd {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   background: var(--bg-3);
   border: 1px solid var(--rule);
   padding: 1px 5px;
@@ -863,7 +838,7 @@ button:disabled {
   gap: 6px;
   padding: 4px 20px 8px;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 13px;
   color: var(--ink-4);
 }
 
@@ -874,10 +849,10 @@ button:disabled {
   flex-shrink: 0;
 }
 
-.sidebar-sync-dot.connected { background: var(--success-color); }
+.sidebar-sync-dot.connected { background: var(--success); }
 .sidebar-sync-dot.connecting,
-.sidebar-sync-dot.reconnecting { background: #f59e0b; animation: pulse 1.5s ease-in-out infinite; }
-.sidebar-sync-dot.disconnected { background: var(--danger-color); }
+.sidebar-sync-dot.reconnecting { background: var(--warning); animation: pulse 1.5s ease-in-out infinite; }
+.sidebar-sync-dot.disconnected { background: var(--danger); }
 
 .note-editor-action-btn {
   width: 28px;
@@ -887,7 +862,7 @@ button:disabled {
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   color: var(--ink-3);
-  font-size: 14px;
+  font-size: 17px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -902,19 +877,22 @@ button:disabled {
 }
 
 .note-editor-action-btn.danger:hover {
-  background: var(--danger-color);
+  background: var(--danger);
   color: white;
-  border-color: var(--danger-color);
+  border-color: var(--danger);
 }
 
+/* Editor column. The pane can be any width; the line length is what is
+   held constant, so the measure is set with padding rather than a
+   max-width — a textarea cannot centre a narrower child. */
 .note-editor-content {
   flex: 1;
-  padding: 24px;
+  padding: 32px max(24px, calc((100% - var(--measure)) / 2));
   background: var(--bg);
   border: none;
   color: var(--ink);
-  font-size: var(--editor-size, 17px);
-  line-height: 1.7;
+  font-size: var(--editor-size, 22px);
+  line-height: var(--leading);
   letter-spacing: 0.01em;
   resize: none;
   outline: none;
@@ -967,7 +945,7 @@ button:disabled {
   border: none;
   border-radius: 4px;
   color: var(--ink);
-  font-size: 13px;
+  font-size: 15.5px;
   cursor: pointer;
   text-align: left;
   font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Consolas', 'Courier New', monospace;
@@ -984,7 +962,7 @@ button:disabled {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1013,7 +991,7 @@ button:disabled {
 
 .category-manager-header h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 600;
 }
 
@@ -1024,7 +1002,7 @@ button:disabled {
   background: none;
   border: none;
   color: var(--ink-2);
-  font-size: 24px;
+  font-size: 28px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1055,7 +1033,7 @@ button:disabled {
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   color: var(--ink);
-  font-size: 14px;
+  font-size: 17px;
 }
 
 .category-manager-input:focus {
@@ -1069,7 +1047,7 @@ button:disabled {
   background: var(--accent);
   color: var(--accent-ink);
   border-radius: var(--radius);
-  font-size: 14px;
+  font-size: 17px;
 }
 
 .category-manager-submit:disabled {
@@ -1083,7 +1061,7 @@ button:disabled {
   background: var(--surface);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
-  font-size: 14px;
+  font-size: 17px;
   color: var(--ink-2);
 }
 
@@ -1119,8 +1097,8 @@ button:disabled {
 .category-manager-error {
   margin-top: 12px;
   margin-bottom: 0;
-  color: var(--danger-color);
-  font-size: 13px;
+  color: var(--danger);
+  font-size: 15.5px;
 }
 
 .category-manager-list {
@@ -1163,7 +1141,7 @@ button:disabled {
 }
 
 .category-manager-item-name {
-  font-size: 14px;
+  font-size: 17px;
   color: var(--ink);
   flex: 1;
   overflow: hidden;
@@ -1172,7 +1150,7 @@ button:disabled {
 }
 
 .category-manager-item-count {
-  font-size: 12px;
+  font-size: 14.5px;
   color: var(--ink-3);
   flex-shrink: 0;
 }
@@ -1189,7 +1167,7 @@ button:disabled {
   background: var(--surface);
   border: 1px solid var(--rule);
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 14.5px;
   color: var(--ink-2);
 }
 
@@ -1199,8 +1177,8 @@ button:disabled {
 }
 
 .category-manager-item-btn.danger:hover {
-  background: var(--danger-color);
-  border-color: var(--danger-color);
+  background: var(--danger);
+  border-color: var(--danger);
   color: white;
 }
 
@@ -1225,7 +1203,7 @@ button:disabled {
 
 .settings-header h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 600;
 }
 
@@ -1236,7 +1214,7 @@ button:disabled {
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   color: var(--ink-2);
-  font-size: 14px;
+  font-size: 17px;
 }
 
 .settings-back:hover {
@@ -1254,7 +1232,7 @@ button:disabled {
 
 .settings-section h2 {
   margin: 0 0 16px 0;
-  font-size: 16px;
+  font-size: 19px;
   font-weight: 600;
   color: var(--ink);
 }
@@ -1278,17 +1256,17 @@ button:disabled {
 
 .settings-item label {
   margin: 0;
-  font-size: 14px;
+  font-size: 17px;
   color: var(--ink);
 }
 
 .settings-item span:first-child {
-  font-size: 14px;
+  font-size: 17px;
   color: var(--ink);
 }
 
 .settings-value {
-  font-size: 14px;
+  font-size: 17px;
   color: var(--ink-2);
 }
 
@@ -1298,11 +1276,11 @@ button:disabled {
 }
 
 .settings-logout-btn {
-  background: var(--danger-color);
+  background: var(--danger);
 }
 
 .settings-logout-btn:hover {
-  background: #dc2626;
+  background: color-mix(in oklab, var(--danger) 82%, black);
 }
 
 /* Focus Mode */
@@ -1322,7 +1300,7 @@ button:disabled {
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   color: var(--ink-2);
-  font-size: 16px;
+  font-size: 19px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1431,7 +1409,7 @@ button:disabled {
   border-radius: 8px;
   padding: 12px 20px;
   color: var(--ink);
-  font-size: 14px;
+  font-size: 17px;
   box-shadow: var(--shadow);
   animation: toast-slide-up 0.3s ease-out;
 }
@@ -1470,7 +1448,7 @@ button:disabled {
 }
 
 .landing-logo {
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 700;
   color: var(--accent);
   margin: 0;
@@ -1489,7 +1467,7 @@ button:disabled {
   background: var(--surface);
   border: 1px solid var(--rule);
   border-radius: 8px;
-  font-size: 18px;
+  font-size: 22px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1507,7 +1485,7 @@ button:disabled {
   border: 1px solid var(--rule);
   border-radius: 8px;
   color: var(--ink);
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 500;
 }
 
@@ -1532,7 +1510,7 @@ button:disabled {
 }
 
 .landing-hero-title {
-  font-size: 48px;
+  font-size: 57px;
   font-weight: 700;
   color: var(--ink);
   margin: 0 0 16px 0;
@@ -1540,7 +1518,7 @@ button:disabled {
 }
 
 .landing-hero-subtitle {
-  font-size: 20px;
+  font-size: 24px;
   color: var(--ink-2);
   margin: 0 0 32px 0;
   max-width: 600px;
@@ -1558,7 +1536,7 @@ button:disabled {
 .landing-cta-btn {
   width: auto;
   padding: 14px 32px;
-  font-size: 16px;
+  font-size: 19px;
   font-weight: 500;
   border-radius: 8px;
   background: var(--surface);
@@ -1581,7 +1559,7 @@ button:disabled {
 }
 
 .landing-section-title {
-  font-size: 32px;
+  font-size: 38.5px;
   font-weight: 600;
   color: var(--ink);
   text-align: center;
@@ -1610,20 +1588,20 @@ button:disabled {
 }
 
 .landing-feature-icon {
-  font-size: 40px;
+  font-size: 48px;
   display: block;
   margin-bottom: 16px;
 }
 
 .landing-feature-card h4 {
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 600;
   color: var(--ink);
   margin: 0 0 8px 0;
 }
 
 .landing-feature-card p {
-  font-size: 14px;
+  font-size: 17px;
   color: var(--ink-2);
   margin: 0;
   line-height: 1.5;
@@ -1648,7 +1626,7 @@ button:disabled {
 }
 
 .landing-download-group h4 {
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 600;
   color: var(--ink);
   margin: 0 0 16px 0;
@@ -1661,7 +1639,7 @@ button:disabled {
   color: var(--accent-ink);
   text-decoration: none;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 500;
   transition: background-color 0.15s;
 }
@@ -1671,7 +1649,7 @@ button:disabled {
 }
 
 .landing-download-note {
-  font-size: 12px;
+  font-size: 14.5px;
   color: var(--ink-3);
   margin: 8px 0 0 0;
 }
@@ -1690,7 +1668,7 @@ button:disabled {
   color: var(--ink-2);
   text-decoration: none;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 17px;
   cursor: not-allowed;
   opacity: 0.6;
 }
@@ -1713,7 +1691,7 @@ button:disabled {
 }
 
 .landing-footer-copyright {
-  font-size: 14px;
+  font-size: 17px;
   color: var(--ink-3);
   margin: 0;
 }
@@ -1739,12 +1717,12 @@ button:disabled {
 
 .privacy-header h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 600;
 }
 
 .privacy-updated {
-  font-size: 14px;
+  font-size: 17px;
   color: var(--ink-3);
   margin-bottom: 32px;
 }
@@ -1754,21 +1732,21 @@ button:disabled {
 }
 
 .privacy-content h2 {
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 600;
   color: var(--ink);
   margin: 0 0 16px 0;
 }
 
 .privacy-content h3 {
-  font-size: 16px;
+  font-size: 19px;
   font-weight: 600;
   color: var(--ink);
   margin: 16px 0 8px 0;
 }
 
 .privacy-content p {
-  font-size: 15px;
+  font-size: 18px;
   color: var(--ink-2);
   line-height: 1.6;
   margin: 0 0 12px 0;
@@ -1780,7 +1758,7 @@ button:disabled {
 }
 
 .privacy-content li {
-  font-size: 15px;
+  font-size: 18px;
   color: var(--ink-2);
   line-height: 1.6;
   margin-bottom: 4px;
@@ -1798,11 +1776,11 @@ button:disabled {
 /* Responsive Landing Page */
 @media (max-width: 600px) {
   .landing-hero-title {
-    font-size: 32px;
+    font-size: 38.5px;
   }
 
   .landing-hero-subtitle {
-    font-size: 16px;
+    font-size: 19px;
   }
 
   .landing-hero {
@@ -1822,7 +1800,7 @@ button:disabled {
   }
 
   .landing-section-title {
-    font-size: 24px;
+    font-size: 28px;
   }
 }
 
@@ -1840,14 +1818,14 @@ button:disabled {
 }
 
 .download-hero h2 {
-  font-size: 36px;
+  font-size: 43.5px;
   font-weight: 700;
   color: var(--ink);
   margin: 0 0 12px 0;
 }
 
 .download-subtitle {
-  font-size: 18px;
+  font-size: 22px;
   color: var(--ink-2);
   margin: 0 0 24px 0;
 }
@@ -1858,7 +1836,7 @@ button:disabled {
   background: var(--surface);
   border: 1px solid var(--rule);
   border-radius: 20px;
-  font-size: 14px;
+  font-size: 17px;
   color: var(--ink-2);
   margin-bottom: 32px;
 }
@@ -1878,7 +1856,7 @@ button:disabled {
 }
 
 .download-detected {
-  font-size: 16px;
+  font-size: 19px;
   color: var(--ink-2);
   margin: 0 0 16px 0;
 }
@@ -1890,7 +1868,7 @@ button:disabled {
   color: var(--accent-ink);
   text-decoration: none;
   border-radius: 10px;
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 600;
   transition: background-color 0.15s, transform 0.15s;
 }
@@ -1901,7 +1879,7 @@ button:disabled {
 }
 
 .download-file-info {
-  font-size: 13px;
+  font-size: 15.5px;
   color: var(--ink-3);
   margin: 12px 0 0 0;
 }
@@ -1912,7 +1890,7 @@ button:disabled {
 }
 
 .download-other-platforms h3 {
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 600;
   color: var(--ink);
   margin: 0 0 24px 0;
@@ -1953,17 +1931,17 @@ button:disabled {
 }
 
 .download-platform-icon {
-  font-size: 32px;
+  font-size: 38.5px;
 }
 
 .download-platform-name {
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 500;
   color: var(--ink);
 }
 
 .download-platform-size {
-  font-size: 12px;
+  font-size: 14.5px;
   color: var(--ink-3);
 }
 
@@ -1975,7 +1953,7 @@ button:disabled {
 .download-link {
   color: var(--accent);
   text-decoration: none;
-  font-size: 14px;
+  font-size: 17px;
 }
 
 .download-link:hover {
@@ -1994,26 +1972,26 @@ button:disabled {
 }
 
 .download-mobile h3 {
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 600;
   color: var(--ink);
   margin: 0 0 8px 0;
 }
 
 .download-mobile p {
-  font-size: 14px;
+  font-size: 17px;
   color: var(--ink-3);
   margin: 0 0 16px 0;
 }
 
 @media (max-width: 600px) {
   .download-hero h2 {
-    font-size: 28px;
+    font-size: 34px;
   }
 
   .download-primary-btn {
     padding: 14px 32px;
-    font-size: 16px;
+    font-size: 19px;
   }
 
   .download-platform-card {
@@ -2036,7 +2014,7 @@ button:disabled {
 }
 
 .appearance-label {
-  font-size: 13px;
+  font-size: 15.5px;
   font-weight: 600;
   color: var(--ink-2);
 }
@@ -2054,7 +2032,7 @@ button:disabled {
   background: transparent;
   border: none;
   padding: 6px 14px;
-  font-size: 13px;
+  font-size: 15.5px;
   color: var(--ink-3);
   border-radius: var(--radius);
   cursor: pointer;
@@ -2106,14 +2084,14 @@ button:disabled {
 
 .appearance-tile-heading {
   font-family: var(--font-display);
-  font-size: 16px;
+  font-size: 19px;
   font-weight: 600;
   color: var(--ink);
 }
 
 .appearance-tile-body {
   font-family: var(--font-body);
-  font-size: 12px;
+  font-size: 14.5px;
   color: var(--ink-2);
   line-height: 1.4;
 }
@@ -2142,7 +2120,7 @@ button:disabled {
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   color: var(--ink-2);
-  font-size: 16px;
+  font-size: 19px;
   line-height: 1;
   cursor: pointer;
   display: flex;
@@ -2169,7 +2147,7 @@ button:disabled {
 
 .appearance-slider-value {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 14.5px;
   color: var(--ink-2);
   min-width: 36px;
 }
@@ -2189,7 +2167,7 @@ button:disabled {
 .command-palette-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--overlay-soft);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -2210,7 +2188,7 @@ button:disabled {
 
 .command-palette-header {
   padding: 12px 16px;
-  font-size: 12px;
+  font-size: 14.5px;
   font-weight: 600;
   color: var(--ink-3);
   border-bottom: 1px solid var(--rule);
@@ -2234,7 +2212,7 @@ button:disabled {
   border-radius: var(--radius);
   cursor: pointer;
   color: var(--ink);
-  font-size: 14px;
+  font-size: 17px;
 }
 
 .command-palette-item.focus {
@@ -2249,7 +2227,7 @@ button:disabled {
 
 .command-palette-item-shortcut {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 13px;
   color: var(--ink-3);
 }
 
@@ -2279,12 +2257,12 @@ button:disabled {
   color: var(--ink-2);
 }
 
-.type-size-glyph.small { font-size: 10px; line-height: 1; }
-.type-size-glyph.large { font-size: 14px; line-height: 1; }
+.type-size-glyph.small { font-size: 12px; line-height: 1; }
+.type-size-glyph.large { font-size: 17px; line-height: 1; }
 
 .type-size-readout {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 13px;
   color: var(--ink-3);
   margin-left: 2px;
 }
@@ -2314,7 +2292,7 @@ button:disabled {
   border-radius: var(--radius);
   color: var(--ink-2);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 17px;
   line-height: 1;
   display: flex;
   align-items: center;

@@ -11,6 +11,17 @@ type ViewType = 'inbox' | 'archive' | 'trash' | string;
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
+// Pane sizing. The notes list used to stop at a flat 500px, which is stingy on
+// a wide display; it now runs to NOTES_LIST_MAX so long as the editor keeps at
+// least EDITOR_MIN.
+const NOTES_LIST_MAX = 900;
+const EDITOR_MIN = 480;
+
+function clampNotesListWidth(width: number, sidebar: number): number {
+  const cap = Math.min(NOTES_LIST_MAX, window.innerWidth - sidebar - EDITOR_MIN);
+  return Math.max(200, Math.min(cap, width));
+}
+
 function Home() {
   const { api } = useAuth();
   const [notes, setNotes] = useState<Note[]>([]);
@@ -30,7 +41,8 @@ function Home() {
   });
   const [notesListWidth, setNotesListWidth] = useState(() => {
     const saved = localStorage.getItem('flashpad-noteslist-width');
-    return saved ? parseInt(saved, 10) : 300;
+    const raw = saved ? parseInt(saved, 10) : 300;
+    return clampNotesListWidth(Number.isFinite(raw) ? raw : 300, sidebarWidth);
   });
   const [isResizing, setIsResizing] = useState<'sidebar' | 'noteslist' | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -54,6 +66,20 @@ function Home() {
     selectedViewRef.current = selectedView;
   }, [selectedView]);
 
+  // The list is flex-shrink: 0, so a width saved on a wide window would crush
+  // the editor after the window narrows. Re-clamp whenever the window changes.
+  useEffect(() => {
+    const onResize = () => {
+      setNotesListWidth(w => {
+        const next = clampNotesListWidth(w, sidebarWidth);
+        if (next !== w) localStorage.setItem('flashpad-noteslist-width', String(next));
+        return next;
+      });
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [sidebarWidth]);
+
   // Handle resize drag
   useEffect(() => {
     if (!isResizing) return;
@@ -64,7 +90,7 @@ function Home() {
         setSidebarWidth(newWidth);
         localStorage.setItem('flashpad-sidebar-width', String(newWidth));
       } else if (isResizing === 'noteslist') {
-        const newWidth = Math.max(200, Math.min(500, e.clientX - sidebarWidth - 4));
+        const newWidth = clampNotesListWidth(e.clientX - sidebarWidth - 4, sidebarWidth);
         setNotesListWidth(newWidth);
         localStorage.setItem('flashpad-noteslist-width', String(newWidth));
       }

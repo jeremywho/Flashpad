@@ -43,6 +43,17 @@
   --accent-ink:#ffffff;
   --sel:       oklch(0.92 0.06 85);
 
+  /* Status — semantic meaning, deliberately independent of the accent.
+     These stay constant across variants: danger must read as danger
+     whichever theme is on. */
+  --danger:        #C0393B;
+  --success:       #2E7D4F;
+  --warning:       #B26B00;
+  --warning-tint:  #F6EBD6;
+  --warning-line:  #E3C79A;
+  --overlay:       rgba(20, 22, 26, 0.42);
+  --overlay-soft:  rgba(20, 22, 26, 0.28);
+
   --shadow:    0 1px 0 rgba(40,35,20,0.04),
                0 10px 30px -12px rgba(40,35,20,0.12);
 
@@ -73,6 +84,14 @@
   --accent-ink:#0f0f0d;
   --sel:       oklch(0.32 0.06 85);
 
+  --danger:        #E5686B;
+  --success:       #5FBF88;
+  --warning:       #E0A458;
+  --warning-tint:  #2E2415;
+  --warning-line:  #4A3A1E;
+  --overlay:       rgba(0, 0, 0, 0.62);
+  --overlay-soft:  rgba(0, 0, 0, 0.45);
+
   --shadow:    0 1px 0 rgba(0,0,0,0.4),
                0 20px 40px -20px rgba(0,0,0,0.6);
 
@@ -89,6 +108,67 @@
    Each variant declares fonts + shape, then OPTIONALLY tints
    surfaces/ink under each theme.
    ============================================================ */
+
+/* Reading defaults. Plain :root loses to every :root[data-variant]
+   rule below, so a variant only declares these to disagree. */
+:root {
+  /* Editor column width — the line length, not the pane. In ch so the
+     measure holds its character count as the editor font size changes;
+     a px value would silently shorten the line at 22px. */
+  --measure: 86ch;
+  --leading: 1.7;
+}
+
+/* ---- LEDGER ---- humanist sans, bone ground, one ink blue ----
+   Default variant. Typography carries the product, so body and UI are
+   the same face and the only colour on the canvas is the accent.
+   Dark ramp generated in OKLCH: ground L 0.195 C 0.005 H 250, ink L 0.96. */
+:root[data-variant="ledger"] {
+  --font-ui:      "Mulish", ui-sans-serif, system-ui, sans-serif;
+  --font-body:    "Mulish", ui-sans-serif, system-ui, sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, monospace;
+  --font-display: "Mulish", ui-sans-serif, system-ui, sans-serif;
+  --radius:       8px;
+  --density:      1;
+  --measure:      92ch;
+  --leading:      1.72;
+}
+:root[data-variant="ledger"][data-theme="light"] {
+  --bg:        #F7F7F5;
+  --bg-2:      #EFEFEE;
+  --bg-3:      #E3E5E8;
+  --surface:   #FFFFFF;
+
+  --ink:       #16181C;
+  --ink-2:     #3F444C;
+  --ink-3:     #767C86;
+  --ink-4:     #A6ABB3;
+
+  --rule:      #E2E3E6;
+  --rule-2:    #C8CAD0;
+
+  --accent:    #1E4D7B;
+  --accent-ink:#FFFFFF;
+  --sel:       #DCE7F2;
+}
+:root[data-variant="ledger"][data-theme="dark"] {
+  --bg:        #131517;
+  --bg-2:      #181A1C;
+  --bg-3:      #1F2123;
+  --surface:   #151719;
+
+  --ink:       #F0F2F4;
+  --ink-2:     #BEBFC1;
+  --ink-3:     #8C8E8F;
+  --ink-4:     #636566;
+
+  --rule:      #1B1D1F;
+  --rule-2:    #242629;
+
+  --accent:    #76B6F7;
+  --accent-ink:#0B1017;
+  --sel:       #092137;
+}
 
 /* ---- PAPER ---- warm, editorial, serif body ----------------- */
 :root[data-variant="paper"] {

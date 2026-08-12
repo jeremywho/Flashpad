@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { useAppearance } from '../theme/AppearanceProvider';
+import { useAppearance, MIN_FONT, MAX_FONT, DEFAULT_FONT } from '../theme/AppearanceProvider';
 
-const MIN = 13;
-const MAX = 22;
-const DEFAULT_SIZE = 16;
+const MIN = MIN_FONT;
+const MAX = MAX_FONT;
+const DEFAULT_SIZE = DEFAULT_FONT;
 
 export function FontSizeControl() {
   const { appearance, setAppearance } = useAppearance();
