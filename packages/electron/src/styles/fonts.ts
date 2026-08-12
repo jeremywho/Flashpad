@@ -1,6 +1,14 @@
 // Self-hosted @font-face rules for every family referenced in themes.css.
 // Imported for side effects so Vite bundles the woff2 files into the app.
 
+// Mulish — Ledger UI + body. Stands in for Avenir Next, which is a macOS
+// system font and cannot ship on Windows, Linux or the web.
+import '@fontsource/mulish/400.css';
+import '@fontsource/mulish/500.css';
+import '@fontsource/mulish/600.css';
+import '@fontsource/mulish/700.css';
+import '@fontsource/mulish/400-italic.css';
+
 // Inter Tight — Paper UI
 import '@fontsource/inter-tight/400.css';
 import '@fontsource/inter-tight/500.css';

@@ -9,14 +9,18 @@ interface Combo {
 }
 
 const ALL_COMBOS: Combo[] = [
-  { variant: 'paper',    theme: 'light', digit: '1', label: 'Paper · Light' },
-  { variant: 'paper',    theme: 'dark',  digit: '2', label: 'Paper · Dark' },
-  { variant: 'terminal', theme: 'light', digit: '3', label: 'Terminal · Light' },
-  { variant: 'terminal', theme: 'dark',  digit: '4', label: 'Terminal · Dark' },
-  { variant: 'atelier',  theme: 'light', digit: '5', label: 'Atelier · Light' },
-  { variant: 'atelier',  theme: 'dark',  digit: '6', label: 'Atelier · Dark' },
-  { variant: 'index',    theme: 'light', digit: '7', label: 'Index Card · Light' },
-  { variant: 'index',    theme: 'dark',  digit: '8', label: 'Index Card · Dark' },
+  { variant: 'ledger',   theme: 'light', digit: '1', label: 'Ledger · Light' },
+  { variant: 'ledger',   theme: 'dark',  digit: '2', label: 'Ledger · Dark' },
+  { variant: 'paper',    theme: 'light', digit: '3', label: 'Paper · Light' },
+  { variant: 'paper',    theme: 'dark',  digit: '4', label: 'Paper · Dark' },
+  { variant: 'terminal', theme: 'light', digit: '5', label: 'Terminal · Light' },
+  { variant: 'terminal', theme: 'dark',  digit: '6', label: 'Terminal · Dark' },
+  { variant: 'atelier',  theme: 'light', digit: '7', label: 'Atelier · Light' },
+  { variant: 'atelier',  theme: 'dark',  digit: '8', label: 'Atelier · Dark' },
+  // Five variants make ten combinations but there are only eight digits.
+  // Index Card keeps its palette entry and loses only the numeric shortcut.
+  { variant: 'index',    theme: 'light', digit: '',  label: 'Index Card · Light' },
+  { variant: 'index',    theme: 'dark',  digit: '',  label: 'Index Card · Dark' },
 ];
 const COMBOS: Combo[] = ALL_COMBOS.filter(c => ENABLED_VARIANTS.includes(c.variant));
 
@@ -90,7 +94,7 @@ export function CommandPalette() {
             return (
               <li
                 id={`combo-${i}`}
-                key={combo.digit}
+                key={`${combo.variant}-${combo.theme}`}
                 role="option"
                 aria-selected={isFocus}
                 className={`command-palette-item${isFocus ? ' focus' : ''}${isCurrent ? ' active' : ''}`}
@@ -101,7 +105,7 @@ export function CommandPalette() {
                 onMouseEnter={() => setFocusIndex(i)}
               >
                 <span className="command-palette-item-label">{combo.label}</span>
-                <span className="command-palette-item-shortcut">{modLabel}{combo.digit}</span>
+                <span className="command-palette-item-shortcut">{combo.digit ? `${modLabel}${combo.digit}` : ''}</span>
               </li>
             );
           })}
