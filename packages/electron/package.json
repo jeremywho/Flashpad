@@ -119,6 +119,7 @@
       ]
     },
     "linux": {
+      "executableName": "flashpad",
       "icon": "resources/icon.png",
       "target": [
         "AppImage",
