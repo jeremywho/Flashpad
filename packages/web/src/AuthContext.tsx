@@ -6,6 +6,7 @@ interface AuthContextType {
   user: User | null;
   api: ApiClient;
   isAuthenticated: boolean;
+  hasAccessToken: boolean;
   isLoading: boolean;
   login: (accessToken: string, refreshToken: string, user: User) => void;
   logout: () => void;
@@ -40,6 +41,7 @@ function withCrossTabRefreshLock(work: () => Promise<void>): Promise<void> {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasAccessToken, setHasAccessToken] = useState(false);
   const refresherRef = useRef<SessionRefresher | null>(null);
 
   const clearLocalSession = useCallback(() => {
@@ -49,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     api.logout();
     SignalRManager.clear();
     setUser(null);
+    setHasAccessToken(false);
   }, []);
 
   const getRefresher = useCallback(() => {
@@ -64,6 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, response.refreshToken);
           localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(response.user));
           setUser(response.user);
+          setHasAccessToken(true);
         }),
         onRejected: clearLocalSession,
       });
@@ -124,12 +128,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData));
     api.setToken(accessToken);
     setUser(userData);
+    setHasAccessToken(true);
     getRefresher().start();
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, api, isAuthenticated: !!user, isLoading, login, logout }}
+      value={{ user, api, isAuthenticated: !!user, hasAccessToken, isLoading, login, logout }}
     >
       {children}
     </AuthContext.Provider>

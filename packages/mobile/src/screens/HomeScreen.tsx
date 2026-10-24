@@ -150,7 +150,7 @@ function SwipeableNoteItem({ children, onSwipeLeft, enabled, actionText }: Swipe
 }
 
 function HomeScreen({ navigation }: HomeScreenProps) {
-  const { api, logout } = useAuth();
+  const { api, hasAccessToken, logout } = useAuth();
   const [notes, setNotes] = useState<Note[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedTab, setSelectedTab] = useState<TabType>('inbox');
@@ -361,7 +361,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
   // SignalR real-time sync - uses singleton to survive React re-renders
   useEffect(() => {
     const token = api.getToken();
-    if (!token || !deviceId) return;
+    if (!hasAccessToken || !token || !deviceId) return;
 
     const signalRUrl = getApiUrl();
 
@@ -452,7 +452,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
       appStateSubscription.remove();
       // Don't stop - singleton persists. Connection stopped via SignalRManager.clear() on logout
     };
-  }, [api, deviceId, fetchCategories]);
+  }, [api, hasAccessToken, deviceId, fetchCategories]);
 
   const onRefresh = () => {
     setRefreshing(true);

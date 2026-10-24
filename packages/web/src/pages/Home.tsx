@@ -23,7 +23,7 @@ function clampNotesListWidth(width: number, sidebar: number): number {
 }
 
 function Home() {
-  const { api } = useAuth();
+  const { api, hasAccessToken } = useAuth();
   const [notes, setNotes] = useState<Note[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedView, setSelectedView] = useState<ViewType>('inbox');
@@ -203,7 +203,7 @@ function Home() {
   // SignalR real-time sync - uses singleton to survive React re-renders
   useEffect(() => {
     const token = api.getToken();
-    if (!token) return;
+    if (!hasAccessToken || !token) return;
 
     // Helper to check if note should show in current view (uses ref for current selectedView)
     const shouldShowInView = (note: Note): boolean => {
@@ -282,7 +282,7 @@ function Home() {
 
     // Don't stop on cleanup - singleton persists across re-renders
     // Connection is only stopped via SignalRManager.clear() on logout
-  }, [api, fetchCategories, fetchInboxCount]);
+  }, [api, hasAccessToken, fetchCategories, fetchInboxCount]);
 
   // Helper to check if a note should show in current view
   const shouldShowNoteInCurrentView = (note: Note): boolean => {

@@ -17,6 +17,7 @@ interface AuthContextType {
   user: User | null;
   api: ApiClient;
   isLoading: boolean;
+  hasAccessToken: boolean;
   login: (accessToken: string, refreshToken: string, user: User) => Promise<void>;
   logout: () => Promise<void>;
   switchEnvironment: (environment: ApiEnvironment) => Promise<void>;
@@ -27,6 +28,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasAccessToken, setHasAccessToken] = useState(false);
   const refreshTokenRef = useRef<string | null>(null);
   const refresherRef = useRef<SessionRefresher | null>(null);
 
@@ -41,6 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     api.logout();
     await SignalRManager.clear();
     setUser(null);
+    setHasAccessToken(false);
   }, [api]);
 
   const resetAuthState = useCallback(async () => {
@@ -74,6 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await storeRefreshToken(response.refreshToken);
           await storeCachedUser(response.user);
           setUser(response.user);
+          setHasAccessToken(true);
         },
         onRejected: () => {
           void resetAuthState();
@@ -138,12 +142,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await storeCachedUser(userData);
     api.setToken(accessToken);
     setUser(userData);
+    setHasAccessToken(true);
     getRefresher().start();
   }, [api, getRefresher]);
 
   const contextValue = useMemo(
-    () => ({ user, api, isLoading, login, logout, switchEnvironment }),
-    [user, api, isLoading, login, logout, switchEnvironment]
+    () => ({ user, api, isLoading, hasAccessToken, login, logout, switchEnvironment }),
+    [user, api, isLoading, hasAccessToken, login, logout, switchEnvironment]
   );
 
   return (

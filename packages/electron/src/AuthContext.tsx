@@ -6,6 +6,7 @@ interface AuthContextType {
   user: User | null;
   api: ApiClient;
   isLoading: boolean;
+  hasAccessToken: boolean;
   login: (accessToken: string, refreshToken: string, user: User) => void;
   logout: () => void;
   refreshSession: () => Promise<boolean>;
@@ -35,6 +36,7 @@ async function persistRefreshToken(refreshToken: string): Promise<void> {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasAccessToken, setHasAccessToken] = useState(false);
   const refreshTokenRef = useRef<string | null>(null);
   const refresherRef = useRef<SessionRefresher | null>(null);
 
@@ -47,6 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void window.electron.auth.clearRefreshToken().catch(() => undefined);
     SignalRManager.clear();
     setUser(null);
+    setHasAccessToken(false);
   }, []);
 
   const getRefresher = useCallback(() => {
@@ -63,6 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await persistRefreshToken(response.refreshToken);
           localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(response.user));
           setUser(response.user);
+          setHasAccessToken(true);
           void window.electron.auth.setSessionActive(true);
         },
         onRejected: clearLocalSession,
@@ -143,6 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData));
     void window.electron.auth.setSessionActive(true);
     setUser(userData);
+    setHasAccessToken(true);
     getRefresher().start();
   }, [getRefresher]);
 
@@ -150,8 +155,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // internal state changing) produces a new object and cascades re-renders through
   // every consumer that destructures useAuth(), breaking downstream React.memo.
   const contextValue = useMemo(
-    () => ({ user, api, isLoading, login, logout, refreshSession }),
-    [user, isLoading, login, logout, refreshSession]
+    () => ({ user, api, isLoading, hasAccessToken, login, logout, refreshSession }),
+    [user, isLoading, hasAccessToken, login, logout, refreshSession]
   );
 
   return (
