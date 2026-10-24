@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { OnePasswordFillResult } from '../src/services/onePasswordItems';
 
 export interface AppSettings {
   minimizeToTray: boolean;
@@ -61,6 +62,11 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke('auth:clear-refresh-token'),
     isEncryptionAvailable: (): Promise<boolean> =>
       ipcRenderer.invoke('auth:is-encryption-available'),
+  },
+  onePassword: {
+    isAvailable: (): Promise<boolean> => ipcRenderer.invoke('one-password:is-available'),
+    fill: (appHost: string, itemId?: string): Promise<OnePasswordFillResult> =>
+      ipcRenderer.invoke('one-password:fill', appHost, itemId),
   },
   quickCapture: {
     close: (): Promise<void> => ipcRenderer.invoke('close-quick-capture'),

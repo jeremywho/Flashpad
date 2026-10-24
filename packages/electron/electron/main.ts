@@ -8,6 +8,7 @@ import * as fsSync from 'fs';
 import { settingsStore, AppSettings } from './settings';
 import { checkForUpdates as requestUpdateCheck } from '../src/services/updater-listeners';
 import { getStoredRefreshToken, storeRefreshToken, clearStoredRefreshToken, isEncryptionAvailable } from './authStore';
+import { fillFromOnePassword, isOnePasswordAvailable } from './onePassword';
 
 let mainWindow: BrowserWindow | null = null;
 let quickCaptureWindow: BrowserWindow | null = null;
@@ -715,6 +716,24 @@ ipcMain.handle('auth:clear-refresh-token', async () => {
 
 ipcMain.handle('auth:is-encryption-available', () => {
   return isEncryptionAvailable();
+});
+
+ipcMain.handle('one-password:is-available', (event) => {
+  if (event.sender.id !== mainWindow?.webContents.id) return false;
+  return isOnePasswordAvailable();
+});
+
+ipcMain.handle('one-password:fill', (event, appHost: unknown, itemId: unknown) => {
+  if (event.sender.id !== mainWindow?.webContents.id) {
+    return { status: 'error', message: 'Not available in this window.' };
+  }
+  if (typeof appHost !== 'string' || !/^[a-z0-9.-]+$/i.test(appHost)) {
+    return { status: 'error', message: 'Invalid app host.' };
+  }
+  if (itemId !== undefined && typeof itemId !== 'string') {
+    return { status: 'error', message: 'Invalid 1Password item.' };
+  }
+  return fillFromOnePassword(appHost, itemId);
 });
 
 ipcMain.handle('note-created-from-quick-capture', () => {

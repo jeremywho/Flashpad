@@ -1,3 +1,5 @@
+import type { OnePasswordFillResult } from '../services/onePasswordItems';
+
 export interface AppSettings {
   minimizeToTray: boolean;
   startMinimized: boolean;
@@ -72,6 +74,10 @@ export interface ElectronAPI {
     setRefreshToken: (token: string) => Promise<void>;
     clearRefreshToken: () => Promise<void>;
     isEncryptionAvailable: () => Promise<boolean>;
+  };
+  onePassword: {
+    isAvailable: () => Promise<boolean>;
+    fill: (appHost: string, itemId?: string) => Promise<OnePasswordFillResult>;
   };
   quickCapture: {
     close: () => Promise<void>;

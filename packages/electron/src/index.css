@@ -2097,3 +2097,45 @@ h1, h2, h3 {
   width: 120px;
   accent-color: var(--accent);
 }
+
+.input-with-action {
+  position: relative;
+}
+
+.input-with-action input {
+  padding-right: 44px;
+}
+
+.input-action {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.input-action:hover:not(:disabled),
+.input-action:focus-visible {
+  color: var(--accent);
+}
+
+.input-action:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.one-password-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
