@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using System.Text.Json;
 
 namespace Backend.Tests;
 
@@ -93,6 +94,27 @@ public class NotePinningTests
         Assert.Equal(Edited, Assert.Single(pinned).PinnedAt);
         Assert.Equal(unpinnedId, Assert.Single(unpinned).Id);
         Assert.Equal(2, all.Count);
+    }
+
+    [Fact]
+    public async Task NotesReadFromTheDatabaseSerializeAsUtc()
+    {
+        await using var context = await CreateContextAsync();
+        var controller = CreateController(context, new RecordingNotesHubService());
+        var noteId = await SeedNoteAsync(context, userId: 1, pinnedAt: Edited);
+
+        var single = Assert.IsType<NoteResponseDto>(Assert.IsType<OkObjectResult>((await controller.GetNote(noteId)).Result).Value);
+        var listed = Assert.Single(await ListAsync(controller, pinned: true));
+
+        foreach (var note in new[] { single, listed })
+        {
+            Assert.Equal(DateTimeKind.Utc, note.UpdatedAt.Kind);
+            Assert.Equal(DateTimeKind.Utc, note.CreatedAt.Kind);
+            Assert.Equal(DateTimeKind.Utc, note.PinnedAt!.Value.Kind);
+            var json = JsonSerializer.Serialize(note, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            Assert.Contains("\"updatedAt\":\"2026-10-01T12:00:00Z\"", json);
+            Assert.Contains("\"pinnedAt\":\"2026-10-01T12:00:00Z\"", json);
+        }
     }
 
     private static async Task<List<NoteResponseDto>> ListAsync(NotesController controller, bool? pinned)

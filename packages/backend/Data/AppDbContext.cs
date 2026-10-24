@@ -76,5 +76,24 @@ public class AppDbContext : DbContext
                 .HasForeignKey(h => h.NoteId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
+
+        ApplyUtcDateTimeConverters(modelBuilder);
+    }
+
+    private static void ApplyUtcDateTimeConverters(ModelBuilder modelBuilder)
+    {
+        var utc = new UtcDateTimeConverter();
+        var nullableUtc = new NullableUtcDateTimeConverter();
+        foreach (var property in modelBuilder.Model.GetEntityTypes().SelectMany(entity => entity.GetProperties()))
+        {
+            if (property.ClrType == typeof(DateTime))
+            {
+                property.SetValueConverter(utc);
+            }
+            else if (property.ClrType == typeof(DateTime?))
+            {
+                property.SetValueConverter(nullableUtc);
+            }
+        }
     }
 }
