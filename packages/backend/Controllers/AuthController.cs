@@ -94,8 +94,9 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<ActionResult<AuthResponseDto>> Login(LoginDto dto)
     {
-        var usernameNormalized = dto.Username.ToLowerInvariant();
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == usernameNormalized);
+        var loginName = dto.Username.Trim().ToLowerInvariant();
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == loginName)
+            ?? await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == loginName);
 
         if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
         {

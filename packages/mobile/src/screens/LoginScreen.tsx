@@ -132,7 +132,7 @@ function LoginScreen({ navigation }: any) {
           <Text style={styles.title}>Login</Text>
 
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Username</Text>
+            <Text style={styles.label}>Username or email</Text>
             <TextInput
               style={styles.input}
               value={username}
