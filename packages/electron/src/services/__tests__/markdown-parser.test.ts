@@ -5,6 +5,7 @@ import {
   normalizeNoteId,
   parseNoteFile,
   resolvePathWithinBaseDir,
+  serializeNote,
 } from '../markdown-parser';
 import { NoteStatus } from '@shared/index';
 import path from 'path';
@@ -63,5 +64,32 @@ describe('parseNoteFile', () => {
     ].join('\n');
 
     expect(parseNoteFile(content)).toBeNull();
+  });
+});
+
+describe('pinnedAt in note frontmatter', () => {
+  const baseMetadata = {
+    id: 'note-1',
+    categoryId: null,
+    status: NoteStatus.Inbox,
+    version: 2,
+    deviceId: 'desk',
+    createdAt: '2026-10-01T00:00:00.000Z',
+    updatedAt: '2026-10-02T00:00:00.000Z',
+    isLocal: false,
+    serverId: 'note-1',
+  };
+
+  it('round-trips a pinned note', () => {
+    const file = serializeNote({ ...baseMetadata, pinnedAt: '2026-10-03T04:05:06.000Z' }, 'Pinned body');
+    const parsed = parseNoteFile(file);
+    expect(parsed?.metadata.pinnedAt).toBe('2026-10-03T04:05:06.000Z');
+    expect(parsed?.content).toBe('Pinned body');
+  });
+
+  it('leaves unpinned files unchanged and reads them back as unpinned', () => {
+    const file = serializeNote({ ...baseMetadata, pinnedAt: null }, 'Body');
+    expect(file).not.toContain('pinnedAt');
+    expect(parseNoteFile(file)?.metadata.pinnedAt).toBeNull();
   });
 });

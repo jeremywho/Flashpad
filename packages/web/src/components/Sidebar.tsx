@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Category } from '@shared/types';
-import { Inbox, Archive, Trash2, Settings, User } from 'lucide-react';
+import { Category, Note } from '@shared/types';
+import { getNoteCardText } from '@shared/index';
+import { Inbox, Archive, Trash2, Settings, User, Pin, PinOff } from 'lucide-react';
 
 interface SidebarProps {
   categories: Category[];
@@ -10,6 +11,10 @@ interface SidebarProps {
   onManageCategories: () => void;
   onNewNoteInCategory?: (categoryId: string) => void;
   inboxCount: number;
+  pinnedNotes: Note[];
+  selectedNoteId: string | null;
+  onOpenPinnedNote: (note: Note) => void;
+  onUnpinNote: (note: Note) => void;
   archiveCount: number;
   trashCount: number;
   style?: React.CSSProperties;
@@ -31,6 +36,10 @@ export default function Sidebar({
   onManageCategories,
   onNewNoteInCategory,
   inboxCount,
+  pinnedNotes,
+  selectedNoteId,
+  onOpenPinnedNote,
+  onUnpinNote,
   archiveCount,
   trashCount,
   style,
@@ -54,8 +63,30 @@ export default function Sidebar({
     }
   }, [contextMenu.visible]);
 
+  const [pinnedMenu, setPinnedMenu] = useState<{ visible: boolean; x: number; y: number; note: Note | null }>({
+    visible: false,
+    x: 0,
+    y: 0,
+    note: null,
+  });
+
+  useEffect(() => {
+    const handleClick = () => setPinnedMenu((prev) => ({ ...prev, visible: false }));
+    if (pinnedMenu.visible) {
+      document.addEventListener('click', handleClick);
+      return () => document.removeEventListener('click', handleClick);
+    }
+  }, [pinnedMenu.visible]);
+
+  const handlePinnedContextMenu = (e: React.MouseEvent, note: Note) => {
+    e.preventDefault();
+    setContextMenu((prev) => ({ ...prev, visible: false }));
+    setPinnedMenu({ visible: true, x: e.clientX, y: e.clientY, note });
+  };
+
   const handleCategoryContextMenu = (e: React.MouseEvent, category: Category) => {
     e.preventDefault();
+    setPinnedMenu((prev) => ({ ...prev, visible: false }));
     setContextMenu({
       visible: true,
       x: e.clientX,
@@ -107,6 +138,23 @@ export default function Sidebar({
             {trashCount > 0 && <span className="sidebar-count">{trashCount}</span>}
           </button>
         </div>
+        {pinnedNotes.length > 0 && (
+          <div className="sidebar-section">
+            <div className="sidebar-section-header">Pinned</div>
+            {pinnedNotes.map((note) => (
+              <button
+                key={note.id}
+                className={`sidebar-item ${selectedNoteId === note.id ? 'active' : ''}`}
+                onClick={() => onOpenPinnedNote(note)}
+                onContextMenu={(e) => handlePinnedContextMenu(e, note)}
+                title={getNoteCardText(note.content).title}
+              >
+                <span className="sidebar-icon"><Pin size={15} strokeWidth={1.75} /></span>
+                <span className="sidebar-label sidebar-pinned-label">{getNoteCardText(note.content).title}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="sidebar-section">
           <div className="sidebar-section-header">Categories</div>
@@ -158,6 +206,25 @@ export default function Sidebar({
           );
         })()}
       </div>
+
+      {pinnedMenu.visible && pinnedMenu.note && (
+        <div
+          className="sidebar-context-menu"
+          style={{ top: pinnedMenu.y, left: pinnedMenu.x }}
+        >
+          <button
+            className="sidebar-context-menu-item"
+            onClick={() => {
+              const note = pinnedMenu.note;
+              setPinnedMenu((prev) => ({ ...prev, visible: false }));
+              if (note) onUnpinNote(note);
+            }}
+          >
+            <span className="sidebar-context-menu-icon"><PinOff size={14} strokeWidth={1.75} /></span>
+            <span>Unpin</span>
+          </button>
+        </div>
+      )}
 
       {contextMenu.visible && (
         <div

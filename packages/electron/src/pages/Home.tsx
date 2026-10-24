@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '../AuthContext';
-import { Note, Category, NoteStatus, CreateCategoryDto, SignalRClient, SignalRManager, ConnectionState, DevicePresence, h4, CardMenuActionId } from '@shared/index';
+import { Note, Category, NoteStatus, CreateCategoryDto, SignalRClient, SignalRManager, ConnectionState, DevicePresence, h4, CardMenuActionId, getPinnedNotes, getNoteHomeView } from '@shared/index';
 import Sidebar from '../components/Sidebar';
 import NotesList from '../components/NotesList';
 import NoteEditor from '../components/NoteEditor';
@@ -9,7 +9,7 @@ import CategoryManager from '../components/CategoryManager';
 import { useToast } from '../components/Toast';
 import { SyncManager, SyncStatus } from '../services/syncManager';
 import { startFileWatcher, stopFileWatcher } from '../services/file-watcher';
-import { saveLocalNote, deleteLocalNote, saveLocalCategory, deleteLocalCategory } from '../services/database';
+import { saveLocalNote, deleteLocalNote, saveLocalCategory, deleteLocalCategory, getLocalNote } from '../services/database';
 
 type ViewType = 'inbox' | 'archive' | 'trash' | string;
 
@@ -38,6 +38,7 @@ function Home() {
   const [isSaving, setIsSaving] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [inboxCount, setInboxCount] = useState(0);
+  const [pinnedNotes, setPinnedNotes] = useState<Note[]>([]);
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [pendingCount, setPendingCount] = useState(0);
@@ -210,7 +211,7 @@ function Home() {
         h4.debug('Data refresh triggered by sync queue completion');
         fetchNotes();
         fetchCategories();
-        fetchInboxCount();
+        refreshSidebar();
       },
       onAuthError: refreshSession,
       onConflict: (noteId, serverVersion) => {
@@ -236,7 +237,7 @@ function Home() {
     syncManager.initialSync().then(() => {
       fetchNotes();
       fetchCategories();
-      fetchInboxCount();
+      refreshSidebar();
     });
 
     return () => {
@@ -301,14 +302,15 @@ function Home() {
     }
   }, []);
 
-  const fetchInboxCount = useCallback(async () => {
+  const refreshSidebar = useCallback(async () => {
     if (!syncManagerRef.current) return;
 
     try {
       const count = await syncManagerRef.current.getInboxCount();
       setInboxCount(count);
+      setPinnedNotes(getPinnedNotes(await syncManagerRef.current.getNotes({})));
     } catch (error) {
-      console.error('Failed to fetch inbox count:', error);
+      console.error('Failed to refresh sidebar:', error);
     }
   }, []);
 
@@ -321,15 +323,15 @@ function Home() {
   useEffect(() => {
     if (syncManagerRef.current) {
       fetchCategories();
-      fetchInboxCount();
+      refreshSidebar();
     }
-  }, [fetchCategories, fetchInboxCount]);
+  }, [fetchCategories, refreshSidebar]);
 
   useEffect(() => {
     const handleRefresh = () => {
       fetchNotes();
       fetchCategories();
-      fetchInboxCount();
+      refreshSidebar();
       syncManagerRef.current?.processSyncQueue();
     };
 
@@ -337,14 +339,14 @@ function Home() {
     return () => {
       window.electron.removeRefreshNotesListener();
     };
-  }, [fetchNotes, fetchCategories, fetchInboxCount]);
+  }, [fetchNotes, fetchCategories, refreshSidebar]);
 
   // Initialize file watcher for external file changes
   useEffect(() => {
     const handleFileChange = (event: 'noteUpdated' | 'noteDeleted', noteId: string) => {
       // Refresh notes when files change externally
       fetchNotes();
-      fetchInboxCount();
+      refreshSidebar();
       fetchCategories();
 
       // Sync any newly queued notes to the server
@@ -373,7 +375,7 @@ function Home() {
         console.error('Failed to stop file watcher:', err);
       });
     };
-  }, [fetchNotes, fetchInboxCount, fetchCategories]);
+  }, [fetchNotes, refreshSidebar, fetchCategories]);
 
   // SignalR real-time sync - uses singleton to survive React re-renders
   useEffect(() => {
@@ -433,12 +435,16 @@ function Home() {
             return [note, ...prev];
           });
         }
-        fetchInboxCount();
+        refreshSidebar();
         fetchCategories();
       },
       onNoteUpdated: async (note) => {
         await saveLocalNote(note, false);
         setNotes((prev) => {
+          const existing = prev.find((n) => n.id === note.id);
+          if (existing && existing.updatedAt === note.updatedAt && shouldShowInView(note)) {
+            return prev.map((n) => (n.id === note.id ? note : n));
+          }
           const filtered = prev.filter((n) => n.id !== note.id);
           if (shouldShowInView(note)) {
             return [note, ...filtered];
@@ -446,19 +452,20 @@ function Home() {
           return filtered;
         });
         setSelectedNote((prev) => (prev?.id === note.id ? note : prev));
+        refreshSidebar();
         fetchCategories();
       },
       onNoteDeleted: async (noteId) => {
         await deleteLocalNote(noteId);
         setNotes((prev) => prev.filter((n) => n.id !== noteId));
         setSelectedNote((prev) => (prev?.id === noteId ? null : prev));
-        fetchInboxCount();
+        refreshSidebar();
       },
       onNoteStatusChanged: async (note) => {
         await saveLocalNote(note, false);
         setNotes((prev) => prev.filter((n) => n.id !== note.id));
         setSelectedNote((prev) => (prev?.id === note.id ? null : prev));
-        fetchInboxCount();
+        refreshSidebar();
         fetchCategories();
       },
       onCategoryCreated: async (category) => {
@@ -479,7 +486,7 @@ function Home() {
         syncManagerRef.current?.initialSync().then(() => {
           fetchNotes();
           fetchCategories();
-          fetchInboxCount();
+          refreshSidebar();
         });
       },
     });
@@ -489,7 +496,7 @@ function Home() {
 
     // Don't stop on cleanup - singleton persists across re-renders
     // Connection is only stopped via SignalRManager.removeInstance() on logout
-  }, [api, hasAccessToken, refreshSession, fetchCategories, fetchInboxCount]);
+  }, [api, hasAccessToken, refreshSession, fetchCategories, refreshSidebar]);
 
   // Helper to check if a note should show in current view.
   // Reads from selectedViewRef so callers wrapped in useCallback don't need to
@@ -586,7 +593,7 @@ function Home() {
           });
           setSelectedNote(newNote);
           setIsNewNote(false);
-          fetchInboxCount();
+          refreshSidebar();
           fetchCategories();
         } finally {
           creatingNoteRef.current = false;
@@ -613,7 +620,7 @@ function Home() {
         } else {
           setSelectedNote(updatedNote);
         }
-        fetchInboxCount();
+        refreshSidebar();
         fetchCategories();
       }
     } catch (error) {
@@ -622,7 +629,7 @@ function Home() {
     } finally {
       setIsSaving(false);
     }
-  }, [fetchInboxCount, fetchCategories, shouldShowNoteInCurrentView, toast]);
+  }, [refreshSidebar, fetchCategories, shouldShowNoteInCurrentView, toast]);
 
   const runNoteAction = useCallback(async (action: CardMenuActionId, note: Note) => {
     if (!syncManagerRef.current) return;
@@ -630,19 +637,41 @@ function Home() {
       return;
     }
     try {
-      if (action === 'archive') {
-        await syncManagerRef.current.archiveNote(note.id);
-      } else if (action === 'restore') {
-        await syncManagerRef.current.restoreNote(note.id);
-      } else if (action === 'trash') {
-        await syncManagerRef.current.trashNote(note.id);
-      } else {
-        await syncManagerRef.current.deleteNotePermanently(note.id);
+      switch (action) {
+        case 'pin':
+        case 'unpin': {
+          await syncManagerRef.current.setNotePinned(note.id, action === 'pin');
+          const updated = await getLocalNote(note.id);
+          if (updated) {
+            setNotes((prev) => prev.map((n) => (n.id === updated.id ? updated : n)));
+            setSelectedNote((prev) => (prev?.id === updated.id ? updated : prev));
+          }
+          refreshSidebar();
+          toast.success(action === 'pin' ? 'Pinned to sidebar' : 'Unpinned');
+          return;
+        }
+        case 'archive':
+          await syncManagerRef.current.archiveNote(note.id);
+          break;
+        case 'restore':
+          await syncManagerRef.current.restoreNote(note.id);
+          break;
+        case 'trash':
+          await syncManagerRef.current.trashNote(note.id);
+          break;
+        case 'delete':
+          await syncManagerRef.current.deleteNotePermanently(note.id);
+          break;
+        default: {
+          const unhandled: never = action;
+          throw new Error(`Unhandled note action: ${String(unhandled)}`);
+        }
       }
       setNotes((prev) => prev.filter((n) => n.id !== note.id));
       setSelectedNote((prev) => (prev?.id === note.id ? null : prev));
+      refreshSidebar();
       if (action !== 'delete') fetchCategories();
-      const messages: Record<CardMenuActionId, string> = {
+      const messages: Record<'archive' | 'restore' | 'trash' | 'delete', string> = {
         archive: 'Note archived',
         restore: 'Note restored',
         trash: 'Note moved to trash',
@@ -653,7 +682,22 @@ function Home() {
       console.error(`Failed to ${action} note:`, error);
       toast.error(`Failed to ${action} note`);
     }
-  }, [fetchCategories, toast]);
+  }, [fetchCategories, refreshSidebar, toast]);
+
+  const handleOpenPinnedNote = useCallback((note: Note) => {
+    const view = getNoteHomeView(note);
+    if (view !== selectedViewRef.current) {
+      selectedViewRef.current = view;
+      setSelectedView(view);
+      setIsLoading(true);
+    }
+    setSelectedNote(note);
+    setIsNewNote(false);
+  }, []);
+
+  const handleUnpinNote = useCallback((note: Note) => {
+    runNoteAction('unpin', note);
+  }, [runNoteAction]);
 
   const handleCopyNotePath = useCallback(async (note: Note) => {
     try {
@@ -746,6 +790,10 @@ function Home() {
             onManageCategories={handleOpenCategoryManager}
             onNewNoteInCategory={handleNewNoteInCategory}
             inboxCount={inboxCount}
+            pinnedNotes={pinnedNotes}
+            selectedNoteId={selectedNote?.id ?? null}
+            onOpenPinnedNote={handleOpenPinnedNote}
+            onUnpinNote={handleUnpinNote}
             archiveCount={0}
             trashCount={0}
             style={sidebarStyle}

@@ -10,6 +10,7 @@ export interface NoteMetadata {
   updatedAt: string;
   isLocal: boolean;
   serverId: string | null;
+  pinnedAt: string | null;
 }
 
 export interface ParsedNote {
@@ -189,6 +190,7 @@ export function parseNoteFile(fileContent: string): ParsedNote | null {
       updatedAt: String(data.updatedAt || new Date().toISOString()),
       isLocal: data.isLocal === true,
       serverId: data.serverId !== null ? String(data.serverId) : null,
+      pinnedAt: typeof data.pinnedAt === 'string' && data.pinnedAt ? data.pinnedAt : null,
     };
 
     return { metadata, content };
@@ -215,6 +217,9 @@ export function serializeNote(
     isLocal: metadata.isLocal,
     serverId: metadata.serverId,
   };
+  if (metadata.pinnedAt) {
+    yamlData.pinnedAt = metadata.pinnedAt;
+  }
 
   const yaml = serializeYaml(yamlData);
 
@@ -243,6 +248,7 @@ export function createDefaultMetadata(): NoteMetadata {
     updatedAt: now,
     isLocal: true,
     serverId: null,
+    pinnedAt: null,
   };
 }
 

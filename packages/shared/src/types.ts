@@ -61,6 +61,7 @@ export interface Note {
   deviceId?: string;
   createdAt: string;
   updatedAt: string;
+  pinnedAt?: string | null;
 }
 
 export interface CreateNoteDto {
@@ -130,6 +131,7 @@ export interface NotesQueryParams {
   status?: NoteStatus;
   categoryId?: string;
   search?: string;
+  pinned?: boolean;
   page?: number;
   pageSize?: number;
 }

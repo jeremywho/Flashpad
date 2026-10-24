@@ -160,6 +160,7 @@ export class ApiClient {
     if (params?.status !== undefined) searchParams.set('status', String(params.status));
     if (params?.categoryId) searchParams.set('categoryId', params.categoryId);
     if (params?.search) searchParams.set('search', params.search);
+    if (params?.pinned !== undefined) searchParams.set('pinned', String(params.pinned));
     if (params?.page) searchParams.set('page', String(params.page));
     if (params?.pageSize) searchParams.set('pageSize', String(params.pageSize));
 
@@ -188,6 +189,13 @@ export class ApiClient {
   async archiveNote(id: string, deviceId?: string): Promise<Note> {
     const query = deviceId ? `?deviceId=${encodeURIComponent(deviceId)}` : '';
     return this.request<Note>(`/api/notes/${id}/archive${query}`, {
+      method: 'POST',
+    });
+  }
+
+  async setNotePinned(id: string, pinned: boolean, deviceId?: string): Promise<Note> {
+    const query = deviceId ? `?deviceId=${encodeURIComponent(deviceId)}` : '';
+    return this.request<Note>(`/api/notes/${id}/${pinned ? 'pin' : 'unpin'}${query}`, {
       method: 'POST',
     });
   }

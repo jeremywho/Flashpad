@@ -1,4 +1,4 @@
-export type CardMenuActionId = 'archive' | 'restore' | 'trash' | 'delete';
+export type CardMenuActionId = 'pin' | 'unpin' | 'archive' | 'restore' | 'trash' | 'delete';
 
 export interface CardMenuAction {
   id: CardMenuActionId;
@@ -12,13 +12,7 @@ export interface CardMenuAction {
  * Context menu items for a note card, by the current view.
  * `view` is 'inbox' | 'archive' | 'trash' | a category id (treated like inbox).
  */
-export function getCardMenuActions(view: string): CardMenuAction[] {
-  if (view === 'archive') {
-    return [
-      { id: 'restore', label: 'Restore to Inbox' },
-      { id: 'trash', label: 'Move to Trash' },
-    ];
-  }
+export function getCardMenuActions(view: string, options: { pinned?: boolean } = {}): CardMenuAction[] {
   if (view === 'trash') {
     return [
       { id: 'restore', label: 'Restore to Inbox' },
@@ -30,7 +24,20 @@ export function getCardMenuActions(view: string): CardMenuAction[] {
       },
     ];
   }
+
+  const pinAction: CardMenuAction = options.pinned
+    ? { id: 'unpin', label: 'Unpin from sidebar' }
+    : { id: 'pin', label: 'Pin to sidebar' };
+
+  if (view === 'archive') {
+    return [
+      pinAction,
+      { id: 'restore', label: 'Restore to Inbox' },
+      { id: 'trash', label: 'Move to Trash' },
+    ];
+  }
   return [
+    pinAction,
     { id: 'archive', label: 'Archive' },
     { id: 'trash', label: 'Move to Trash' },
   ];

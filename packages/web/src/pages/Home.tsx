@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../AuthContext';
-import { Note, Category, NoteStatus, CreateCategoryDto, SignalRClient, SignalRManager, ConnectionState, HttpError, CardMenuActionId } from '@shared/index';
+import { Note, Category, NoteStatus, CreateCategoryDto, SignalRClient, SignalRManager, ConnectionState, HttpError, CardMenuActionId, getPinnedNotes, getNoteHomeView } from '@shared/index';
 import Sidebar from '../components/Sidebar';
 import NotesList from '../components/NotesList';
 import NoteEditor from '../components/NoteEditor';
@@ -33,6 +33,7 @@ function Home() {
   const [isSaving, setIsSaving] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [inboxCount, setInboxCount] = useState(0);
+  const [pinnedNotes, setPinnedNotes] = useState<Note[]>([]);
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -182,12 +183,16 @@ function Home() {
     }
   }, [api]);
 
-  const fetchInboxCount = useCallback(async () => {
+  const refreshSidebar = useCallback(async () => {
     try {
-      const response = await api.getNotes({ status: NoteStatus.Inbox, pageSize: 1 });
-      setInboxCount(response.totalCount);
+      const [inbox, pinned] = await Promise.all([
+        api.getNotes({ status: NoteStatus.Inbox, pageSize: 1 }),
+        api.getNotes({ pinned: true, pageSize: 100 }),
+      ]);
+      setInboxCount(inbox.totalCount);
+      setPinnedNotes(getPinnedNotes(pinned.notes));
     } catch (error) {
-      console.error('Failed to fetch inbox count:', error);
+      console.error('Failed to refresh sidebar:', error);
     }
   }, [api]);
 
@@ -197,8 +202,8 @@ function Home() {
 
   useEffect(() => {
     fetchCategories();
-    fetchInboxCount();
-  }, [fetchCategories, fetchInboxCount]);
+    refreshSidebar();
+  }, [fetchCategories, refreshSidebar]);
 
   // SignalR real-time sync - uses singleton to survive React re-renders
   useEffect(() => {
@@ -238,12 +243,16 @@ function Home() {
             return [note, ...prev];
           });
         }
-        fetchInboxCount();
+        refreshSidebar();
         fetchCategories();
       },
       onNoteUpdated: (note) => {
         // Move updated note to top if it belongs in current view, remove if not
         setNotes((prev) => {
+          const existing = prev.find((n) => n.id === note.id);
+          if (existing && existing.updatedAt === note.updatedAt && shouldShowInView(note)) {
+            return prev.map((n) => (n.id === note.id ? note : n));
+          }
           const filtered = prev.filter((n) => n.id !== note.id);
           if (shouldShowInView(note)) {
             return [note, ...filtered];
@@ -251,18 +260,19 @@ function Home() {
           return filtered;
         });
         setSelectedNote((prev) => (prev?.id === note.id ? note : prev));
+        refreshSidebar();
         fetchCategories();
       },
       onNoteDeleted: (noteId) => {
         setNotes((prev) => prev.filter((n) => n.id !== noteId));
         setSelectedNote((prev) => (prev?.id === noteId ? null : prev));
-        fetchInboxCount();
+        refreshSidebar();
       },
       onNoteStatusChanged: (note) => {
         // Remove from current view if status changed
         setNotes((prev) => prev.filter((n) => n.id !== note.id));
         setSelectedNote((prev) => (prev?.id === note.id ? null : prev));
-        fetchInboxCount();
+        refreshSidebar();
         fetchCategories();
       },
       onCategoryCreated: (category) => {
@@ -282,7 +292,7 @@ function Home() {
 
     // Don't stop on cleanup - singleton persists across re-renders
     // Connection is only stopped via SignalRManager.clear() on logout
-  }, [api, hasAccessToken, fetchCategories, fetchInboxCount]);
+  }, [api, hasAccessToken, fetchCategories, refreshSidebar]);
 
   // Helper to check if a note should show in current view
   const shouldShowNoteInCurrentView = (note: Note): boolean => {
@@ -354,7 +364,7 @@ function Home() {
         setSelectedNote(newNote);
         setIsNewNote(false);
         setConflictMessage(null);
-        fetchInboxCount();
+        refreshSidebar();
         fetchCategories();
       } else if (selectedNote) {
         const updatedNote = await api.updateNote(selectedNote.id, {
@@ -378,7 +388,7 @@ function Home() {
           setSelectedNote(updatedNote);
         }
         setConflictMessage(null);
-        fetchInboxCount();
+        refreshSidebar();
         fetchCategories();
       }
     } catch (error) {
@@ -396,7 +406,7 @@ function Home() {
           setConflictMessage('This note changed on another device. Latest version loaded.');
           setEditorResetToken((current) => current + 1);
           showToast('Note changed on another device. Refreshed to the latest version.');
-          fetchInboxCount();
+          refreshSidebar();
           fetchCategories();
           return;
         } catch (refreshError) {
@@ -418,22 +428,51 @@ function Home() {
     }
     try {
       const deviceId = getOrCreateWebDeviceId();
-      if (action === 'archive') {
-        await api.archiveNote(note.id, deviceId);
-      } else if (action === 'restore') {
-        await api.restoreNote(note.id, deviceId);
-      } else if (action === 'trash') {
-        await api.trashNote(note.id, deviceId);
-      } else {
-        await api.deleteNotePermanently(note.id, deviceId);
+      switch (action) {
+        case 'pin':
+        case 'unpin': {
+          const updated = await api.setNotePinned(note.id, action === 'pin', deviceId);
+          setNotes((prev) => prev.map((n) => (n.id === updated.id ? updated : n)));
+          setSelectedNote((prev) => (prev?.id === updated.id ? updated : prev));
+          refreshSidebar();
+          return;
+        }
+        case 'archive':
+          await api.archiveNote(note.id, deviceId);
+          break;
+        case 'restore':
+          await api.restoreNote(note.id, deviceId);
+          break;
+        case 'trash':
+          await api.trashNote(note.id, deviceId);
+          break;
+        case 'delete':
+          await api.deleteNotePermanently(note.id, deviceId);
+          break;
+        default: {
+          const unhandled: never = action;
+          throw new Error(`Unhandled note action: ${String(unhandled)}`);
+        }
       }
       setNotes((prev) => prev.filter((n) => n.id !== note.id));
       setSelectedNote((prev) => (prev?.id === note.id ? null : prev));
       setConflictMessage(null);
+      refreshSidebar();
       if (action !== 'delete') fetchCategories();
     } catch (error) {
       console.error(`Failed to ${action} note:`, error);
     }
+  };
+
+  const handleOpenPinnedNote = (note: Note) => {
+    const view = getNoteHomeView(note);
+    if (view !== selectedView) {
+      selectedViewRef.current = view;
+      setSelectedView(view);
+      setIsLoading(true);
+    }
+    setSelectedNote(note);
+    setIsNewNote(false);
   };
 
   const handleArchive = () => { if (selectedNote) runNoteAction('archive', selectedNote); };
@@ -471,6 +510,10 @@ function Home() {
             onManageCategories={() => setShowCategoryManager(true)}
             onNewNoteInCategory={handleNewNoteInCategory}
             inboxCount={inboxCount}
+            pinnedNotes={pinnedNotes}
+            selectedNoteId={selectedNote?.id ?? null}
+            onOpenPinnedNote={handleOpenPinnedNote}
+            onUnpinNote={(note) => runNoteAction('unpin', note)}
             archiveCount={0}
             trashCount={0}
             style={{ width: sidebarWidth }}

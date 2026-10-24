@@ -262,6 +262,10 @@ export class SyncManager {
                     serverNote = await this.api.getNote(serverNote.id);
                   }
 
+                  if (localNote?.pinnedAt) {
+                    serverNote = await this.api.setNotePinned(serverNote.id, true, finalDeviceId);
+                  }
+
                   // Update local note with server ID
                   if (localNote) {
                     await deleteLocalNote(item.entityId);
@@ -335,6 +339,10 @@ export class SyncManager {
 
               case SyncOperation.Move:
                 await this.api.moveNote(item.entityId, payload);
+                break;
+
+              case SyncOperation.Pin:
+                await this.api.setNotePinned(item.entityId, (payload as { pinned?: boolean }).pinned === true);
                 break;
             }
 
@@ -593,6 +601,41 @@ export class SyncManager {
         baseVersion: null,
       });
       await this.updatePendingCount();
+    }
+  }
+
+  async setNotePinned(id: string, pinned: boolean): Promise<void> {
+    const note = await getLocalNote(id);
+    if (note) {
+      note.pinnedAt = pinned ? (note.pinnedAt || new Date().toISOString()) : null;
+      await saveLocalNote(note, id.startsWith('local_'));
+    }
+    h4.info(pinned ? 'Note pinned locally' : 'Note unpinned locally', { noteId: id, online: this.isOnline });
+
+    if (id.startsWith('local_')) return;
+
+    const queuePin = async () => {
+      await addToSyncQueue({
+        entityType: 'note',
+        entityId: id,
+        operation: SyncOperation.Pin,
+        payload: JSON.stringify({ pinned }),
+        baseVersion: null,
+      });
+      await this.updatePendingCount();
+    };
+
+    if (!this.isOnline) {
+      await queuePin();
+      return;
+    }
+
+    try {
+      await this.api.setNotePinned(id, pinned, this.deviceId);
+    } catch (error) {
+      h4.error('Note pin failed on server, queued', { noteId: id, pinned, error: (error as Error).message });
+      await queuePin();
+      if (this.isAuthError(error)) this.handleAuthError();
     }
   }
 

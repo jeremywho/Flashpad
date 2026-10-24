@@ -2314,3 +2314,11 @@ button:disabled {
   width: 120px;
   accent-color: var(--accent);
 }
+
+.sidebar-pinned-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}

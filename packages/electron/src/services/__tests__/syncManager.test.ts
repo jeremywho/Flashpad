@@ -46,6 +46,7 @@ function createMockApi(overrides: Record<string, jest.Mock> = {}) {
     deleteCategory: jest.fn(),
     getToken: jest.fn().mockReturnValue('test-token'),
     setToken: jest.fn(),
+    setNotePinned: jest.fn(),
     ...overrides,
   };
 }
@@ -702,5 +703,89 @@ describe('expired access token during sync', () => {
 
     expect(mockApi.createNote).toHaveBeenCalledTimes(2);
     expect(store.notes.has('server-uuid-401')).toBe(true);
+  });
+});
+
+describe('pinning notes', () => {
+  function setOnline(online: boolean) {
+    Object.defineProperty(globalThis.navigator, 'onLine', { value: online, writable: true, configurable: true });
+  }
+
+  afterEach(() => setOnline(true));
+
+  function seedServerNote(id: string, pinnedAt?: string) {
+    store.notes.set(id, buildNoteFile({ id, content: 'Pin me', isLocal: false, serverId: id, pinnedAt }));
+  }
+
+  it('pins locally and on the server when online, without queueing', async () => {
+    seedServerNote('server-pin-1');
+    const mockApi = createMockApi({ setNotePinned: jest.fn().mockResolvedValue({}) });
+    const sm = new SyncManager({ api: mockApi as never, deviceId: 'test-device' });
+    await sm.initialSync();
+
+    await sm.setNotePinned('server-pin-1', true);
+
+    expect(mockApi.setNotePinned).toHaveBeenCalledWith('server-pin-1', true, 'test-device');
+    expect(store.notes.get('server-pin-1')).toMatch(/pinnedAt: /);
+    expect(((store.json.get('sync-queue.json') as { items?: unknown[] } | undefined)?.items ?? [])).toHaveLength(0);
+  });
+
+  it('queues the pin while offline and sends it when the queue drains', async () => {
+    seedServerNote('server-pin-2');
+    setOnline(false);
+    const mockApi = createMockApi({ setNotePinned: jest.fn().mockResolvedValue({}) });
+    const sm = new SyncManager({ api: mockApi as never, deviceId: 'test-device' });
+
+    await sm.setNotePinned('server-pin-2', true);
+
+    expect(mockApi.setNotePinned).not.toHaveBeenCalled();
+    const queued = (store.json.get('sync-queue.json') as { items: Array<{ operation: string; payload: string }> }).items;
+    expect(queued.map((item) => [item.operation, JSON.parse(item.payload)])).toEqual([['PIN', { pinned: true }]]);
+
+    setOnline(true);
+    const reconnected = new SyncManager({ api: mockApi as never, deviceId: 'test-device' });
+    await reconnected.processSyncQueue();
+
+    expect(mockApi.setNotePinned).toHaveBeenCalledWith('server-pin-2', true);
+  });
+
+  it('unpinning clears pinnedAt from the note file', async () => {
+    seedServerNote('server-pin-3', '2026-10-03T00:00:00.000Z');
+    const mockApi = createMockApi({ setNotePinned: jest.fn().mockResolvedValue({}) });
+    const sm = new SyncManager({ api: mockApi as never, deviceId: 'test-device' });
+    await sm.initialSync();
+
+    await sm.setNotePinned('server-pin-3', false);
+
+    expect(mockApi.setNotePinned).toHaveBeenCalledWith('server-pin-3', false, 'test-device');
+    expect(store.notes.get('server-pin-3')).not.toMatch(/pinnedAt/);
+  });
+
+  it('pins a not-yet-synced note on the server right after creating it', async () => {
+    store.notes.set('local_pin_abc', buildNoteFile({ id: 'local_pin_abc', content: 'Fresh', isLocal: true, serverId: null }));
+    const serverNote: Note = {
+      id: 'server-uuid-pin',
+      content: 'Fresh',
+      status: NoteStatus.Inbox,
+      version: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    const pinnedServerNote: Note = { ...serverNote, pinnedAt: '2026-10-04T00:00:00.000Z' };
+    const mockApi = createMockApi({
+      createNote: jest.fn().mockResolvedValue(serverNote),
+      setNotePinned: jest.fn().mockResolvedValue(pinnedServerNote),
+    });
+    const sm = new SyncManager({ api: mockApi as never, deviceId: 'test-device' });
+
+    await sm.setNotePinned('local_pin_abc', true);
+    expect(mockApi.setNotePinned).not.toHaveBeenCalled();
+
+    await sm.initialSync();
+    await sm.processSyncQueue();
+
+    expect(mockApi.createNote).toHaveBeenCalledTimes(1);
+    expect(mockApi.setNotePinned).toHaveBeenCalledWith('server-uuid-pin', true, undefined);
+    expect(store.notes.get('server-uuid-pin')).toMatch(/pinnedAt: /);
   });
 });

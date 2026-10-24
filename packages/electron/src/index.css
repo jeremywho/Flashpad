@@ -2139,3 +2139,11 @@ h1, h2, h3 {
   gap: 8px;
   margin-bottom: 16px;
 }
+
+.sidebar-pinned-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}

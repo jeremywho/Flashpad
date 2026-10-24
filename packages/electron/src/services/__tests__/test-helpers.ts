@@ -125,6 +125,7 @@ export function buildNoteFile(opts: {
   serverId?: string | null;
   createdAt?: string;
   updatedAt?: string;
+  pinnedAt?: string;
 }): string {
   const now = new Date().toISOString();
   const lines = [
@@ -138,6 +139,7 @@ export function buildNoteFile(opts: {
     `updatedAt: "${opts.updatedAt ?? now}"`,
     `isLocal: ${opts.isLocal ?? true}`,
     `serverId: ${opts.serverId ? `"${opts.serverId}"` : 'null'}`,
+    ...(opts.pinnedAt ? [`pinnedAt: "${opts.pinnedAt}"`] : []),
     '---',
     opts.content,
   ];

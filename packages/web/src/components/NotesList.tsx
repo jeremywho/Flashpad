@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Note } from '@shared/types';
-import { getCardMenuActions, getNoteCardText, CardMenuActionId } from '@shared/index';
-import { Archive, RotateCcw, Trash2 } from 'lucide-react';
+import { getCardMenuActions, getNoteCardText, CardMenuActionId, isNotePinned } from '@shared/index';
+import { Archive, RotateCcw, Trash2, Pin, PinOff } from 'lucide-react';
 
 const ACTION_ICONS: Record<CardMenuActionId, typeof Archive> = {
+  pin: Pin,
+  unpin: PinOff,
   archive: Archive,
   restore: RotateCcw,
   trash: Trash2,
@@ -168,7 +170,7 @@ export default function NotesList({
           className="notes-list-context-menu"
           style={{ top: contextMenu.y, left: contextMenu.x }}
         >
-          {getCardMenuActions(currentView ?? 'inbox').map((action) => {
+          {getCardMenuActions(currentView ?? 'inbox', { pinned: isNotePinned(contextMenu.note) }).map((action) => {
             const Icon = ACTION_ICONS[action.id];
             return (
               <button

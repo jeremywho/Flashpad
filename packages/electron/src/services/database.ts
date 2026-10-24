@@ -36,6 +36,7 @@ export interface LocalNote {
   updatedAt: string;
   isLocal: boolean;
   serverId: string | null;
+  pinnedAt: string | null;
 }
 
 export interface LocalCategory {
@@ -58,6 +59,7 @@ export enum SyncOperation {
   Restore = 'RESTORE',
   Trash = 'TRASH',
   Move = 'MOVE',
+  Pin = 'PIN',
 }
 
 export interface SyncQueueItem {
@@ -299,6 +301,7 @@ async function loadNotesFromFiles(): Promise<void> {
           updatedAt: parsed.metadata.updatedAt,
           isLocal: parsed.metadata.isLocal,
           serverId: parsed.metadata.serverId,
+          pinnedAt: parsed.metadata.pinnedAt,
         };
         notesCache.set(note.id, note);
 
@@ -398,6 +401,7 @@ async function writeNoteFile(note: LocalNote): Promise<void> {
     updatedAt: note.updatedAt,
     isLocal: note.isLocal,
     serverId: note.serverId,
+    pinnedAt: note.pinnedAt,
   };
 
   const fileContent = serializeNote(metadata, note.content);
@@ -469,6 +473,7 @@ export async function saveLocalNote(note: Note, isLocal = false): Promise<void> 
     updatedAt: note.updatedAt,
     isLocal: isLocal,
     serverId: isLocal ? null : note.id,
+    pinnedAt: resolvePinnedAt(note, existing),
   };
 
   notesCache.set(note.id, localNote);
@@ -529,6 +534,7 @@ export async function bulkSaveNotes(notes: Note[]): Promise<void> {
           deviceId: note.deviceId || '',
           updatedAt: note.updatedAt,
           serverId: note.id,
+          pinnedAt: resolvePinnedAt(note, existing),
         };
         notesCache.set(note.id, localNote);
         await writeNoteFile(localNote);
@@ -545,6 +551,7 @@ export async function bulkSaveNotes(notes: Note[]): Promise<void> {
         updatedAt: note.updatedAt,
         isLocal: false,
         serverId: note.id,
+        pinnedAt: note.pinnedAt ?? null,
       };
       notesCache.set(note.id, localNote);
       await writeNoteFile(localNote);
@@ -770,7 +777,15 @@ function localNoteToNote(localNote: LocalNote): Note {
     deviceId: localNote.deviceId || undefined,
     createdAt: localNote.createdAt,
     updatedAt: localNote.updatedAt,
+    pinnedAt: localNote.pinnedAt,
   };
+}
+
+// A Note without a pinnedAt key (an older server, or a caller that never read it)
+// keeps the existing pin; only an explicit null unpins.
+function resolvePinnedAt(note: Note, existing: LocalNote | undefined): string | null {
+  if (note.pinnedAt === undefined) return existing?.pinnedAt ?? null;
+  return note.pinnedAt || null;
 }
 
 function localCategoryToCategory(localCategory: LocalCategory): Category {
@@ -820,6 +835,7 @@ export async function reloadNoteFromFile(id: string): Promise<Note | null> {
     updatedAt: parsed.metadata.updatedAt,
     isLocal: parsed.metadata.isLocal,
     serverId: parsed.metadata.serverId,
+    pinnedAt: parsed.metadata.pinnedAt,
   };
 
   const existing = notesCache.get(note.id);
@@ -895,6 +911,7 @@ async function ingestPlainMarkdown(originalFileId: string, content: string): Pro
     updatedAt: metadata.updatedAt,
     isLocal: true,
     serverId: null,
+    pinnedAt: null,
   };
 
   // Write new file with frontmatter under the generated ID

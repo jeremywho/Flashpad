@@ -73,6 +73,7 @@ export async function migrateFromLocalStorage(): Promise<{
         updatedAt: note.updatedAt,
         isLocal: note.isLocal,
         serverId: note.serverId,
+        pinnedAt: note.pinnedAt,
       };
       const fileContent = serializeNote(metadata, note.content);
       await window.electron.fs.writeNote(note.id, fileContent);
@@ -142,6 +143,7 @@ function extractNotes(db: InstanceType<Awaited<ReturnType<typeof initSqlJs>>['Da
         updatedAt: obj.updated_at as string,
         isLocal: obj.is_local === 1,
         serverId: obj.server_id as string | null,
+        pinnedAt: null,
       });
     }
   } catch {
