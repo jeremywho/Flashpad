@@ -43,6 +43,7 @@ public class NotesController : ControllerBase
         [FromQuery] NoteStatus? status = null,
         [FromQuery] Guid? categoryId = null,
         [FromQuery] string? search = null,
+        [FromQuery] bool? pinned = null,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50)
     {
@@ -93,6 +94,13 @@ public class NotesController : ControllerBase
             query = query.Where(n => n.Content.ToLower().Contains(search.ToLower()));
         }
 
+        if (pinned.HasValue)
+        {
+            query = pinned.Value
+                ? query.Where(n => n.PinnedAt != null)
+                : query.Where(n => n.PinnedAt == null);
+        }
+
         var totalCount = await query.CountAsync();
 
         var notes = await query
@@ -110,7 +118,8 @@ public class NotesController : ControllerBase
                 Version = n.Version,
                 DeviceId = n.DeviceId,
                 CreatedAt = n.CreatedAt,
-                UpdatedAt = n.UpdatedAt
+                UpdatedAt = n.UpdatedAt,
+                PinnedAt = n.PinnedAt
             })
             .ToListAsync();
 
@@ -152,19 +161,7 @@ public class NotesController : ControllerBase
 
         _h4.Debug("Note fetched", new { userId, noteId = id, version = note.Version });
 
-        return Ok(new NoteResponseDto
-        {
-            Id = note.Id,
-            Content = note.Content,
-            CategoryId = note.CategoryId,
-            CategoryName = note.Category?.Name,
-            CategoryColor = note.Category?.Color,
-            Status = note.Status,
-            Version = note.Version,
-            DeviceId = note.DeviceId,
-            CreatedAt = note.CreatedAt,
-            UpdatedAt = note.UpdatedAt
-        });
+        return Ok(ToResponseDto(note));
     }
 
     [HttpPost]
@@ -199,19 +196,7 @@ public class NotesController : ControllerBase
 
         await _context.Entry(note).Reference(n => n.Category).LoadAsync();
 
-        var response = new NoteResponseDto
-        {
-            Id = note.Id,
-            Content = note.Content,
-            CategoryId = note.CategoryId,
-            CategoryName = note.Category?.Name,
-            CategoryColor = note.Category?.Color,
-            Status = note.Status,
-            Version = note.Version,
-            DeviceId = note.DeviceId,
-            CreatedAt = note.CreatedAt,
-            UpdatedAt = note.UpdatedAt
-        };
+        var response = ToResponseDto(note);
 
         _h4.Info("Note created", new { userId, noteId = note.Id, version = note.Version, categoryId = note.CategoryId });
         await _hubService.NotifyNoteCreated(userId, response, dto.DeviceId);
@@ -280,19 +265,7 @@ public class NotesController : ControllerBase
 
         await _context.Entry(note).Reference(n => n.Category).LoadAsync();
 
-        var response = new NoteResponseDto
-        {
-            Id = note.Id,
-            Content = note.Content,
-            CategoryId = note.CategoryId,
-            CategoryName = note.Category?.Name,
-            CategoryColor = note.Category?.Color,
-            Status = note.Status,
-            Version = note.Version,
-            DeviceId = note.DeviceId,
-            CreatedAt = note.CreatedAt,
-            UpdatedAt = note.UpdatedAt
-        };
+        var response = ToResponseDto(note);
 
         _h4.Info("Note updated", new { userId, noteId = note.Id, version = note.Version, categoryId = note.CategoryId });
         await _hubService.NotifyNoteUpdated(userId, response, dto.DeviceId);
@@ -319,22 +292,56 @@ public class NotesController : ControllerBase
 
         await _context.SaveChangesAsync();
 
-        var response = new NoteResponseDto
-        {
-            Id = note.Id,
-            Content = note.Content,
-            CategoryId = note.CategoryId,
-            CategoryName = note.Category?.Name,
-            CategoryColor = note.Category?.Color,
-            Status = note.Status,
-            Version = note.Version,
-            DeviceId = note.DeviceId,
-            CreatedAt = note.CreatedAt,
-            UpdatedAt = note.UpdatedAt
-        };
+        var response = ToResponseDto(note);
 
         _h4.Info("Note archived", new { userId, noteId = note.Id });
         await _hubService.NotifyNoteStatusChanged(userId, response, deviceId);
+
+        return Ok(response);
+    }
+
+    [HttpPost("{id}/pin")]
+    public Task<ActionResult<NoteResponseDto>> PinNote(Guid id, [FromQuery] string? deviceId = null)
+    {
+        return SetPinnedAsync(id, pinned: true, deviceId);
+    }
+
+    [HttpPost("{id}/unpin")]
+    public Task<ActionResult<NoteResponseDto>> UnpinNote(Guid id, [FromQuery] string? deviceId = null)
+    {
+        return SetPinnedAsync(id, pinned: false, deviceId);
+    }
+
+    // Pinning is metadata: it must not bump Version (content edits conflict-check on it)
+    // or UpdatedAt (lists sort by it, so pinning would reorder the inbox).
+    private async Task<ActionResult<NoteResponseDto>> SetPinnedAsync(Guid id, bool pinned, string? deviceId)
+    {
+        var userId = GetCurrentUserId();
+
+        var note = await _context.Notes
+            .Include(n => n.Category)
+            .FirstOrDefaultAsync(n => n.Id == id && n.UserId == userId && !n.IsDeleted);
+
+        if (note == null)
+        {
+            return NotFound(new { message = "Note not found" });
+        }
+
+        if (pinned && note.PinnedAt == null)
+        {
+            note.PinnedAt = DateTime.UtcNow;
+        }
+        else if (!pinned)
+        {
+            note.PinnedAt = null;
+        }
+
+        await _context.SaveChangesAsync();
+
+        var response = ToResponseDto(note);
+
+        _h4.Info(pinned ? "Note pinned" : "Note unpinned", new { userId, noteId = note.Id });
+        await _hubService.NotifyNoteUpdated(userId, response, deviceId);
 
         return Ok(response);
     }
@@ -360,19 +367,7 @@ public class NotesController : ControllerBase
 
         await _context.SaveChangesAsync();
 
-        var response = new NoteResponseDto
-        {
-            Id = note.Id,
-            Content = note.Content,
-            CategoryId = note.CategoryId,
-            CategoryName = note.Category?.Name,
-            CategoryColor = note.Category?.Color,
-            Status = note.Status,
-            Version = note.Version,
-            DeviceId = note.DeviceId,
-            CreatedAt = note.CreatedAt,
-            UpdatedAt = note.UpdatedAt
-        };
+        var response = ToResponseDto(note);
 
         _h4.Info("Note restored", new { userId, noteId = note.Id });
         await _hubService.NotifyNoteStatusChanged(userId, response, deviceId);
@@ -482,19 +477,7 @@ public class NotesController : ControllerBase
 
         await _context.Entry(note).Reference(n => n.Category).LoadAsync();
 
-        var response = new NoteResponseDto
-        {
-            Id = note.Id,
-            Content = note.Content,
-            CategoryId = note.CategoryId,
-            CategoryName = note.Category?.Name,
-            CategoryColor = note.Category?.Color,
-            Status = note.Status,
-            Version = note.Version,
-            DeviceId = note.DeviceId,
-            CreatedAt = note.CreatedAt,
-            UpdatedAt = note.UpdatedAt
-        };
+        var response = ToResponseDto(note);
 
         _h4.Info("Note moved", new { userId, noteId = note.Id, fromCategoryId = previousCategoryId, toCategoryId = dto.CategoryId });
         await _hubService.NotifyNoteUpdated(userId, response, note.DeviceId);
@@ -530,5 +513,23 @@ public class NotesController : ControllerBase
             .ToListAsync();
 
         return Ok(history);
+    }
+
+    private static NoteResponseDto ToResponseDto(Note note)
+    {
+        return new NoteResponseDto
+        {
+            Id = note.Id,
+            Content = note.Content,
+            CategoryId = note.CategoryId,
+            CategoryName = note.Category?.Name,
+            CategoryColor = note.Category?.Color,
+            Status = note.Status,
+            Version = note.Version,
+            DeviceId = note.DeviceId,
+            CreatedAt = note.CreatedAt,
+            UpdatedAt = note.UpdatedAt,
+            PinnedAt = note.PinnedAt
+        };
     }
 }

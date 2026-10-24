@@ -15,7 +15,7 @@ namespace Flashpad.Data.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.5");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.13");
 
             modelBuilder.Entity("Backend.Models.Category", b =>
                 {
@@ -84,6 +84,9 @@ namespace Flashpad.Data.Migrations
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("PinnedAt")
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Status")
                         .HasColumnType("INTEGER");

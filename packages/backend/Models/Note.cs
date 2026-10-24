@@ -46,5 +46,7 @@ public class Note
 
     public DateTime? DeletedAt { get; set; }
 
+    public DateTime? PinnedAt { get; set; }
+
     public ICollection<NoteHistory> History { get; set; } = new List<NoteHistory>();
 }

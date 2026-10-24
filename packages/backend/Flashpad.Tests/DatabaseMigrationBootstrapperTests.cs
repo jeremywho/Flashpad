@@ -1,6 +1,8 @@
 using Backend.Data;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Data.Sqlite;
 
 namespace Backend.Tests;
@@ -13,7 +15,9 @@ public class DatabaseMigrationBootstrapperTests
         var dbPath = CreateTempDbPath();
         await using (var seedContext = CreateContext(dbPath))
         {
-            await seedContext.Database.EnsureCreatedAsync();
+            var initialCreate = seedContext.Database.GetMigrations().First();
+            await seedContext.GetService<IMigrator>().MigrateAsync(initialCreate);
+            await seedContext.Database.ExecuteSqlRawAsync("""DROP TABLE "__EFMigrationsHistory";""");
             await seedContext.Database.ExecuteSqlRawAsync("""DROP TABLE "RefreshSessions";""");
         }
 
@@ -22,7 +26,8 @@ public class DatabaseMigrationBootstrapperTests
 
         var tables = await GetTableNamesAsync(context);
         Assert.Contains("RefreshSessions", tables);
-        Assert.Contains(context.Database.GetAppliedMigrations(), migration => migration.Contains("InitialCreate"));
+        Assert.Equal(context.Database.GetMigrations(), context.Database.GetAppliedMigrations());
+        Assert.Contains("PinnedAt", await GetColumnNamesAsync(context, "Notes"));
     }
 
     [Fact]
@@ -48,6 +53,29 @@ public class DatabaseMigrationBootstrapperTests
             .Options;
 
         return new AppDbContext(options);
+    }
+
+    private static async Task<HashSet<string>> GetColumnNamesAsync(AppDbContext context, string table)
+    {
+        await context.Database.OpenConnectionAsync();
+        try
+        {
+            using var command = context.Database.GetDbConnection().CreateCommand();
+            command.CommandText = $"SELECT name FROM pragma_table_info('{table}');";
+
+            using var reader = await command.ExecuteReaderAsync();
+            var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            while (await reader.ReadAsync())
+            {
+                columns.Add(reader.GetString(0));
+            }
+
+            return columns;
+        }
+        finally
+        {
+            await context.Database.CloseConnectionAsync();
+        }
     }
 
     private static async Task<HashSet<string>> GetTableNamesAsync(AppDbContext context)

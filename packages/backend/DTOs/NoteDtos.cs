@@ -44,6 +44,7 @@ public class NoteResponseDto
     public string? DeviceId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public DateTime? PinnedAt { get; set; }
 }
 
 public class NoteListResponseDto
