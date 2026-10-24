@@ -59,7 +59,7 @@
     "@vitejs/plugin-react": "^5.1.2",
     "concurrently": "^9.1.2",
     "electron": "40.6.1",
-    "electron-builder": "^26.0.12",
+    "electron-builder": "^26.18.0",
     "jest": "^30.3.0",
     "png-to-ico": "^3.0.1",
     "ts-jest": "^29.4.9",
