@@ -38,6 +38,7 @@ function Login() {
               id="username"
               name="username"
               autoComplete="username"
+              autoFocus
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
