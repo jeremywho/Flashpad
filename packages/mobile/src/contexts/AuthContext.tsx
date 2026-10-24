@@ -1,20 +1,17 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { ApiClient, SignalRManager } from '@flashpad/shared';
+import { AppState } from 'react-native';
+import { ApiClient, SignalRManager, HttpError, SessionRefresher } from '@flashpad/shared';
 import type { User } from '@flashpad/shared';
 import type { ApiEnvironment } from '../config';
 import { getApiEnvironment, getApiUrl, setApiEnvironment } from '../config';
 import {
   clearStoredAuthState,
   clearUserSessionData,
+  getCachedUser,
   getStoredRefreshToken,
+  storeCachedUser,
   storeRefreshToken,
 } from '../services/authStorage';
-
-// Refresh 60s before the access token expires. Access tokens live 15 min
-// (see backend AuthService.GenerateAccessToken), so a 24h buffer would
-// schedule the refresh timer with delay=0 and storm the refresh endpoint
-// — and any single refresh failure would bounce the user back to Login.
-const REFRESH_BUFFER_MS = 60 * 1000;
 
 interface AuthContextType {
   user: User | null;
@@ -30,17 +27,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refreshTokenRef = useRef<string | null>(null);
+  const refresherRef = useRef<SessionRefresher | null>(null);
 
   // Create API client with current config URL - memoized to prevent recreation
   const api = useMemo(() => new ApiClient(getApiUrl()), []);
 
-  const clearRefreshTimer = useCallback(() => {
-    if (refreshTimerRef.current) {
-      clearTimeout(refreshTimerRef.current);
-      refreshTimerRef.current = null;
-    }
+  const stopRefresher = useCallback(() => {
+    refresherRef.current?.stop();
   }, []);
 
   const disconnectClient = useCallback(async () => {
@@ -50,21 +44,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [api]);
 
   const resetAuthState = useCallback(async () => {
-    clearRefreshTimer();
+    stopRefresher();
     refreshTokenRef.current = null;
     await clearStoredAuthState();
     await disconnectClient();
-  }, [clearRefreshTimer, disconnectClient]);
+  }, [stopRefresher, disconnectClient]);
 
   const clearCurrentSession = useCallback(async () => {
-    clearRefreshTimer();
+    stopRefresher();
     const refreshToken = refreshTokenRef.current;
     refreshTokenRef.current = null;
 
     if (refreshToken) {
       void api.logoutSession(refreshToken).catch(() => undefined);
     }
-  }, [api, clearRefreshTimer]);
+  }, [api, stopRefresher]);
+
+  const getRefresher = useCallback(() => {
+    if (!refresherRef.current) {
+      refresherRef.current = new SessionRefresher({
+        getAccessTokenExpiryMs: () => api.getTokenExpiryMs(),
+        refresh: async () => {
+          const currentRefreshToken = refreshTokenRef.current;
+          if (!currentRefreshToken) {
+            throw new HttpError(401, 'Signed out');
+          }
+          const response = await api.refreshToken(currentRefreshToken);
+          refreshTokenRef.current = response.refreshToken;
+          await storeRefreshToken(response.refreshToken);
+          await storeCachedUser(response.user);
+          setUser(response.user);
+        },
+        onRejected: () => {
+          void resetAuthState();
+        },
+      });
+    }
+    return refresherRef.current;
+  }, [api, resetAuthState]);
 
   const switchEnvironment = useCallback(async (environment: ApiEnvironment) => {
     if (environment === getApiEnvironment()) {
@@ -83,68 +100,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await disconnectClient();
   }, [clearCurrentSession, disconnectClient]);
 
-  const scheduleRefresh = useCallback((onAuthFailure: () => Promise<void>) => {
-    clearRefreshTimer();
-    const expiryMs = api.getTokenExpiryMs();
-    if (!expiryMs) return;
-
-    const now = Date.now();
-    const timeUntilExpiry = expiryMs - now;
-    if (timeUntilExpiry <= 0) {
-      void onAuthFailure();
-      return;
-    }
-
-    const delay = Math.max(timeUntilExpiry - REFRESH_BUFFER_MS, 0);
-    refreshTimerRef.current = setTimeout(async () => {
-      try {
-        const currentRefreshToken = refreshTokenRef.current;
-        if (!currentRefreshToken) {
-          await onAuthFailure();
-          return;
-        }
-
-        const response = await api.refreshToken(currentRefreshToken);
-        refreshTokenRef.current = response.refreshToken;
-        await storeRefreshToken(response.refreshToken);
-        setUser(response.user);
-        scheduleRefresh(onAuthFailure);
-      } catch {
-        await onAuthFailure();
-      }
-    }, delay);
-  }, [api, clearRefreshTimer]);
-
-  const loadUser = useCallback(async () => {
-    try {
-      const refreshToken = await getStoredRefreshToken();
-      if (refreshToken) {
-        refreshTokenRef.current = refreshToken;
-        const response = await api.refreshToken(refreshToken);
-        refreshTokenRef.current = response.refreshToken;
-        await storeRefreshToken(response.refreshToken);
-        setUser(response.user);
-        scheduleRefresh(resetAuthState);
-      }
-    } catch {
-      await resetAuthState();
-    } finally {
-      setIsLoading(false);
-    }
-  }, [api, scheduleRefresh, resetAuthState]);
-
   useEffect(() => {
-    loadUser();
-    return clearRefreshTimer;
-  }, [loadUser, clearRefreshTimer]);
+    let cancelled = false;
+    const refresher = getRefresher();
+
+    (async () => {
+      try {
+        const refreshToken = await getStoredRefreshToken();
+        if (cancelled || !refreshToken) return;
+
+        refreshTokenRef.current = refreshToken;
+        refresher.start();
+        const refreshed = await refresher.refreshNow();
+        if (cancelled) return;
+        if (!refreshed && refresher.isRunning) {
+          setUser(await getCachedUser());
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+
+    const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') refresher.refreshIfDue();
+    });
+
+    return () => {
+      cancelled = true;
+      refresher.stop();
+      appStateSubscription.remove();
+    };
+  }, [getRefresher]);
 
   const login = useCallback(async (accessToken: string, refreshToken: string, userData: User) => {
     refreshTokenRef.current = refreshToken;
     await storeRefreshToken(refreshToken);
+    await storeCachedUser(userData);
     api.setToken(accessToken);
     setUser(userData);
-    scheduleRefresh(resetAuthState);
-  }, [api, scheduleRefresh, resetAuthState]);
+    getRefresher().start();
+  }, [api, getRefresher]);
 
   const contextValue = useMemo(
     () => ({ user, api, isLoading, login, logout, switchEnvironment }),

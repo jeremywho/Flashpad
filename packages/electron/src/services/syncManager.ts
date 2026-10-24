@@ -44,7 +44,7 @@ export interface SyncManagerOptions {
   onSyncStatusChange?: (status: SyncStatus) => void;
   onPendingCountChange?: (count: number) => void;
   onDataRefresh?: () => void;
-  onAuthError?: () => void;
+  onAuthError?: () => Promise<boolean>;
   onConflict?: (noteId: string, serverVersion: number) => void;
   onSyncItemFailed?: (item: import('./database').SyncQueueItem) => void;
 }
@@ -60,7 +60,7 @@ export class SyncManager {
   private onSyncStatusChange?: (status: SyncStatus) => void;
   private onPendingCountChange?: (count: number) => void;
   private onDataRefresh?: () => void;
-  private onAuthError?: () => void;
+  private onAuthError?: () => Promise<boolean>;
   private onConflict?: (noteId: string, serverVersion: number) => void;
   private onSyncItemFailed?: (item: import('./database').SyncQueueItem) => void;
 
@@ -127,7 +127,12 @@ export class SyncManager {
     if (this.authErrorDetected) return;
     this.authErrorDetected = true;
     this.updateSyncStatus('error');
-    this.onAuthError?.();
+    void (this.onAuthError?.() ?? Promise.resolve(false))
+      .catch(() => false)
+      .then((recovered) => {
+        this.authErrorDetected = false;
+        if (recovered) void this.processSyncQueue();
+      });
   }
 
   private isConflictError(error: unknown): boolean {

@@ -139,10 +139,10 @@ function LoginScreen({ navigation }: any) {
               onChangeText={setUsername}
               autoCapitalize="none"
               autoCorrect={false}
-              autoComplete="off"
+              autoComplete="username"
               spellCheck={false}
               textContentType="username"
-              importantForAutofill="no"
+              importantForAutofill="yes"
               placeholderTextColor={theme.textMuted}
             />
           </View>
@@ -156,10 +156,10 @@ function LoginScreen({ navigation }: any) {
               secureTextEntry
               autoCapitalize="none"
               autoCorrect={false}
-              autoComplete="off"
+              autoComplete="current-password"
               spellCheck={false}
               textContentType="password"
-              importantForAutofill="no"
+              importantForAutofill="yes"
               placeholderTextColor={theme.textMuted}
             />
           </View>

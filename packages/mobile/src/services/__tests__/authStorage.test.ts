@@ -4,9 +4,12 @@ import { clearLocalData } from '../database';
 import {
   AUTH_REFRESH_TOKEN_STORAGE_KEY,
   AUTH_TOKEN_STORAGE_KEY,
+  AUTH_USER_STORAGE_KEY,
   clearStoredAuthState,
   clearUserSessionData,
+  getCachedUser,
   getStoredRefreshToken,
+  storeCachedUser,
   storeRefreshToken,
 } from '../authStorage';
 import { getNamespacedStorageKey, setApiEnvironment } from '../../config';
@@ -68,6 +71,7 @@ describe('authStorage', () => {
     expect(AsyncStorage.multiRemove).toHaveBeenCalledWith([
       getNamespacedStorageKey(AUTH_TOKEN_STORAGE_KEY, 'local'),
       getNamespacedStorageKey(AUTH_REFRESH_TOKEN_STORAGE_KEY, 'local'),
+      getNamespacedStorageKey(AUTH_USER_STORAGE_KEY, 'local'),
     ]);
     expect(clearLocalData).toHaveBeenCalledTimes(1);
   });
@@ -118,5 +122,16 @@ describe('authStorage', () => {
 
     // Subsequent reads come straight from the keychain.
     expect(await getStoredRefreshToken()).toBe('legacy-token');
+  });
+  it('caches the signed-in user so an offline launch stays signed in, and clears it with auth state', async () => {
+    await setApiEnvironment('local');
+    const user = { id: 1, username: 'jeremy', email: 'j@example.com', createdAt: '2026-01-01', updatedAt: '2026-01-01' };
+
+    expect(await getCachedUser()).toBeNull();
+    await storeCachedUser(user);
+    expect(await getCachedUser()).toEqual(user);
+
+    await clearStoredAuthState();
+    expect(await getCachedUser()).toBeNull();
   });
 });

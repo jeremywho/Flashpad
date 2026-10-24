@@ -27,7 +27,7 @@ function clampNotesListWidth(width: number, sidebar: number): number {
 }
 
 function Home() {
-  const { api, logout } = useAuth();
+  const { api, refreshSession } = useAuth();
   const toast = useToast();
   const [notes, setNotes] = useState<Note[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -212,7 +212,7 @@ function Home() {
         fetchCategories();
         fetchInboxCount();
       },
-      onAuthError: logout,
+      onAuthError: refreshSession,
       onConflict: (noteId, serverVersion) => {
         h4.warning('Conflict resolved — refreshed to server version', { noteId, serverVersion });
         toast.warning('Note was modified on another device — refreshed to latest version');
@@ -244,7 +244,7 @@ function Home() {
       syncManagerRef.current = null;
       h4.destroy();
     };
-  }, [api, logout]);
+  }, [api, refreshSession]);
 
   const fetchNotes = useCallback(async () => {
     if (!syncManagerRef.current) return;
@@ -420,7 +420,11 @@ function Home() {
       onDeviceDisconnected: (device) => {
         console.log('Device disconnected:', device.deviceName);
       },
-      onAuthError: logout,
+      onAuthError: () => {
+        void refreshSession().then((refreshed) => {
+          if (refreshed) client.start().catch(console.error);
+        });
+      },
       onNoteCreated: async (note) => {
         await saveLocalNote(note, false);
         if (shouldShowInView(note)) {
@@ -485,7 +489,7 @@ function Home() {
 
     // Don't stop on cleanup - singleton persists across re-renders
     // Connection is only stopped via SignalRManager.removeInstance() on logout
-  }, [api, logout, fetchCategories, fetchInboxCount]);
+  }, [api, refreshSession, fetchCategories, fetchInboxCount]);
 
   // Helper to check if a note should show in current view.
   // Reads from selectedViewRef so callers wrapped in useCallback don't need to

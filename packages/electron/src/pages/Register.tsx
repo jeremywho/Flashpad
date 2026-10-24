@@ -41,6 +41,8 @@ function Register() {
           <label htmlFor="username">Username</label>
           <input
             id="username"
+            name="username"
+            autoComplete="username"
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
@@ -51,6 +53,8 @@ function Register() {
           <label htmlFor="email">Email</label>
           <input
             id="email"
+            name="email"
+            autoComplete="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -61,6 +65,8 @@ function Register() {
           <label htmlFor="fullName">Full Name (optional)</label>
           <input
             id="fullName"
+            name="name"
+            autoComplete="name"
             type="text"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
@@ -70,6 +76,8 @@ function Register() {
           <label htmlFor="password">Password</label>
           <input
             id="password"
+            name="password"
+            autoComplete="new-password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}

@@ -16,7 +16,7 @@ public class AuthController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly IAuthService _authService;
-    private const int RefreshTokenLifetimeDays = 30;
+    private const int RefreshTokenLifetimeDays = 90;
 
     public AuthController(AppDbContext context, IAuthService authService)
     {

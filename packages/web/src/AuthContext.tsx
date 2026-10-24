@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { ApiClient } from '@shared/api-client';
-import { User, SignalRManager } from '@shared/index';
+import { User, SignalRManager, HttpError, SessionRefresher } from '@shared/index';
 
 interface AuthContextType {
   user: User | null;
@@ -16,101 +16,115 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const api = new ApiClient(API_URL);
 const REFRESH_TOKEN_STORAGE_KEY = 'refreshToken';
+const USER_STORAGE_KEY = 'authUser';
+const REFRESH_LOCK_NAME = 'flashpad-auth-refresh';
 
-// Refresh 60s before the access token expires. Access tokens live 15 min
-// (see backend AuthService.GenerateAccessToken), so a 24h buffer would
-// schedule the refresh timer with delay=0 and storm the refresh endpoint
-// — and any single refresh failure would bounce the user back to Login.
-const REFRESH_BUFFER_MS = 60 * 1000;
+function readCachedUser(): User | null {
+  try {
+    const raw = localStorage.getItem(USER_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as User) : null;
+  } catch {
+    return null;
+  }
+}
+
+// Tabs share one refresh token and the server rotates it on every use, so
+// refreshes must be serialized across tabs and always read the latest token.
+function withCrossTabRefreshLock(work: () => Promise<void>): Promise<void> {
+  if (typeof navigator !== 'undefined' && navigator.locks) {
+    return navigator.locks.request<void>(REFRESH_LOCK_NAME, work);
+  }
+  return work();
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const refreshTokenRef = useRef<string | null>(null);
+  const refresherRef = useRef<SessionRefresher | null>(null);
 
-  const clearRefreshTimer = useCallback(() => {
-    if (refreshTimerRef.current) {
-      clearTimeout(refreshTimerRef.current);
-      refreshTimerRef.current = null;
-    }
-  }, []);
-
-  const scheduleRefresh = useCallback((onLogout: () => void) => {
-    clearRefreshTimer();
-    const expiryMs = api.getTokenExpiryMs();
-    if (!expiryMs) return;
-
-    const now = Date.now();
-    const timeUntilExpiry = expiryMs - now;
-    if (timeUntilExpiry <= 0) {
-      onLogout();
-      return;
-    }
-
-    const delay = Math.max(timeUntilExpiry - REFRESH_BUFFER_MS, 0);
-    refreshTimerRef.current = setTimeout(async () => {
-      try {
-        const currentRefreshToken = refreshTokenRef.current;
-        if (!currentRefreshToken) {
-          onLogout();
-          return;
-        }
-
-        const response = await api.refreshToken(currentRefreshToken);
-        refreshTokenRef.current = response.refreshToken;
-        localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, response.refreshToken);
-        setUser(response.user);
-        scheduleRefresh(onLogout);
-      } catch {
-        onLogout();
-      }
-    }, delay);
-  }, [clearRefreshTimer]);
-
-  const logout = useCallback(() => {
-    clearRefreshTimer();
-    const refreshToken = refreshTokenRef.current;
-    refreshTokenRef.current = null;
+  const clearLocalSession = useCallback(() => {
+    refresherRef.current?.stop();
     localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
-    if (refreshToken) {
-      void api.logoutSession(refreshToken).catch(() => undefined);
-    }
+    localStorage.removeItem(USER_STORAGE_KEY);
     api.logout();
     SignalRManager.clear();
     setUser(null);
-  }, [clearRefreshTimer]);
+  }, []);
 
-  useEffect(() => {
+  const getRefresher = useCallback(() => {
+    if (!refresherRef.current) {
+      refresherRef.current = new SessionRefresher({
+        getAccessTokenExpiryMs: () => api.getTokenExpiryMs(),
+        refresh: () => withCrossTabRefreshLock(async () => {
+          const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
+          if (!storedRefreshToken) {
+            throw new HttpError(401, 'Signed out');
+          }
+          const response = await api.refreshToken(storedRefreshToken);
+          localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, response.refreshToken);
+          localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(response.user));
+          setUser(response.user);
+        }),
+        onRejected: clearLocalSession,
+      });
+    }
+    return refresherRef.current;
+  }, [clearLocalSession]);
+
+  const logout = useCallback(() => {
     const refreshToken = localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
     if (refreshToken) {
-      refreshTokenRef.current = refreshToken;
-      api
-        .refreshToken(refreshToken)
-        .then((userData) => {
-          refreshTokenRef.current = userData.refreshToken;
-          localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, userData.refreshToken);
-          setUser(userData.user);
-          scheduleRefresh(logout);
-        })
-        .catch(() => {
-          refreshTokenRef.current = null;
-          localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
-          api.setToken(null);
-        })
-        .finally(() => setIsLoading(false));
+      void api.logoutSession(refreshToken).catch(() => undefined);
+    }
+    clearLocalSession();
+  }, [clearLocalSession]);
+
+  useEffect(() => {
+    const refresher = getRefresher();
+    let cancelled = false;
+
+    if (localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY)) {
+      refresher.start();
+      void refresher.refreshNow().then((refreshed) => {
+        if (cancelled) return;
+        if (!refreshed && refresher.isRunning) {
+          setUser(readCachedUser());
+        }
+        setIsLoading(false);
+      });
     } else {
       setIsLoading(false);
     }
-    return clearRefreshTimer;
-  }, [scheduleRefresh, logout, clearRefreshTimer]);
+
+    const handleWake = () => {
+      if (document.visibilityState === 'visible') refresher.refreshIfDue();
+    };
+    const handleOnline = () => refresher.refreshIfDue();
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === REFRESH_TOKEN_STORAGE_KEY && event.newValue === null && refresher.isRunning) {
+        clearLocalSession();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleWake);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      cancelled = true;
+      refresher.stop();
+      document.removeEventListener('visibilitychange', handleWake);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, [getRefresher, clearLocalSession]);
 
   const login = (accessToken: string, refreshToken: string, userData: User) => {
-    refreshTokenRef.current = refreshToken;
     localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, refreshToken);
+    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData));
     api.setToken(accessToken);
     setUser(userData);
-    scheduleRefresh(logout);
+    getRefresher().start();
   };
 
   return (

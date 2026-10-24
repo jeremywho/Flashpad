@@ -34,6 +34,8 @@ function Login() {
           <label htmlFor="username">Username</label>
           <input
             id="username"
+            name="username"
+            autoComplete="username"
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
@@ -44,6 +46,8 @@ function Login() {
           <label htmlFor="password">Password</label>
           <input
             id="password"
+            name="password"
+            autoComplete="current-password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}

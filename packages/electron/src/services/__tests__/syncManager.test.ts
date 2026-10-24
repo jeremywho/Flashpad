@@ -632,3 +632,75 @@ describe('local-only CREATE snapshot maintenance', () => {
     expect(store.notes.has('server-note-remap')).toBe(true);
   });
 });
+
+describe('expired access token during sync', () => {
+  async function unauthorized() {
+    const shared = await import('@shared/index');
+    return new shared.HttpError(401, 'Unauthorized');
+  }
+
+  async function settle(condition: () => boolean) {
+    for (let i = 0; i < 50 && !condition(); i++) {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+  }
+
+  function seedLocalNote() {
+    store.notes.set('local_401_abc', buildNoteFile({
+      id: 'local_401_abc',
+      content: 'Written while the token expired',
+      isLocal: true,
+      serverId: null,
+    }));
+  }
+
+  const serverNote: Note = {
+    id: 'server-uuid-401',
+    content: 'Written while the token expired',
+    status: NoteStatus.Inbox,
+    version: 1,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  it('refreshes the session and resumes the queue instead of staying stuck', async () => {
+    seedLocalNote();
+    const mockApi = createMockApi({
+      createNote: jest.fn()
+        .mockRejectedValueOnce(await unauthorized())
+        .mockResolvedValue(serverNote),
+    });
+    const onAuthError = jest.fn().mockResolvedValue(true);
+
+    const sm = new SyncManager({ api: mockApi as never, deviceId: 'test-device', onAuthError });
+    await sm.initialSync();
+    await settle(() => store.notes.has('server-uuid-401'));
+
+    expect(onAuthError).toHaveBeenCalledTimes(1);
+    expect(mockApi.createNote).toHaveBeenCalledTimes(2);
+    expect(store.notes.has('server-uuid-401')).toBe(true);
+  });
+
+  it('lets the next sync pass retry when the refresh could not reach the server', async () => {
+    seedLocalNote();
+    const mockApi = createMockApi({
+      createNote: jest.fn()
+        .mockRejectedValueOnce(await unauthorized())
+        .mockResolvedValue(serverNote),
+    });
+    const onAuthError = jest.fn().mockResolvedValue(false);
+
+    const sm = new SyncManager({ api: mockApi as never, deviceId: 'test-device', onAuthError });
+    await sm.initialSync();
+    await settle(() => false);
+
+    expect(onAuthError).toHaveBeenCalledTimes(1);
+
+    expect(mockApi.createNote).toHaveBeenCalledTimes(1);
+
+    await sm.processSyncQueue();
+
+    expect(mockApi.createNote).toHaveBeenCalledTimes(2);
+    expect(store.notes.has('server-uuid-401')).toBe(true);
+  });
+});
