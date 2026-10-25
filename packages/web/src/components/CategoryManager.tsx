@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Category, CreateCategoryDto } from '@shared/types';
+import { CATEGORY_PRESET_COLORS as PRESET_COLORS } from '@shared/index';
 
 interface CategoryManagerProps {
   categories: Category[];
@@ -8,19 +9,6 @@ interface CategoryManagerProps {
   onDeleteCategory: (id: string) => Promise<void>;
   onClose: () => void;
 }
-
-const PRESET_COLORS = [
-  '#6366f1', // Indigo
-  '#8b5cf6', // Violet
-  '#ec4899', // Pink
-  '#ef4444', // Red
-  '#f97316', // Orange
-  '#eab308', // Yellow
-  '#22c55e', // Green
-  '#14b8a6', // Teal
-  '#06b6d4', // Cyan
-  '#3b82f6', // Blue
-];
 
 export default function CategoryManager({
   categories,

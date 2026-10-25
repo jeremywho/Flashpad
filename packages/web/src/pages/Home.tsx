@@ -485,6 +485,17 @@ function Home() {
     fetchCategories();
   };
 
+  const handleQuickAddCategory = async (name: string, color: string) => {
+    try {
+      await api.createCategory({ name, color });
+      fetchCategories();
+    } catch (error) {
+      console.error('Failed to create category:', error);
+      showToast('Failed to create category');
+      throw error;
+    }
+  };
+
   const handleUpdateCategory = async (id: string, data: CreateCategoryDto) => {
     await api.updateCategory(id, { ...data, sortOrder: undefined });
     fetchCategories();
@@ -508,6 +519,7 @@ function Home() {
             selectedView={selectedView}
             onViewChange={handleViewChange}
             onManageCategories={() => setShowCategoryManager(true)}
+            onQuickAddCategory={handleQuickAddCategory}
             onNewNoteInCategory={handleNewNoteInCategory}
             inboxCount={inboxCount}
             pinnedNotes={pinnedNotes}

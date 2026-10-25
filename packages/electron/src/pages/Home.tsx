@@ -746,6 +746,18 @@ function Home() {
     }
   };
 
+  const handleQuickAddCategory = useCallback(async (name: string, color: string) => {
+    if (!syncManagerRef.current) return;
+    try {
+      await syncManagerRef.current.createCategory({ name, color });
+      fetchCategories();
+    } catch (error) {
+      console.error('Failed to create category:', error);
+      toast.error('Failed to create category');
+      throw error;
+    }
+  }, [fetchCategories, toast]);
+
   const handleUpdateCategory = async (id: string, data: CreateCategoryDto) => {
     if (!syncManagerRef.current) return;
     try {
@@ -788,6 +800,7 @@ function Home() {
             selectedView={selectedView}
             onViewChange={handleViewChange}
             onManageCategories={handleOpenCategoryManager}
+            onQuickAddCategory={handleQuickAddCategory}
             onNewNoteInCategory={handleNewNoteInCategory}
             inboxCount={inboxCount}
             pinnedNotes={pinnedNotes}

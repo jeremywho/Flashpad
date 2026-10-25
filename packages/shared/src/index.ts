@@ -1,5 +1,6 @@
 export * from './types';
 export * from './noteCardMenu';
+export * from './categoryColors';
 export * from './pinnedNotes';
 export * from './categoryViewMode';
 export * from './noteCardText';

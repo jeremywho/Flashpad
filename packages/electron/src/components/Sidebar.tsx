@@ -1,14 +1,16 @@
 import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Category, Note } from '@shared/types';
-import { getNoteCardText } from '@shared/index';
-import { Inbox, Archive, Trash2, Settings, User, Pin, PinOff } from 'lucide-react';
+import { getNoteCardText, nextCategoryColor } from '@shared/index';
+import { Inbox, Archive, Trash2, Settings, User, Pin, PinOff, Plus } from 'lucide-react';
+import CategoryQuickAdd from './CategoryQuickAdd';
 
 interface SidebarProps {
   categories: Category[];
   selectedView: 'inbox' | 'archive' | 'trash' | string;
   onViewChange: (view: 'inbox' | 'archive' | 'trash' | string) => void;
   onManageCategories: () => void;
+  onQuickAddCategory?: (name: string, color: string) => Promise<void>;
   onNewNoteInCategory?: (categoryId: string) => void;
   inboxCount: number;
   pinnedNotes: Note[];
@@ -36,6 +38,7 @@ function SidebarInner({
   selectedView,
   onViewChange,
   onManageCategories,
+  onQuickAddCategory,
   onNewNoteInCategory,
   inboxCount,
   pinnedNotes,
@@ -50,6 +53,7 @@ function SidebarInner({
   pendingCount,
 }: SidebarProps) {
   const navigate = useNavigate();
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     visible: false,
     x: 0,
@@ -161,7 +165,20 @@ function SidebarInner({
         )}
 
         <div className="sidebar-section">
-          <div className="sidebar-section-header">Categories</div>
+          <div className="sidebar-section-header with-action">
+            <span>Categories</span>
+            {onQuickAddCategory && (
+              <button
+                type="button"
+                className="sidebar-header-action"
+                title="Add category"
+                aria-label="Add category"
+                onClick={() => setIsAddingCategory(true)}
+              >
+                <Plus size={14} strokeWidth={2} />
+              </button>
+            )}
+          </div>
           {categories.map((category) => (
             <button
               key={category.id}
@@ -179,6 +196,16 @@ function SidebarInner({
               )}
             </button>
           ))}
+          {isAddingCategory && onQuickAddCategory && (
+            <CategoryQuickAdd
+              color={nextCategoryColor(categories)}
+              onCommit={async (name) => {
+                await onQuickAddCategory(name, nextCategoryColor(categories));
+                setIsAddingCategory(false);
+              }}
+              onCancel={() => setIsAddingCategory(false)}
+            />
+          )}
           <button className="sidebar-add-category" onClick={onManageCategories}>
             <span>+</span>
             <span>Manage Categories</span>
