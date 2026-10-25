@@ -8,6 +8,8 @@ export function EditorColumn({ children }: { children: React.ReactNode }) {
   const probeRef = useRef<HTMLSpanElement>(null);
   const draggedRef = useRef<EditorMeasure | undefined>(undefined);
   const draggingRef = useRef(false);
+  const grabOffsetRef = useRef(0);
+  const pressXRef = useRef(0);
   const [dragging, setDragging] = useState(false);
 
   const applyLive = (measure: EditorMeasure) => {
@@ -20,15 +22,26 @@ export function EditorColumn({ children }: { children: React.ReactNode }) {
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
     draggedRef.current = undefined;
+    grabOffsetRef.current = 0;
+    pressXRef.current = e.clientX;
+    const column = columnRef.current;
+    const content = column?.querySelector<HTMLElement>('.note-editor-content');
+    if (column && content) {
+      const rect = column.getBoundingClientRect();
+      const style = getComputedStyle(content);
+      const textHalfPx = (content.getBoundingClientRect().width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)) / 2;
+      grabOffsetRef.current = Math.abs(e.clientX - (rect.left + rect.width / 2)) - textHalfPx;
+    }
     draggingRef.current = true;
     setDragging(true);
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!draggingRef.current || !columnRef.current || !probeRef.current) return;
+    if (draggedRef.current === undefined && Math.abs(e.clientX - pressXRef.current) < 2) return;
     const rect = columnRef.current.getBoundingClientRect();
     const measure = measureFromDrag(
-      e.clientX - (rect.left + rect.width / 2),
+      Math.max(0, Math.abs(e.clientX - (rect.left + rect.width / 2)) - grabOffsetRef.current),
       probeRef.current.getBoundingClientRect().width,
       rect.width
     );

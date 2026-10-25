@@ -2206,6 +2206,7 @@ h1, h2, h3 {
   min-height: 0;
   font-size: var(--editor-size, 22px);
   font-family: var(--font-body);
+  --measure-handle-gap: 12px;
 }
 
 .note-editor-column.resizing {
@@ -2225,11 +2226,11 @@ h1, h2, h3 {
 }
 
 .note-editor-measure-handle.left {
-  left: max(24px, calc((100% - var(--measure)) / 2));
+  left: calc(max(24px, calc((100% - var(--measure)) / 2)) - var(--measure-handle-gap));
 }
 
 .note-editor-measure-handle.right {
-  left: calc(100% - max(24px, calc((100% - var(--measure)) / 2)));
+  left: calc(100% - max(24px, calc((100% - var(--measure)) / 2)) + var(--measure-handle-gap));
 }
 
 .note-editor-measure-handle::after {
@@ -2238,9 +2239,8 @@ h1, h2, h3 {
   top: 12px;
   bottom: 12px;
   left: 50%;
-  width: 2px;
+  width: 1px;
   transform: translateX(-50%);
-  border-radius: 1px;
   background: var(--rule-2);
   opacity: 0;
   transition: opacity 0.15s ease, background-color 0.15s ease;
