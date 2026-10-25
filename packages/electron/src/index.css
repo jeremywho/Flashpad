@@ -2196,3 +2196,70 @@ h1, h2, h3 {
   background: var(--surface);
   color: var(--ink);
 }
+
+/* Wraps the editor and preview so the measure handles can sit on the text
+   column's edges. It carries the editor font size because --measure is in ch. */
+.note-editor-column {
+  flex: 1;
+  display: flex;
+  position: relative;
+  min-height: 0;
+  font-size: var(--editor-size, 22px);
+  font-family: var(--font-body);
+}
+
+.note-editor-column.resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.note-editor-measure-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  transform: translateX(-50%);
+  cursor: col-resize;
+  z-index: 1;
+  touch-action: none;
+}
+
+.note-editor-measure-handle.left {
+  left: max(24px, calc((100% - var(--measure)) / 2));
+}
+
+.note-editor-measure-handle.right {
+  left: calc(100% - max(24px, calc((100% - var(--measure)) / 2)));
+}
+
+.note-editor-measure-handle::after {
+  content: '';
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  border-radius: 1px;
+  background: var(--rule-2);
+  opacity: 0;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.note-editor-column:hover .note-editor-measure-handle::after {
+  opacity: 1;
+}
+
+.note-editor-measure-handle:hover::after,
+.note-editor-column.resizing .note-editor-measure-handle::after {
+  opacity: 1;
+  background: var(--accent);
+}
+
+.note-editor-measure-probe {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  width: 1ch;
+  height: 0;
+}

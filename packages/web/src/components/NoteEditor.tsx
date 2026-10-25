@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Note, Category, NoteStatus } from '@shared/types';
 import { Archive, Inbox, RotateCcw, Trash2, Maximize2, X, Code, FileText } from 'lucide-react';
 import { FontSizeControl } from './FontSizeControl';
+import { EditorColumn } from './EditorColumn';
 import { useAppearance, MIN_FONT, MAX_FONT } from '../theme/AppearanceProvider';
 
 const CODE_LANGUAGES = [
@@ -514,15 +515,17 @@ export default function NoteEditor({
         <div className="note-editor-conflict-banner">{conflictMessage}</div>
       )}
 
-      <textarea
-        ref={textareaRef}
-        className="note-editor-content"
-        value={content}
-        onChange={handleContentChange}
-        onKeyDown={handleKeyDown}
-        placeholder="Start typing your note..."
-        autoFocus={isNew}
-      />
+      <EditorColumn>
+        <textarea
+          ref={textareaRef}
+          className="note-editor-content"
+          value={content}
+          onChange={handleContentChange}
+          onKeyDown={handleKeyDown}
+          placeholder="Start typing your note..."
+          autoFocus={isNew}
+        />
+      </EditorColumn>
 
       {/* Editor footer bar */}
       {!isNew && (

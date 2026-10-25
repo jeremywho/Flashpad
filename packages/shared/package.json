@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "test": "npm run build && node --test tests/api-client.test.js tests/sessionRefresher.test.js tests/pinnedNotes.test.js tests/categoryColors.test.js",
+    "test": "npm run build && node --test tests/api-client.test.js tests/sessionRefresher.test.js tests/pinnedNotes.test.js tests/categoryColors.test.js tests/editorMeasure.test.js",
     "watch": "tsc --watch"
   },
   "keywords": [

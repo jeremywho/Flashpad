@@ -3,6 +3,7 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Note, Category, NoteStatus } from '@shared/types';
 import { FontSizeControl } from './FontSizeControl';
+import { EditorColumn } from './EditorColumn';
 import { shouldResetContentOnNoteIdChange } from './noteEditorLogic';
 import { categoryDefaultsToPreview, rememberCategoryViewMode } from '../categoryViewModeStore';
 import { Code, Maximize2, X, Archive, Inbox, RotateCcw, Trash2 } from 'lucide-react';
@@ -552,6 +553,7 @@ function NoteEditorInner({
         </div>
       </div>
 
+      <EditorColumn>
       {previewMode ? (
         <div className="note-editor-content note-editor-preview">
           <Markdown
@@ -584,6 +586,7 @@ function NoteEditorInner({
           autoFocus={isNew}
         />
       )}
+      </EditorColumn>
 
       {/* Editor footer bar */}
       <div className="note-editor-footer">

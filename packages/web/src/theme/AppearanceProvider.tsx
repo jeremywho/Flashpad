@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { EditorMeasure, measureCssValue, normalizeMeasure } from '@shared/index';
 
 export type Theme = 'light' | 'dark' | 'system';
 export type Variant = 'ledger' | 'paper' | 'terminal' | 'atelier' | 'index';
@@ -7,6 +8,7 @@ export interface Appearance {
   theme: Theme;
   variant: Variant;
   editorFontSize: number;
+  editorMeasure: EditorMeasure;
 }
 
 // Single source of truth for the editor size bounds — FontSizeControl and the
@@ -15,7 +17,7 @@ export const MIN_FONT = 13;
 export const MAX_FONT = 32;
 export const DEFAULT_FONT = 22;
 
-const DEFAULT: Appearance = { theme: 'dark', variant: 'ledger', editorFontSize: DEFAULT_FONT };
+const DEFAULT: Appearance = { theme: 'dark', variant: 'ledger', editorFontSize: DEFAULT_FONT, editorMeasure: null };
 const STORAGE_KEY = 'flashpad.appearance';
 
 // Bumped when the shipped default changes. Relying on validVariant() alone to
@@ -81,6 +83,7 @@ function loadInitial(): Appearance {
         theme: parsed.theme === 'light' || parsed.theme === 'dark' || parsed.theme === 'system' ? parsed.theme : DEFAULT.theme,
         variant,
         editorFontSize: fontSize,
+        editorMeasure: normalizeMeasure(parsed.editorMeasure),
       };
     }
     // One-time migration from the legacy 'theme' key.
@@ -103,6 +106,12 @@ export function AppearanceProvider({ children }: { children: React.ReactNode }) 
     r.dataset.theme = effectiveTheme;
     r.dataset.variant = appearance.variant;
     r.style.setProperty('--editor-size', appearance.editorFontSize + 'px');
+    const measure = measureCssValue(appearance.editorMeasure);
+    if (measure) {
+      r.style.setProperty('--measure', measure);
+    } else {
+      r.style.removeProperty('--measure');
+    }
   }, [appearance, effectiveTheme]);
 
   React.useEffect(() => {
@@ -120,6 +129,9 @@ export function AppearanceProvider({ children }: { children: React.ReactNode }) 
       const next: Appearance = { ...prev, ...patch };
       if (typeof patch.editorFontSize === 'number') {
         next.editorFontSize = clampFont(patch.editorFontSize);
+      }
+      if ('editorMeasure' in patch) {
+        next.editorMeasure = normalizeMeasure(patch.editorMeasure);
       }
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...next, v: APPEARANCE_VERSION }));

@@ -62,6 +62,10 @@
           if (typeof fs !== 'number' || fs < 13 || fs > 32) { fs = 22; }
           if (a.v !== 2) { fs = Math.max(fs, 22); }
           r.style.setProperty('--editor-size', fs + 'px');
+          // Bounds mirror normalizeMeasure() in @flashpad/shared.
+          var m = a.editorMeasure;
+          if (m === 'full') { r.style.setProperty('--measure', '100%'); }
+          else if (typeof m === 'number' && isFinite(m)) { r.style.setProperty('--measure', Math.max(40, Math.min(1000, Math.round(m))) + 'ch'); }
         } catch (e) { /* keep static fallback on <html> */ }
       })();
     </script>
