@@ -9,6 +9,55 @@ import { settingsStore, AppSettings } from './settings';
 import { checkForUpdates as requestUpdateCheck } from '../src/services/updater-listeners';
 import { getStoredRefreshToken, storeRefreshToken, clearStoredRefreshToken, isEncryptionAvailable } from './authStore';
 import { fillFromOnePassword, isOnePasswordAvailable } from './onePassword';
+import { APP_USER_MODEL_ID, planShortcutRepairs, ShortcutInfo } from '../src/services/windowsShortcuts';
+
+if (process.platform === 'win32' && app.isPackaged) {
+  app.setAppUserModelId(APP_USER_MODEL_ID);
+}
+
+// Older builds ran under Electron's default id, so pins made from the running
+// window carry it and never match again. Fix them in place: renaming or deleting
+// a pinned .lnk breaks the pin.
+function repairWindowsShortcuts(): void {
+  const appData = app.getPath('appData');
+  const dirs = [
+    path.join(appData, 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
+    path.join(appData, 'Microsoft', 'Internet Explorer', 'Quick Launch', 'User Pinned', 'TaskBar'),
+    app.getPath('desktop'),
+  ];
+  const shortcuts: ShortcutInfo[] = [];
+  for (const dir of dirs) {
+    let names: string[];
+    try {
+      names = fsSync.readdirSync(dir);
+    } catch {
+      continue;
+    }
+    for (const name of names) {
+      if (!name.toLowerCase().endsWith('.lnk')) continue;
+      const file = path.join(dir, name);
+      try {
+        const link = shell.readShortcutLink(file);
+        shortcuts.push({ path: file, target: link.target, appUserModelId: link.appUserModelId, icon: link.icon });
+      } catch {
+        continue;
+      }
+    }
+  }
+  for (const repair of planShortcutRepairs(shortcuts, process.execPath)) {
+    try {
+      const updated = shell.writeShortcutLink(repair.path, 'update', {
+        ...shell.readShortcutLink(repair.path),
+        appUserModelId: repair.appUserModelId,
+        icon: repair.icon,
+        iconIndex: repair.iconIndex,
+      });
+      console.log(`[shortcuts] ${updated ? 'repaired' : 'could not repair'} ${repair.path}`);
+    } catch (error) {
+      console.warn(`[shortcuts] could not repair ${repair.path}:`, error);
+    }
+  }
+}
 
 let mainWindow: BrowserWindow | null = null;
 let quickCaptureWindow: BrowserWindow | null = null;
@@ -893,6 +942,9 @@ if (!gotSingleInstanceLock) {
   });
 
   app.whenReady().then(() => {
+    if (process.platform === 'win32' && app.isPackaged) {
+      repairWindowsShortcuts();
+    }
     createTray();
     createWindow();
     registerGlobalShortcut();
