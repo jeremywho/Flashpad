@@ -9,7 +9,7 @@ import CategoryManager from '../components/CategoryManager';
 import { useToast } from '../components/Toast';
 import { SyncManager, SyncStatus } from '../services/syncManager';
 import { startFileWatcher, stopFileWatcher } from '../services/file-watcher';
-import { saveLocalNote, deleteLocalNote, saveLocalCategory, deleteLocalCategory, getLocalNote } from '../services/database';
+import { saveLocalNote, deleteLocalNote, saveLocalCategory, deleteLocalCategory, getLocalNote, ensureLocalDataOwner } from '../services/database';
 
 type ViewType = 'inbox' | 'archive' | 'trash' | string;
 
@@ -27,7 +27,8 @@ function clampNotesListWidth(width: number, sidebar: number): number {
 }
 
 function Home() {
-  const { api, hasAccessToken, refreshSession } = useAuth();
+  const { api, user, hasAccessToken, refreshSession } = useAuth();
+  const userId = user?.id;
   const toast = useToast();
   const [notes, setNotes] = useState<Note[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -231,21 +232,33 @@ function Home() {
       },
     });
 
-    syncManagerRef.current = syncManager;
-
-    // Perform initial sync
-    syncManager.initialSync().then(() => {
-      fetchNotes();
-      fetchCategories();
-      refreshSidebar();
-    });
+    let cancelled = false;
+    const ownership = userId === undefined ? Promise.resolve('kept' as const) : ensureLocalDataOwner(userId);
+    ownership
+      .catch((error) => {
+        h4.error('Could not check which account owns the local notes', { error: (error as Error).message });
+        return 'kept' as const;
+      })
+      .then((result) => {
+        if (cancelled) return;
+        if (result === 'cleared') {
+          h4.warning('Local notes belonged to another account and were cleared', { userId });
+        }
+        syncManagerRef.current = syncManager;
+        return syncManager.initialSync().then(() => {
+          fetchNotes();
+          fetchCategories();
+          refreshSidebar();
+        });
+      });
 
     return () => {
+      cancelled = true;
       syncManager.destroy();
       syncManagerRef.current = null;
       h4.destroy();
     };
-  }, [api, refreshSession]);
+  }, [api, userId, refreshSession]);
 
   const fetchNotes = useCallback(async () => {
     if (!syncManagerRef.current) return;

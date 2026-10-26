@@ -20,7 +20,7 @@ export interface ParsedNote {
 
 const FRONTMATTER_REGEX = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/;
 const NOTE_ID_REGEX = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
-const ALLOWED_DATA_FILENAMES = new Set(['categories.json', 'sync-queue.json', 'device-info.json']);
+const ALLOWED_DATA_FILENAMES = new Set(['categories.json', 'sync-queue.json', 'device-info.json', 'account.json']);
 
 interface ParsedPathInfo {
   root: string;

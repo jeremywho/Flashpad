@@ -459,3 +459,46 @@ describe('startup unsynced category detection', () => {
     });
   });
 });
+
+describe('ensureLocalDataOwner', () => {
+  function seedNote(id: string) {
+    store.notes.set(id, buildNoteFile({ id, content: `Note ${id}`, isLocal: false, serverId: id }));
+  }
+
+  it('claims existing local data for the first account seen', async () => {
+    seedNote('note-a');
+
+    expect(await db.ensureLocalDataOwner(1)).toBe('claimed');
+
+    expect(store.notes.has('note-a')).toBe(true);
+    expect(store.json.get('account.json')).toEqual({ userId: 1 });
+  });
+
+  it('keeps local data when the same account signs in again', async () => {
+    seedNote('note-a');
+    store.json.set('account.json', { userId: 1 });
+
+    expect(await db.ensureLocalDataOwner(1)).toBe('kept');
+
+    expect(store.notes.has('note-a')).toBe(true);
+  });
+
+  it('clears another account\'s notes, categories and queue before a different account syncs', async () => {
+    seedNote('note-a');
+    seedNote('note-b');
+    store.json.set('account.json', { userId: 5 });
+    store.json.set('categories.json', { categories: [{ id: 'cat-1', name: 'Theirs', color: '#000', sortOrder: 0, noteCount: 0, createdAt: '', updatedAt: '', isLocal: false, serverId: 'cat-1' }] });
+    store.json.set('sync-queue.json', { items: [buildPendingCreateQueueItem('note', 'local_x', { content: 'x' })], nextId: 2 });
+
+    expect((await db.getLocalNotes({})).length).toBe(2);
+    expect((await db.getLocalCategories()).map((c) => c.name)).toEqual(['Theirs']);
+
+    expect(await db.ensureLocalDataOwner(1)).toBe('cleared');
+
+    expect(store.notes.size).toBe(0);
+    expect(await db.getLocalNotes({})).toEqual([]);
+    expect(await db.getLocalCategories()).toEqual([]);
+    expect((store.json.get('sync-queue.json') as { items: unknown[] }).items).toEqual([]);
+    expect(store.json.get('account.json')).toEqual({ userId: 1 });
+  });
+});

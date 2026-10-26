@@ -738,6 +738,23 @@ export async function clearLocalData(): Promise<void> {
   await saveSyncQueueFile();
 }
 
+// The notes folder holds one account's data. Signing in as a different
+// account must not show, edit or sync the previous account's notes, so the
+// folder records its owner and is emptied when someone else signs in.
+const ACCOUNT_FILENAME = 'account.json';
+
+export async function ensureLocalDataOwner(userId: number): Promise<'kept' | 'claimed' | 'cleared'> {
+  await initDatabase();
+  const account = await window.electron.fs.readJsonFile<{ userId?: unknown }>(ACCOUNT_FILENAME);
+  const owner = typeof account?.userId === 'number' ? account.userId : null;
+  if (owner === userId) return 'kept';
+  if (owner !== null) {
+    await clearLocalData();
+  }
+  await window.electron.fs.writeJsonFile(ACCOUNT_FILENAME, { userId });
+  return owner === null ? 'claimed' : 'cleared';
+}
+
 // Get note counts for categories
 export async function getCategoryCounts(): Promise<Record<string, number>> {
   await initDatabase();
