@@ -26,6 +26,7 @@ function AccountScreen() {
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
@@ -99,9 +100,15 @@ function AccountScreen() {
     }
   }, [user]);
 
+  const needsCurrentPassword = password.length > 0 || (user !== null && email.trim() !== '' && email !== user.email);
+
   const handleSubmit = async () => {
     setError('');
     setSuccess('');
+    if (needsCurrentPassword && !currentPassword) {
+      setError('Enter your current password to change your email or password.');
+      return;
+    }
     setLoading(true);
 
     try {
@@ -109,10 +116,13 @@ function AccountScreen() {
         email: email !== user?.email ? email : undefined,
         fullName: fullName !== user?.fullName ? fullName : undefined,
         password: password || undefined,
+        currentPassword: needsCurrentPassword ? currentPassword : undefined,
       });
-      setSuccess('Account updated successfully!');
+      const message = password ? 'Password changed. Other devices have been signed out.' : 'Account updated successfully!';
+      setSuccess(message);
       setPassword('');
-      Alert.alert('Success', 'Account updated successfully!');
+      setCurrentPassword('');
+      Alert.alert('Success', message);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Update failed';
@@ -331,8 +341,25 @@ function AccountScreen() {
               autoCapitalize="none"
               placeholder="Leave blank to keep current"
               placeholderTextColor={theme.textMuted}
+              textContentType="newPassword"
             />
           </View>
+
+          {needsCurrentPassword ? (
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Current Password</Text>
+              <TextInput
+                style={styles.input}
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+                secureTextEntry
+                autoCapitalize="none"
+                placeholder="Required to change email or password"
+                placeholderTextColor={theme.textMuted}
+                textContentType="password"
+              />
+            </View>
+          ) : null}
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
           {success ? <Text style={styles.success}>{success}</Text> : null}

@@ -23,6 +23,7 @@ export interface UpdateUserDto {
   email?: string;
   fullName?: string;
   password?: string;
+  currentPassword?: string;
 }
 
 export interface AuthResponse {

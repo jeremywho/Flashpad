@@ -39,6 +39,8 @@ public class UpdateUserDto
 
     [StringLength(100, MinimumLength = 6)]
     public string? Password { get; set; }
+
+    public string? CurrentPassword { get; set; }
 }
 
 public class UserResponseDto

@@ -8,6 +8,7 @@ function Account() {
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,6 +19,8 @@ function Account() {
       setFullName(user.fullName || '');
     }
   }, [user]);
+
+  const needsCurrentPassword = password.length > 0 || (user !== null && email.trim() !== '' && email !== user.email);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,9 +33,11 @@ function Account() {
         email: email !== user?.email ? email : undefined,
         fullName: fullName !== user?.fullName ? fullName : undefined,
         password: password || undefined,
+        currentPassword: needsCurrentPassword ? currentPassword : undefined,
       });
-      setSuccess('Account updated successfully!');
+      setSuccess(password ? 'Password changed. Other devices have been signed out.' : 'Account updated successfully!');
       setPassword('');
+      setCurrentPassword('');
 
       // Refresh user data (would require updating AuthContext to refresh the user state)
       await api.getCurrentUser();
@@ -106,8 +111,22 @@ function Account() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 minLength={6}
+                autoComplete="new-password"
               />
             </div>
+            {needsCurrentPassword && (
+              <div className="form-group">
+                <label htmlFor="currentPassword">Current Password</label>
+                <input
+                  id="currentPassword"
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                />
+              </div>
+            )}
             {error && <div className="error">{error}</div>}
             {success && <div className="success">{success}</div>}
             <button type="submit" disabled={loading} className="btn-primary">

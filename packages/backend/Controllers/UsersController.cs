@@ -20,6 +20,12 @@ public class UsersController : ControllerBase
         _context = context;
     }
 
+    private Guid? GetCurrentSessionId()
+    {
+        var sid = User.FindFirst("sid")?.Value ?? User.FindFirst(ClaimTypes.Sid)?.Value;
+        return Guid.TryParse(sid, out var id) ? id : null;
+    }
+
     private int GetCurrentUserId()
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -63,9 +69,21 @@ public class UsersController : ControllerBase
             return NotFound(new { message = "User not found" });
         }
 
-        if (!string.IsNullOrEmpty(dto.Email) && dto.Email != user.Email)
+        var changingEmail = !string.IsNullOrEmpty(dto.Email) && dto.Email != user.Email;
+        var changingPassword = !string.IsNullOrEmpty(dto.Password);
+
+        // The email is a sign-in name and the password is the sign-in secret, so a
+        // signed-in session alone is not enough to change either.
+        if ((changingEmail || changingPassword)
+            && (string.IsNullOrEmpty(dto.CurrentPassword) || !BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.PasswordHash)))
         {
-            if (await _context.Users.AnyAsync(u => u.Email == dto.Email && u.Id != userId))
+            return BadRequest(new { message = "Current password is incorrect" });
+        }
+
+        if (changingEmail)
+        {
+            var emailNormalized = dto.Email!.ToLower();
+            if (await _context.Users.AnyAsync(u => u.Email.ToLower() == emailNormalized && u.Id != userId))
             {
                 return BadRequest(new { message = "Email already in use" });
             }
@@ -77,9 +95,14 @@ public class UsersController : ControllerBase
             user.FullName = dto.FullName;
         }
 
-        if (!string.IsNullOrEmpty(dto.Password))
+        if (changingPassword)
         {
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+            var currentSessionId = GetCurrentSessionId();
+            var now = DateTime.UtcNow;
+            await _context.RefreshSessions
+                .Where(s => s.UserId == userId && s.RevokedAt == null && s.Id != currentSessionId)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, now));
         }
 
         user.UpdatedAt = DateTime.UtcNow;
